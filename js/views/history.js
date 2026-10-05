@@ -1,6 +1,7 @@
 /* Historial: resumen semanal y mensual con gráficos de promedios. */
 
 import { DB, getProfile } from '../db.js';
+import { icon } from '../icons.js';
 import { calcTargets, computeTotals } from '../nutrition.js';
 import { barChart } from '../charts.js';
 import {
@@ -51,8 +52,8 @@ export async function render(root, args, query) {
   root.innerHTML = `
     <h1>Historial</h1>
     <div class="tabs">
-      <button class="tab ${isWeek ? 'active' : ''}" data-tb="semana" type="button">📅 Semana</button>
-      <button class="tab ${!isWeek ? 'active' : ''}" data-tb="mes" type="button">🗓️ Mes</button>
+      <button class="tab ${isWeek ? 'active' : ''}" data-tb="semana" type="button">${icon('calendar')} Semana</button>
+      <button class="tab ${!isWeek ? 'active' : ''}" data-tb="mes" type="button">${icon('calendarDays')} Mes</button>
     </div>
 
     <div class="daynav">
@@ -77,7 +78,7 @@ export async function render(root, args, query) {
       <div class="tiny muted">Promedio total del período: <b>${num(sums.kcal)} kcal</b> · ${num(sums.p)} g proteína · ${num(sums.c)} g carbos · ${num(sums.f)} g grasas</div>
     </div>
 
-    <div class="disclaimer"><span>⚠️</span><span>Valores estimados. Comparar promedios tiene más sentido que fijarse en un solo día.</span></div>
+    <div class="disclaimer"><span>${icon('alert')}</span><span>Valores estimados. Comparar promedios tiene más sentido que fijarse en un solo día.</span></div>
 
     ${isWeek ? weekRows(stat, goal) : monthRows(stat)}
   `;
@@ -138,7 +139,7 @@ function monthRows(stat) {
     <div class="group-title">Días con comidas</div>
     ${withData.length ? withData.slice().reverse().map(s => {
     const d = fromISODate(s.date);
-    const tipo = s.rows.map(m => ICONO_TIPO[m.type] || '').join('');
+    const tipo = s.rows.map(m => icon(ICONO_TIPO[m.type] || 'utensils')).join('');
     return `
       <div class="hrow" data-day="${s.date}">
         <div class="hd"><div class="d1">${DIAS_CORTO[d.getDay()]} ${d.getDate()}</div>
@@ -146,7 +147,7 @@ function monthRows(stat) {
         <div class="hb"><div class="row wrap" style="gap:5px">${macroLine(s, 0)}</div></div>
         <div class="hk">${num(s.kcal)}<small>kcal</small></div>
       </div>`;
-  }).join('') : `<div class="empty"><span class="ico">📊</span><b>Sin comidas en este mes</b>
+  }).join('') : `<div class="empty"><span class="ico">${icon('barChart')}</span><b>Sin comidas en este mes</b>
       <p class="small muted">Registra tu primera comida para ver el resumen.</p>
       <a class="btn btn-outline" href="#/registrar" style="display:inline-flex">Registrar</a></div>`}`;
 }

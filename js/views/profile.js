@@ -1,6 +1,7 @@
 /* Perfil, cálculo de metas y evolución de peso. */
 
 import { DB, getProfile, saveProfile } from '../db.js';
+import { icon } from '../icons.js';
 import { calcTargets, bmr, tdee, ACTIVIDADES, OBJETIVOS, SEXOS } from '../nutrition.js';
 import { lineChart } from '../charts.js';
 import { todayISO, esc, num, toast, confirmSheet, openSheet, fmtShortDate, fromISODate, toISODate, uid, DIAS } from '../util.js';
@@ -19,7 +20,7 @@ export async function render(root) {
     <h1>Mi perfil</h1>
 
     <div class="card">
-      <div class="card-title"><h3>📊 Datos</h3>${isNew ? '<span class="badge warn">nuevo</span>' : ''}</div>
+      <div class="card-title"><h3>${icon('barChart')} Datos</h3>${isNew ? '<span class="badge warn">nuevo</span>' : ''}</div>
       <div class="grid2">
         <label class="field"><span class="lbl">Peso (kg)</span>
           <input id="p-w" type="number" inputmode="decimal" step="0.1" min="25" max="350" value="${esc(p.weight)}" placeholder="78.5"></label>
@@ -34,13 +35,13 @@ export async function render(root) {
         <select id="p-act">${ACTIVIDADES.map(a => `<option value="${a.v}" ${String(p.activity) === String(a.v) ? 'selected' : ''}>${a.l} — ${a.d}</option>`).join('')}</select></label>
       <label class="field"><span class="lbl">Objetivo</span>
         <select id="p-obj">${OBJETIVOS.map(o => `<option value="${o.v}" ${p.objective === o.v ? 'selected' : ''}>${o.l}</option>`).join('')}</select></label>
-      <button class="btn btn-primary btn-lg btn-block" id="p-save" type="button">🧮 Calcular mis metas</button>
+      <button class="btn btn-primary btn-lg btn-block" id="p-save" type="button">${icon('calculator')} Calcular mis metas</button>
       <div class="hint">Las metas se pueden editar a mano después de calcularlas.</div>
     </div>
 
     ${t ? `
     <div class="card">
-      <div class="card-title"><h3>🎯 Mis metas diarias</h3>
+      <div class="card-title"><h3>${icon('target')} Mis metas diarias</h3>
         <span class="badge ${manual ? 'warn' : 'ok'}">${manual ? 'editadas a mano' : 'cálculo automático'}</span></div>
       <div class="macro-hero">
         <div class="big">${num(goal.kcal)}</div><div class="lbl">kcal por día</div>
@@ -76,7 +77,7 @@ export async function render(root) {
     <div class="note">Completa peso, estatura y edad para ver tu gasto calórico y tus metas de macros.</div>`}
 
     <div class="card">
-      <div class="card-title"><h3>⚖️ Evolución de peso</h3><span class="badge">${weights.length} registro${weights.length === 1 ? '' : 's'}</span></div>
+      <div class="card-title"><h3>${icon('scale')} Evolución de peso</h3><span class="badge">${weights.length} registro${weights.length === 1 ? '' : 's'}</span></div>
       <div class="row" style="margin-bottom:12px">
         <input id="w-in" type="number" inputmode="decimal" step="0.1" min="25" max="350" placeholder="Peso de hoy (kg)" value="${esc(currentWeight(weights, p))}">
         <button class="btn btn-primary" id="w-add" type="button" style="flex:none">Registrar</button>
@@ -88,7 +89,7 @@ export async function render(root) {
           <button class="list-item" data-w="${w.id}" type="button">
             <div class="li-main"><div class="li-t">${num(w.kg, 1)} kg</div>
               <div class="li-s">${esc(fmtShortDate(w.date))}${w.note ? ' · ' + esc(w.note) : ''}</div></div>
-            <div class="li-end">✎</div>
+            <div class="li-end">${icon('pencil')}</div>
           </button>`).join('')}
       </div>
       ${!weights.length ? '<p class="tiny muted">Aún no hay registros.</p>' : ''}

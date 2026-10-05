@@ -88,15 +88,21 @@ async function callGemini({ parts, apiKey, model, variant = 0, attempt = 0 }) {
   if (variant < 1 && /2\.5|3\./.test(String(model))) cfg.thinkingConfig = { thinkingBudget: 0 };
 
   let res;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 45000);
   try {
     res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: cfg })
+      body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: cfg }),
+      signal: ctrl.signal
     });
   } catch (e) {
+    if (e && e.name === 'AbortError') throw new AIError('Gemini tardó demasiado en responder. Revisa tu conexión e inténtalo de nuevo.', 'timeout');
     if (!navigator.onLine) throw new AIError('Sin conexión a internet. La app funciona sin red para ver y registrar comidas, pero el análisis con IA requiere internet.', 'sin-internet');
     throw new AIError('No se pudo conectar con Gemini. Revisa tu conexión e inténtalo de nuevo.', 'red');
+  } finally {
+    clearTimeout(timer);
   }
 
   const text = await res.text();
@@ -233,7 +239,7 @@ export async function testApiKey(apiKey, model = 'gemini-3.8-flash') {
       parts: [{ text: 'Responde solo con la palabra OK' }],
       apiKey, model
     });
-    return { ok: true, msg: 'La clave funciona correctamente. ✅' };
+    return { ok: true, msg: 'La clave funciona correctamente.' };
   } catch (e) {
     return { ok: false, msg: e.message || 'Error desconocido.' };
   }

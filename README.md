@@ -205,6 +205,23 @@ Para que nadie más pueda usarla aunque se filtre:
 
 ## 6. Primeros pasos dentro de la app
 
+### 0. Primero: la pantalla de acceso
+
+Al abrir la app aparece un candado local (no usa servidor ni internet). Los datos de fábrica son:
+
+| | |
+|---|---|
+| **Usuario** | `alexsu` |
+| **Contraseña** | `123456` |
+
+- Todo queda **solo en este dispositivo**: no hay cuentas ni datos en la nube.
+- Si te equivocas aparece *“Usuario o contraseña incorrectos.”* y puedes volver a intentarlo.
+- Para salir: **Ajustes → Cerrar sesión**; tus comidas, perfil y ajustes quedan guardados.
+
+> ⚠️ Es un candado para curiosos, **no es seguridad real**: el usuario y la contraseña viajan dentro
+> del código de la app, que cualquiera puede leer en la web. Sirve para que nadie vea tu comida
+> agarrando tu celular, nada más.
+
 1. **Perfil** (pestaña 💪): peso, estatura, edad, sexo, nivel de actividad y objetivo
    (déficit / mantenimiento / superávit).
 2. Pulsa **“🧮 Calcular mis metas”**. Verás:

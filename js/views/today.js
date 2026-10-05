@@ -1,6 +1,7 @@
 /* Panel del día: progreso de metas, comidas registradas y agua. */
 
 import { DB, getProfile, getSettings } from '../db.js';
+import { icon } from '../icons.js';
 import { calcTargets, computeTotals } from '../nutrition.js';
 import {
   todayISO, addDays, dayLabel, relDayTitle, fmtLongDate, TIPOS_COMIDA, ICONO_TIPO,
@@ -46,7 +47,7 @@ export async function render(root, params) {
 
     ${!profile ? `
       <div class="empty">
-        <span class="ico">👋</span>
+        <span class="ico">${icon('heart')}</span>
         <b>Primero configura tu perfil</b>
         <p class="small muted">Necesito tu peso, estatura, edad y objetivo para calcular tus metas diarias de kcal y macros.</p>
         <a class="btn btn-primary" href="#/perfil" style="display:inline-flex">Ir a mi perfil</a>
@@ -74,14 +75,14 @@ export async function render(root, params) {
       </div>
     </div>
 
-    <div class="disclaimer"><span>⚠️</span><span>Los valores son <b>estimaciones</b> (IA + tabla de referencia), no mediciones exactas.</span></div>
+    <div class="disclaimer"><span>${icon('alert')}</span><span>Los valores son <b>estimaciones</b> (IA + tabla de referencia), no mediciones exactas.</span></div>
 
     <div class="hero-actions">
-      <a class="btn btn-primary btn-lg btn-block" href="#/registrar?d=${date}">📷 Registrar comida</a>
+      <a class="btn btn-primary btn-lg btn-block" href="#/registrar?d=${date}">${icon('camera')} Registrar comida</a>
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>💧 Agua</h3><span class="badge">${waterG}/${waterGoal} vasos</span></div>
+      <div class="card-title"><h3>${icon('droplet')} Agua</h3><span class="badge">${waterG}/${waterGoal} vasos</span></div>
       <div class="water">
         <div class="water-glasses" id="glasses"></div>
         <div class="stack" style="flex:none">
@@ -93,11 +94,11 @@ export async function render(root, params) {
     </div>
 
     ${ordered.length ? ordered.map(g => `
-      <div class="group-title">${ICONO_TIPO[g.type]} ${g.type}</div>
+      <div class="group-title">${icon(ICONO_TIPO[g.type])} ${g.type}</div>
       ${g.rows.map(mealCard).join('')}
     `).join('') : `
       <div class="empty">
-        <span class="ico">🍽️</span>
+        <span class="ico">${icon('utensils')}</span>
         <b>${meals.length ? '' : 'Aún no registras comidas este día'}</b>
         <p class="small muted">Toma una foto de tu plato, describe el menú o ingrésalo a mano.</p>
         <a class="btn btn-outline" href="#/registrar?d=${date}" style="display:inline-flex">Registrar ahora</a>
@@ -105,7 +106,7 @@ export async function render(root, params) {
 
     <div class="card tight">
       <div class="spread">
-        <div class="tiny muted">📅 <a href="#/historial">Ver historial semanal y mensual</a></div>
+        <div class="tiny muted">${icon('calendar')} <a href="#/historial">Ver historial semanal y mensual</a></div>
         <div class="tiny muted">${meals.length} comida${meals.length === 1 ? '' : 's'}</div>
       </div>
     </div>
@@ -168,10 +169,10 @@ function mealCard(m) {
   <div class="meal">
     <div class="meal-head">
       ${m.photo ? `<img class="meal-thumb" src="${m.photo}" alt="">`
-      : `<div class="meal-thumb empty">${ICONO_TIPO[m.type] || '🍽️'}</div>`}
+      : `<div class="meal-thumb empty">${icon(ICONO_TIPO[m.type] || 'utensils')}</div>`}
       <div class="meal-main" data-items="${m.id}" role="button" tabindex="0">
         <div class="t">${esc(m.name || 'Plato')}</div>
-        <div class="s">${esc(m.type)} · ${m.items.length} ingrediente${m.items.length === 1 ? '' : 's'}${m.source === 'ia' ? ' · ✨ IA' : ''}${m.favId ? ' · ⭐' : ''}</div>
+        <div class="s">${esc(m.type)} · ${m.items.length} ingrediente${m.items.length === 1 ? '' : 's'}${m.source === 'ia' ? ` · ${icon('sparkles')} IA` : ''}${m.favId ? ` · ${icon('star')}` : ''}</div>
       </div>
       <div class="meal-kcal">${num(t.kcal)}<small>kcal</small></div>
     </div>
@@ -180,7 +181,7 @@ function mealCard(m) {
       <span class="mtag">C <b>${num(t.carbs)} g</b></span>
       <span class="mtag">G <b>${num(t.fat)} g</b></span>
       <span class="mtag">${num(t.grams)} g</span>
-      ${m.note ? `<span class="mtag">📝 ${esc(m.note)}</span>` : ''}
+      ${m.note ? `<span class="mtag">${icon('note')} ${esc(m.note)}</span>` : ''}
     </div>
     <div class="meal-actions">
       <button type="button" data-items="${m.id}">Ver ingredientes</button>

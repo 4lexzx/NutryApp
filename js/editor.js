@@ -1,6 +1,7 @@
 /* Editor de plato: lista de ingredientes 100% editable con recálculo de totales. */
 
 import { TIPOS_COMIDA, ICONO_TIPO, esc, openSheet, $, $$, toast } from './util.js';
+import { icon } from './icons.js';
 import { computeTotals, itemMacros, searchFoods, foodToItem, FOODS } from './nutrition.js';
 
 export function newDraft(overrides = {}) {
@@ -47,7 +48,7 @@ export function mountEditor(root, draft, opts = {}) {
   const renderItems = () => {
     const wrap = q('#ed-items');
     if (!draft.items.length) {
-      wrap.innerHTML = `<div class="empty"><span class="ico">🥗</span><b>Sin ingredientes todavía</b><div class="small muted">Añade alimentos manualmente o usa la IA.</div></div>`;
+      wrap.innerHTML = `<div class="empty"><span class="ico">${icon('utensils')}</span><b>Sin ingredientes todavía</b><div class="small muted">Añade alimentos manualmente o usa la IA.</div></div>`;
     } else {
       wrap.innerHTML = draft.items.map((it, i) => itemRowHTML(it, i)).join('');
       bindRows(wrap);
@@ -151,7 +152,7 @@ function itemRowHTML(it, i) {
   <div class="ing-row" data-i="${i}">
     <div class="ing-top">
       <input class="ing-name" type="text" value="${esc(it.nombre)}" aria-label="Nombre del ingrediente">
-      <button class="ing-del" type="button" title="Quitar ingrediente">✕</button>
+      <button class="ing-del" type="button" title="Quitar ingrediente">${icon('x')}</button>
     </div>
     <div class="ing-grid">
       <label class="f g"><span>gramos</span><input class="num" data-k="g" type="number" inputmode="decimal" min="0" step="1" value="${it.gramos || 0}"></label>
@@ -160,20 +161,20 @@ function itemRowHTML(it, i) {
       <label class="f"><span> carb</span><input class="num" data-k="c" type="number" inputmode="decimal" min="0" step="0.1" value="${roundIt(m.c)}"></label>
       <label class="f"><span>gras</span><input class="num" data-k="f" type="number" inputmode="decimal" min="0" step="0.1" value="${roundIt(m.f)}"></label>
     </div>
-    ${it.nota ? `<div class="tiny muted" style="margin-top:6px">📝 ${esc(it.nota)}</div>` : ''}
+    ${it.nota ? `<div class="tiny muted" style="margin-top:6px">${icon('note')} ${esc(it.nota)}</div>` : ''}
   </div>`;
 }
 
 function editorHTML(draft, opts) {
   return `
-  <div class="disclaimer"><span>⚠️</span><span>Valores <b>estimados</b> por IA o por tabla de referencia. Revisa y corrige porciones antes de guardar.</span></div>
+  <div class="disclaimer"><span>${icon('alert')}</span><span>Valores <b>estimados</b> por IA o por tabla de referencia. Revisa y corrige porciones antes de guardar.</span></div>
 
   <div class="card">
     <div class="card-title"><h2>${draft.id ? 'Editar plato' : 'Nuevo plato'}</h2>
-      ${draft.source ? `<span class="badge ai">${draft.source === 'ia' ? '✨ IA' : draft.source === 'favorito' ? '⭐ Favorito' : draft.source === 'texto' ? '📝 Texto' : '✋ Manual'}</span>` : ''}
+      ${draft.source ? `<span class="badge ai">${draft.source === 'ia' ? `${icon('sparkles')} IA` : draft.source === 'favorito' ? `${icon('star')} Favorito` : draft.source === 'texto' ? `${icon('note')} Texto` : `${icon('pencil')} Manual`}</span>` : ''}
     </div>
     <div class="chips big" style="margin-bottom:12px">
-      ${TIPOS_COMIDA.map(t => `<button type="button" class="chip ${draft.type === t ? 'active' : ''}" data-type="${t}">${ICONO_TIPO[t]} ${t}</button>`).join('')}
+      ${TIPOS_COMIDA.map(t => `<button type="button" class="chip ${draft.type === t ? 'active' : ''}" data-type="${t}">${icon(ICONO_TIPO[t])} ${t}</button>`).join('')}
     </div>
     <label class="field"><span class="lbl">Nombre del plato</span>
       <input id="ed-name" type="text" placeholder="Ej. Lomo saltado con arroz" value="${esc(draft.name || '')}"></label>
@@ -182,7 +183,7 @@ function editorHTML(draft, opts) {
 
     <div class="row" style="gap:12px;align-items:flex-start">
       <div class="grow">
-        <div id="ed-photo-empty" class="empty" style="padding:18px 10px"><span class="ico">📷</span><span class="small">Sin foto</span></div>
+        <div id="ed-photo-empty" class="empty" style="padding:18px 10px"><span class="ico">${icon('camera')}</span><span class="small">Sin foto</span></div>
         <img id="ed-thumb" class="photo-preview hidden" alt="Foto del plato">
         <button id="ed-photo-remove" class="btn btn-sm btn-ghost hidden" type="button">Quitar foto</button>
       </div>
@@ -206,10 +207,10 @@ function editorHTML(draft, opts) {
   </div>
 
   <div class="col" style="margin-top:14px">
-    <button id="ed-save" class="btn btn-primary btn-lg btn-block" type="button">💾 Guardar en el día</button>
+    <button id="ed-save" class="btn btn-primary btn-lg btn-block" type="button">${icon('save')} Guardar en el día</button>
     <div class="grid2">
-      <button id="ed-fav" class="btn btn-outline" type="button">⭐ Guardar favorito</button>
-      ${opts.onDelete ? '<button id="ed-del" class="btn btn-danger" type="button">🗑 Eliminar</button>' : '<span></span>'}
+      <button id="ed-fav" class="btn btn-outline" type="button">${icon('star')} Guardar favorito</button>
+      ${opts.onDelete ? `<button id="ed-del" class="btn btn-danger" type="button">${icon('trash')} Eliminar</button>` : '<span></span>'}
     </div>
     <p class="tiny muted center">Se guardará en: <b>${esc(draft.date || '')}</b> · ${esc(draft.type)}</p>
   </div>`;
@@ -223,7 +224,7 @@ export function openAddSheet(draft, onChange) {
       <input id="ad-q" type="search" placeholder="Ej. arroz, pollo, lomo saltado…" autocomplete="off"></label>
     <div id="ad-list"></div>
     <div class="grid2" style="margin-top:10px">
-      <button class="btn btn-outline" id="ad-custom" type="button">✎ Personalizado</button>
+      <button class="btn btn-outline" id="ad-custom" type="button">${icon('pencil')} Personalizado</button>
       <button class="btn btn-ghost" id="ad-close" type="button">Cerrar</button>
     </div>`);
 

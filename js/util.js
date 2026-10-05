@@ -5,7 +5,9 @@ export const MESES_CORTO = ['ene','feb','mar','abr','may','jun','jul','ago','sep
 export const DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 export const DIAS_CORTO = ['dom','lun','mar','mié','jue','vie','sáb'];
 export const TIPOS_COMIDA = ['desayuno', 'almuerzo', 'cena', 'snack'];
-export const ICONO_TIPO = { desayuno: '🌅', almuerzo: '🍽️', cena: '🌙', snack: '🍎' };
+import { icon } from './icons.js';
+
+export const ICONO_TIPO = { desayuno: 'sunrise', almuerzo: 'utensils', cena: 'moon', snack: 'apple' };
 
 export function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -83,7 +85,7 @@ export function toast(msg, type = '') {
   if (!root) return;
   const el = document.createElement('div');
   el.className = 'toast ' + type;
-  const ico = type === 'ok' ? '✅' : type === 'err' ? '⚠️' : type === 'warn' ? '⚠️' : 'ℹ️';
+  const ico = type === 'ok' ? icon('checkCircle') : (type === 'err' || type === 'warn') ? icon('alert') : icon('info');
   el.innerHTML = `<span>${ico}</span><span>${esc(msg)}</span>`;
   root.appendChild(el);
   clearTimeout(toastTimer);

@@ -2,12 +2,15 @@
 
 import { getSettings, DB } from './db.js';
 import { toast } from './util.js';
+import { seedUsers, isAuthed } from './auth.js';
+import { icon } from './icons.js';
 import * as today from './views/today.js';
 import * as log from './views/log.js';
 import * as history from './views/history.js';
 import * as profile from './views/profile.js';
 import * as settings from './views/settings.js';
 import * as ia from './views/ia.js';
+import * as login from './views/login.js';
 
 const view = () => document.getElementById('view');
 
@@ -30,6 +33,22 @@ async function route() {
   const { path, query } = parseHash();
   const name = path[0] || 'hoy';
   const root = view();
+
+  await seedUsers();
+  if (!isAuthed()) {
+    document.body.classList.add('locked');
+    document.querySelectorAll('[data-nav]').forEach(a => a.classList.remove('active'));
+    if (root.querySelector('#auth-form')) return;
+    root.innerHTML = '';
+    window.scrollTo(0, 0);
+    await login.render(root, () => {
+      document.body.classList.remove('locked');
+      if (!location.hash) location.hash = '#/hoy';
+      route();
+    });
+    return;
+  }
+  document.body.classList.remove('locked');
 
   document.querySelectorAll('[data-nav]').forEach(a => {
     a.classList.toggle('active', a.dataset.nav === (NAV_OF[name] || 'hoy'));
@@ -71,9 +90,13 @@ async function applyTheme() {
   const theme = s.theme === 'light' ? 'light' : 'dark';
   document.documentElement.dataset.theme = theme;
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', theme === 'dark' ? '#0b1220' : '#f2f5fa');
+  if (meta) meta.setAttribute('content', theme === 'dark' ? '#000000' : '#f2f2f7');
   const btn = document.getElementById('btn-theme');
-  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+  if (btn) {
+    btn.innerHTML = icon(theme === 'dark' ? 'sun' : 'moon');
+    btn.setAttribute('aria-label', theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro');
+    btn.setAttribute('title', btn.getAttribute('aria-label'));
+  }
   return theme;
 }
 
@@ -91,7 +114,7 @@ function setupInstall() {
     window.__nutriInstall = null;
     const b = document.getElementById('btn-install');
     if (b) b.classList.add('hidden');
-    toast('¡Nutri Gym instalada! 🎉', 'ok');
+    toast('Nutri Gym instalada en tu dispositivo.', 'ok');
   });
   const b = document.getElementById('btn-install');
   if (b) b.onclick = async () => {
@@ -156,7 +179,7 @@ async function init() {
     const { saveSettings } = await import('./db.js');
     await saveSettings({ theme: next });
     applyTheme();
-    toast(next === 'dark' ? 'Tema oscuro 🌙' : 'Tema claro ☀️', 'ok');
+    toast(next === 'dark' ? 'Tema oscuro' : 'Tema claro', 'ok');
   };
 
   window.addEventListener('hashchange', route);

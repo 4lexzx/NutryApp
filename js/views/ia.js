@@ -1,6 +1,7 @@
 /* Instrucciones de la IA (prompt editable que se envía a Gemini). */
 
 import { getPrompt, savePrompt, getSettings, saveSettings } from '../db.js';
+import { icon } from '../icons.js';
 import { DEFAULT_PROMPT, promptHelpHTML, testApiKey, modelOptions } from '../ai.js';
 import { esc, toast, confirmSheet, openSheet } from '../util.js';
 
@@ -12,22 +13,22 @@ export async function render(root) {
   root.innerHTML = `
     <div class="spread" style="margin-bottom:12px">
       <div><h1>Instrucciones de la IA</h1><div class="tiny muted">Prompt que recibe Gemini en cada análisis</div></div>
-      <a class="btn btn-sm btn-ghost" href="#/ajustes">← Ajustes</a>
+      <a class="btn btn-sm btn-ghost" href="#/ajustes">${icon('chevronLeft')} Ajustes</a>
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>📝 Mi prompt</h3>
+      <div class="card-title"><h3>${icon('note')} Mi prompt</h3>
         <span class="badge ${saved ? 'ok' : ''}">${saved ? 'personalizado' : 'predeterminado'}</span></div>
       <textarea id="ia-prompt" rows="16" spellcheck="false">${esc(current)}</textarea>
       <div class="col" style="margin-top:12px">
-        <button class="btn btn-primary btn-block" id="ia-save" type="button">💾 Guardar instrucciones</button>
-        <button class="btn btn-block" id="ia-reset" type="button">↺ Restaurar el predeterminado</button>
+        <button class="btn btn-primary btn-block" id="ia-save" type="button">${icon('save')} Guardar instrucciones</button>
+        <button class="btn btn-block" id="ia-reset" type="button">${icon('refresh')} Restaurar el predeterminado</button>
       </div>
       <div class="hint">Se guardan <b>solo en tu celular</b>. Se usan únicamente cuando tocas “Analizar con la IA”.</div>
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>🔑 API key y modelo</h3></div>
+      <div class="card-title"><h3>${icon('key')} API key y modelo</h3></div>
       <label class="field"><span class="lbl">Modelo</span>
         <select id="ia-model">
           ${modelOptions().map(m => `<option value="${m.v}" ${settings.model === m.v ? 'selected' : ''}>${m.l}</option>`).join('')}
@@ -43,12 +44,12 @@ export async function render(root) {
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>❓ Cómo funciona</h3></div>
+      <div class="card-title"><h3>${icon('help')} Cómo funciona</h3></div>
       ${promptHelpHTML()}
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>🚀 Conseguir una key gratis (paso a paso)</h3></div>
+      <div class="card-title"><h3>${icon('key')} Conseguir una key gratis (paso a paso)</h3></div>
       <ol class="small muted" style="padding-left:20px;line-height:1.8">
         <li>Entra a <b>aistudio.google.com</b> con tu cuenta de Google (no necesita tarjeta).</li>
         <li>Busca <b>“Get API key” / “Obtener clave de API”</b> (botón arriba a la izquierda).</li>
@@ -59,8 +60,8 @@ export async function render(root) {
         <li>En <b>API restrictions</b> deja solo <b>Gemini API</b>.</li>
         <li>NUNCA actives la facturación: sin ella solo usas la cuota gratuita (costo $0).</li>
       </ol>
-      <div class="note">⚠️ Si más adelante activas facturas, fija un <b>presupuesto de alertas</b> en Google Cloud (Billing → Budgets).</div>
-      <a class="btn btn-outline btn-block" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Abrir Google AI Studio ↗</a>
+      <div class="note">${icon('alert')} Si más adelante activas facturas, fija un <b>presupuesto de alertas</b> en Google Cloud (Billing → Budgets).</div>
+      <a class="btn btn-outline btn-block" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">${icon('external')} Abrir Google AI Studio</a>
     </div>
   `;
 
@@ -103,7 +104,7 @@ export async function render(root) {
     out.textContent = '';
     const r = await testApiKey(key, root.querySelector('#ia-model').value);
     btn.disabled = false; btn.textContent = 'Probar';
-    out.innerHTML = r.ok ? `<span style="color:var(--brand)">✅ ${esc(r.msg)}</span>` : `<span style="color:#ff9a9a">⚠️ ${esc(r.msg)}</span>`;
+    out.innerHTML = r.ok ? `<span style="color:var(--brand)">${icon('checkCircle')} ${esc(r.msg)}</span>` : `<span style="color:#ff9a9a">${icon('alert')} ${esc(r.msg)}</span>`;
     toast(r.msg, r.ok ? 'ok' : 'err');
   };
 }

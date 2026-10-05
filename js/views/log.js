@@ -1,6 +1,7 @@
 /* Registro de comidas: foto + IA, texto, manual y favoritos. También editor. */
 
 import { DB, getSettings, getProfile, getPrompt } from '../db.js';
+import { icon } from '../icons.js';
 import { analyzeMeal, DEFAULT_PROMPT } from '../ai.js';
 import { mountEditor, newDraft, openAddSheet, pickGrams } from '../editor.js';
 import { calcTargets, computeTotals, searchFoods, FOODS } from '../nutrition.js';
@@ -28,15 +29,15 @@ export async function renderStart(root, args, query) {
     </div>
 
     <div class="tabs" id="lg-tabs">
-      <button class="tab ${state.tab === 'foto' ? 'active' : ''}" data-tab="foto" type="button">📷 Foto</button>
-      <button class="tab ${state.tab === 'texto' ? 'active' : ''}" data-tab="texto" type="button">📝 Texto</button>
-      <button class="tab ${state.tab === 'manual' ? 'active' : ''}" data-tab="manual" type="button">✋ Manual</button>
-      <button class="tab ${state.tab === 'favoritos' ? 'active' : ''}" data-tab="fav" type="button">⭐</button>
+      <button class="tab ${state.tab === 'foto' ? 'active' : ''}" data-tab="foto" type="button">${icon('camera')} Foto</button>
+      <button class="tab ${state.tab === 'texto' ? 'active' : ''}" data-tab="texto" type="button">${icon('note')} Texto</button>
+      <button class="tab ${state.tab === 'manual' ? 'active' : ''}" data-tab="manual" type="button">${icon('pencil')} Manual</button>
+      <button class="tab ${state.tab === 'favoritos' ? 'active' : ''}" data-tab="fav" type="button">${icon('star')}</button>
     </div>
 
     <div id="lg-body"></div>
 
-    ${!hasKey ? `<div class="note">🔑 <b>Todavía no configuraste Gemini.</b> La app funciona igual para registrar
+    ${!hasKey ? `<div class="note">${icon('key')} <b>Todavía no configuraste Gemini.</b> La app funciona igual para registrar
       comidas <b>manual</b> o desde <b>favoritos</b> sin gastar cuota. Si quieres el análisis automático con IA,
       ve a <a href="#/ajustes">Ajustes → IA</a> y pega tu API key.<br><a href="#/ia">Cómo obtener una key gratis →</a></div>` : ''}
   `;
@@ -57,21 +58,21 @@ export async function renderStart(root, args, query) {
 function renderFoto(body, date, hasKey) {
   body.innerHTML = `
     <div class="card">
-      <div class="card-title"><h3>📷 Foto del plato</h3>${state.photo ? '<span class="badge ok">Foto lista</span>' : ''}</div>
+      <div class="card-title"><h3>${icon('camera')} Foto del plato</h3>${state.photo ? '<span class="badge ok">Foto lista</span>' : ''}</div>
       <div class="grid2" style="margin-bottom:10px">
-        <button class="btn btn-lg btn-primary" id="f-shot" type="button">📸 Tomar foto</button>
-        <button class="btn btn-lg" id="f-gal" type="button">🖼️ Galería</button>
+        <button class="btn btn-lg btn-primary" id="f-shot" type="button">${icon('camera')} Tomar foto</button>
+        <button class="btn btn-lg" id="f-gal" type="button">${icon('image')} Galería</button>
       </div>
       ${state.photo ? `<img class="photo-preview" src="${state.photo}" alt="Plato">` :
-      `<div class="empty" style="padding:22px 12px"><span class="ico">🍽️</span><span class="small">Sube una foto o escribe el plato abajo</span></div>`}
+      `<div class="empty" style="padding:22px 12px"><span class="ico">${icon('utensils')}</span><span class="small">Sube una foto o escribe el plato abajo</span></div>`}
       <label class="field" style="margin-top:12px"><span class="lbl">Descripción opcional (mejora la precisión)</span>
         <textarea id="f-desc" rows="2" placeholder="Ej. almuerzo de gimnasio, con poco arroz y doble presa de pollo">${esc(state.desc)}</textarea></label>
-      <button class="btn btn-accent btn-lg btn-block" id="f-go" type="button">✨ Analizar con la IA</button>
+      <button class="btn btn-accent btn-lg btn-block" id="f-go" type="button">${icon('sparkles')} Analizar con la IA</button>
       ${!hasKey ? `<div class="hint">Necesitas tu API key: <a href="#/ajustes">Ajustes → IA</a>.</div>` : ''}
       <div class="hint">La foto se envía <b>solo</b> a Google Gemini para el análisis; no se sube a ningún otro servidor.</div>
     </div>
     <div class="hero-actions">
-      <button class="btn btn-block" id="f-manual" type="button">✋ Escribir / ingresar a mano</button>
+      <button class="btn btn-block" id="f-manual" type="button">${icon('pencil')} Escribir / ingresar a mano</button>
     </div>
   `;
   body.querySelector('#f-desc').oninput = e => { state.desc = e.target.value; };
@@ -84,10 +85,10 @@ function renderFoto(body, date, hasKey) {
 function renderTexto(body, date, hasKey) {
   body.innerHTML = `
     <div class="card">
-      <div class="card-title"><h3>📝 Describe tu plato</h3></div>
+      <div class="card-title"><h3>${icon('note')} Describe tu plato</h3></div>
       <label class="field"><span class="lbl">¿Qué comiste?</span>
         <textarea id="t-desc" rows="4" placeholder="Ej. 1 lomo saltado con arroz (poco), 1 vaso de chicha morada, 1 presa de pollo a la brasa">${esc(state.desc)}</textarea></label>
-      <button class="btn btn-accent btn-lg btn-block" id="t-go" type="button">✨ Analizar con la IA</button>
+      <button class="btn btn-accent btn-lg btn-block" id="t-go" type="button">${icon('sparkles')} Analizar con la IA</button>
       ${!hasKey ? `<div class="hint">Necesitas tu API key: <a href="#/ajustes">Ajustes → IA</a>.</div>` : ''}
       <div class="hint">No consume fotos (usa menos cuota). También puedes guardar sin IA desde la pestaña “Manual”.</div>
     </div>`;
@@ -103,7 +104,7 @@ function renderManual(body, date) {
   const draw = () => {
     body.innerHTML = `
       <div class="card">
-        <div class="card-title"><h3>✋ Ingresar alimentos a mano</h3>
+        <div class="card-title"><h3>${icon('pencil')} Ingresar alimentos a mano</h3>
           <span class="badge">${state.draft.items.length} ingrediente${state.draft.items.length === 1 ? '' : 's'}</span></div>
         <label class="field"><span class="lbl">Buscar alimento</span>
           <input id="m-q" type="search" placeholder="Ej. arroz, pollo, lomo saltado…" autocomplete="off"></label>
@@ -141,7 +142,7 @@ function renderFavoritos(body, date, favorites) {
   state.draft.date = date;
   body.innerHTML = `
     <div class="card">
-      <div class="card-title"><h3>⭐ Tus platos guardados</h3>
+      <div class="card-title"><h3>${icon('star')} Tus platos guardados</h3>
         <span class="badge">${favorites.length}</span></div>
       <p class="tiny muted">Reutilizar un favorito <b>no gasta consultas</b> a la IA.</p>
       ${favorites.length ? favorites.map(f => {
@@ -151,7 +152,7 @@ function renderFavoritos(body, date, favorites) {
             <div class="li-s">${num(t.kcal)} kcal · P ${t.protein} · C ${t.carbs} · G ${t.fat} · ${f.items.length} ingred.</div></div>
           <div class="li-end">Usar<br><span class="tiny">⋯</span></div>
         </button>`;
-  }).join('') : `<div class="empty"><span class="ico">⭐</span><b>No tienes favoritos aún</b>
+  }).join('') : `<div class="empty"><span class="ico">${icon('star')}</span><b>No tienes favoritos aún</b>
         <p class="small muted">Guarda un plato desde el editor (botón “Guardar favorito”) y aquí aparecerá.</p></div>`}
     </div>`;
   body.querySelectorAll('[data-f]').forEach(b => b.onclick = () => {
@@ -166,7 +167,7 @@ function useFavorite(f, date, body) {
     <h2>${esc(f.name)}</h2>
     <p class="small muted">¿A qué comida la asignamos?</p>
     <div class="chips big" id="uf-t">
-      ${TIPOS_COMIDA.map(t => `<button class="chip ${guessType() === t ? 'active' : ''}" data-t="${t}" type="button">${ICONO_TIPO[t]} ${t}</button>`).join('')}
+      ${TIPOS_COMIDA.map(t => `<button class="chip ${guessType() === t ? 'active' : ''}" data-t="${t}" type="button">${icon(ICONO_TIPO[t])} ${t}</button>`).join('')}
     </div>
     <div class="grid2" style="margin-top:14px">
       <button class="btn btn-primary" id="uf-ok" type="button">Cargar y editar</button>
@@ -269,7 +270,7 @@ async function runAI({ date, hasKey, usePhoto }) {
           <button class="btn btn-primary btn-block" id="ai-retry" type="button">Reintentar</button>
           <a class="btn btn-block" href="#/registrar?d=${date}">Elegir otra opción</a>
           <a class="btn btn-ghost btn-block" href="#/ajustes">Ir a Ajustes → IA</a>
-          <button class="btn btn-ghost btn-block" id="ai-manual" type="button">✋ Ingresar a mano (sin IA)</button>
+          <button class="btn btn-ghost btn-block" id="ai-manual" type="button">${icon('pencil')} Ingresar a mano (sin IA)</button>
         </div>
       </div>`;
     body.querySelector('#ai-retry').onclick = () => runAI({ date, hasKey, usePhoto });
@@ -359,5 +360,5 @@ async function saveFav(draft) {
     createdAt: existing ? existing.createdAt : Date.now()
   };
   await DB.put('favorites', fav);
-  toast('Guardado en favoritos ⭐ (sin costo de IA).', 'ok');
+  toast('Guardado en favoritos (sin costo de IA).', 'ok');
 }

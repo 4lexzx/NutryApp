@@ -1,9 +1,11 @@
 /* Ajustes: instalación, tema, IA, agua, respaldo y datos. */
 
 import { DB, getSettings, saveSettings, getProfile, getPrompt } from '../db.js';
+import { icon } from '../icons.js';
 import { exportMealsCSV, exportWeightsCSV, exportBackup, importBackup, backupSummary, dataHelpHTML } from '../export.js';
 import { testApiKey, modelOptions } from '../ai.js';
 import { esc, toast, confirmSheet, pickFile, downloadFile, todayISO } from '../util.js';
+import { clearSession, currentUser } from '../auth.js';
 
 const VERSION = '1.0.0';
 
@@ -17,26 +19,26 @@ export async function render(root) {
     <h1>Ajustes</h1>
 
     <div class="card">
-      <div class="card-title"><h3>📲 Instalar en tu celular</h3></div>
+      <div class="card-title"><h3>${icon('smartphone')} Instalar en tu celular</h3></div>
       <p class="small muted">Esta es una PWA: se instala como una app normal, con ícono propio y pantalla completa,
         pero sin pasar por la Play Store.</p>
       <div class="col">
-        <button class="btn btn-primary btn-block" id="s-install" type="button">⬇ Instalar Nutri Gym</button>
+        <button class="btn btn-primary btn-block" id="s-install" type="button">${icon('download')} Instalar Nutri Gym</button>
         <div class="tiny muted" id="s-install-hint">Si no está disponible, abre esta página con <b>Chrome</b> → menú ⋮ →
           <b>“Instalar aplicación” / “Añadir a pantalla de inicio”</b>.</div>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>🎨 Apariencia</h3></div>
+      <div class="card-title"><h3>${icon('sliders')} Apariencia</h3></div>
       <div class="row">
-        <button class="btn btn-block ${s.theme === 'dark' ? 'btn-primary' : ''}" data-theme="dark" type="button">🌙 Oscuro</button>
-        <button class="btn btn-block ${s.theme === 'light' ? 'btn-primary' : ''}" data-theme="light" type="button">☀️ Claro</button>
+        <button class="btn btn-block ${s.theme === 'dark' ? 'btn-primary' : ''}" data-theme="dark" type="button">${icon('moon')} Oscuro</button>
+        <button class="btn btn-block ${s.theme === 'light' ? 'btn-primary' : ''}" data-theme="light" type="button">${icon('sun')} Claro</button>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>🤖 Inteligencia artificial</h3>
+      <div class="card-title"><h3>${icon('bot')} Inteligencia artificial</h3>
         <span class="badge ${s.apiKey ? 'ok' : 'warn'}">${s.apiKey ? 'key configurada' : 'sin key'}</span></div>
       <label class="field"><span class="lbl">Modelo</span>
         <select id="s-model">${modelOptions().map(m => `<option value="${m.v}" ${s.model === m.v ? 'selected' : ''}>${m.l}</option>`).join('')}</select></label>
@@ -53,7 +55,7 @@ export async function render(root) {
       <div class="spread">
         <div>
           <b class="small">Instrucciones de la IA</b>
-          <div class="tiny muted">${promptSaved ? 'Prompt personalizado ✓' : 'Usando el predeterminado (comida peruana)'}</div>
+          <div class="tiny muted">${promptSaved ? `${icon('check')} Prompt personalizado` : 'Usando el predeterminado (comida peruana)'}</div>
         </div>
         <a class="btn btn-sm btn-outline" href="#/ia">Editar</a>
       </div>
@@ -62,42 +64,58 @@ export async function render(root) {
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>💧 Agua</h3></div>
+      <div class="card-title"><h3>${icon('droplet')} Agua</h3></div>
       <label class="field"><span class="lbl">Vasos por día (1 vaso = 250 ml)</span>
         <input id="s-water" type="number" inputmode="numeric" min="0" max="30" value="${s.waterGoal}"></label>
       <button class="btn btn-sm btn-primary" id="s-water-save" type="button">Guardar meta de agua</button>
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>💾 Datos y respaldo</h3></div>
+      <div class="card-title"><h3>${icon('save')} Datos y respaldo</h3></div>
       <div class="statgrid" style="margin-bottom:12px">
         <div class="stat"><div class="v">${summary.meals}</div><div class="k">comidas</div></div>
         <div class="stat"><div class="v">${summary.weights}</div><div class="k">pesos</div></div>
         <div class="stat"><div class="v">${summary.favorites}</div><div class="k">favoritos</div></div>
-        <div class="stat"><div class="v">${prof ? '✓' : '—'}</div><div class="k">perfil</div></div>
+        <div class="stat"><div class="v">${prof ? icon('check') : '—'}</div><div class="k">perfil</div></div>
       </div>
       ${dataHelpHTML()}
       <div class="col">
-        <button class="btn btn-primary btn-block" id="s-backup" type="button">⬇ Descargar respaldo (.json)</button>
-        <button class="btn btn-block" id="s-restore" type="button">⬆ Restaurar desde archivo</button>
+        <button class="btn btn-primary btn-block" id="s-backup" type="button">${icon('download')} Descargar respaldo (.json)</button>
+        <button class="btn btn-block" id="s-restore" type="button">${icon('upload')} Restaurar desde archivo</button>
         <div class="grid2">
           <button class="btn btn-sm" id="s-csv1" type="button">CSV comidas</button>
           <button class="btn btn-sm" id="s-csv2" type="button">CSV pesos</button>
         </div>
-        <button class="btn btn-sm btn-ghost" id="s-csvall" type="button">📄 Exportar todo en un CSV maestro</button>
+        <button class="btn btn-sm btn-ghost" id="s-csvall" type="button">${icon('file')} Exportar todo en un CSV maestro</button>
         <div class="divider"></div>
-        <button class="btn btn-danger btn-block" id="s-clear" type="button">🗑 Borrar TODOS los datos</button>
+        <button class="btn btn-danger btn-block" id="s-clear" type="button">${icon('trash')} Borrar TODOS los datos</button>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>ℹ️ Acerca de</h3></div>
+      <div class="card-title"><h3>${icon('user')} Cuenta</h3></div>
+      <div class="spread" style="margin-bottom:14px">
+        <div class="row">
+          <div>
+            <b class="small">${esc(currentUser() || 'invitado')}</b>
+            <div class="tiny muted">Sesión activa en este dispositivo</div>
+          </div>
+        </div>
+        <span class="badge ok">${icon('lock')} local</span>
+      </div>
+      <button class="btn btn-danger btn-block" id="s-logout" type="button">${icon('logout')} Cerrar sesión</button>
+      <p class="tiny muted" style="margin-top:10px">Al cerrar sesión volverás a la pantalla de acceso.
+        Tus comidas y ajustes <b>siguen guardados</b> en el teléfono.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><h3>${icon('info')} Acerca de</h3></div>
       <p class="small muted">Nutri Gym v${VERSION} · PWA 100% local.<br>
       Tus datos (perfil, comidas, historial) viven <b>en este celular</b>. No hay cuentas ni servidores propios;
       la única conexión externa es la consulta opcional a Gemini (Google) cuando usas la IA.</p>
-      <div class="note">⚠️ Los valores nutricionales son <b>estimaciones</b> generadas por IA y tablas de referencia.
+      <div class="note">${icon('alert')} Los valores nutricionales son <b>estimaciones</b> generadas por IA y tablas de referencia.
         No sustituyen la opinión de un nutricionista.</div>
-      <div class="note danger">🔒 Consejo: haz un <b>respaldo .json</b> al menos una vez por semana y guárdalo en
+      <div class="note danger">${icon('lock')} Consejo: haz un <b>respaldo .json</b> al menos una vez por semana y guárdalo en
         Google Drive, tu PC o por correo. Si borras los datos del navegador, se pierde el historial.</div>
     </div>
   `;
@@ -112,7 +130,7 @@ export async function render(root) {
       instHint.textContent = 'Toca el botón y confirma “Instalar”. La app quedará en tu pantalla de inicio.';
     } else if (window.matchMedia('(display-mode: standalone)').matches) {
       instBtn.disabled = true;
-      instBtn.textContent = '✅ Ya está instalada';
+      instBtn.innerHTML = icon('check') + ' Ya está instalada';
     } else {
       instBtn.disabled = false;
     }
@@ -135,7 +153,7 @@ export async function render(root) {
   root.querySelectorAll('[data-theme]').forEach(b => b.onclick = async () => {
     await saveSettings({ theme: b.dataset.theme });
     document.documentElement.dataset.theme = b.dataset.theme;
-    document.querySelector('meta[name="theme-color"]').setAttribute('content', b.dataset.theme === 'dark' ? '#0b1220' : '#f2f5fa');
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', b.dataset.theme === 'dark' ? '#000000' : '#f2f2f7');
     toast('Tema cambiado.', 'ok');
     render(root);
   });
@@ -167,7 +185,7 @@ export async function render(root) {
     btn.disabled = true; btn.textContent = 'Probando…'; res.textContent = '';
     const r = await testApiKey(key, root.querySelector('#s-model').value);
     btn.disabled = false; btn.textContent = 'Probar clave';
-    res.innerHTML = r.ok ? `<span style="color:var(--brand)">✅ ${esc(r.msg)}</span>` : `<span style="color:#ff9a9a">⚠️ ${esc(r.msg)}</span>`;
+    res.innerHTML = r.ok ? `<span style="color:var(--brand)">${icon('checkCircle')} ${esc(r.msg)}</span>` : `<span style="color:#ff9a9a">${icon('alert')} ${esc(r.msg)}</span>`;
   };
 
   /* agua */
@@ -178,6 +196,18 @@ export async function render(root) {
   };
 
   /* datos */
+  root.querySelector('#s-logout').onclick = async () => {
+    const ok = await confirmSheet({
+      title: '¿Cerrar sesión?',
+      msg: 'Volverás a la pantalla de acceso. Tus datos quedan guardados en este dispositivo.',
+      okText: 'Cerrar sesión'
+    });
+    if (!ok) return;
+    clearSession();
+    location.hash = '#/hoy';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    toast('Sesión cerrada.', 'ok');
+  };
   root.querySelector('#s-backup').onclick = async () => {
     try { await exportBackup(); toast('Respaldo descargado. Guárdalo en un lugar seguro.', 'ok'); }
     catch (e) { toast('No se pudo generar el respaldo: ' + e.message, 'err'); }
