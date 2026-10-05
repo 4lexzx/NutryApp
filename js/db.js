@@ -136,7 +136,7 @@ export const DB = {
 export const DEFAULT_SETTINGS = {
   k: 'settings',
   apiKey: '',
-  model: 'gemini-2.5-flash',
+  model: 'gemini-3.8-flash',
   theme: 'dark',
   waterGoal: 8,
   disclaimerSeen: false
@@ -144,7 +144,13 @@ export const DEFAULT_SETTINGS = {
 
 export async function getSettings() {
   const s = await DB.kvGet('settings');
-  return Object.assign({}, DEFAULT_SETTINGS, s || {});
+  const merged = Object.assign({}, DEFAULT_SETTINGS, s || {});
+  // migración: gemini-2.5-flash ya no está disponible para cuentas nuevas
+  if (merged.model === 'gemini-2.5-flash') {
+    merged.model = 'gemini-3.8-flash';
+    await DB.kvSet(merged);
+  }
+  return merged;
 }
 export async function saveSettings(patch) {
   const cur = await getSettings();

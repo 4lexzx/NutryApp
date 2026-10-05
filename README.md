@@ -321,7 +321,7 @@ Crea un contenedor nativo con `npm create @capacitor/app` y apunta la URL de Git
 | *“Tu API key no es válida”* | Copia la clave completa (`AIza…`) en Ajustes → IA → **Guardar** → **Probar clave**. Si cambiaste de clave, borra la anterior primero. |
 | *“403 / restringida a otro dominio”* | La key está restringida a un dominio distinto: edita las **HTTP referrers** en Google AI Studio o quita la restricción. |
 | *“Límite alcanzado”* | Es la **cuota gratuita** (≈10/min y ~250/día). Espera 1 minuto (o al día siguiente). Mientras tanto puedes registrar **manual**. |
-| *“El modelo no existe”* | Cambia el modelo en Ajustes → IA (usa `gemini-2.5-flash`). |
+| *“El modelo no existe”* | Cambia el modelo en Ajustes → IA (usa `gemini-3.8-flash`). |
 | *“Sin conexión a internet”* | El análisis con IA necesita red. Ver historial/registrar manual funciona igual sin internet. |
 | La app no instala | Úsala en **Chrome** (no en Firefox/Samsung Internet si no ofrece instalar) y con **HTTPS** (GitHub Pages sí). O usa ⋮ → *Añadir a pantalla de inicio*. |
 | Se ve rara al abrir | Recarga: menú ⋮ → **Actualizar**. |

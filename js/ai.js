@@ -45,8 +45,7 @@ export class AIError extends Error {
 }
 
 const MODELS = [
-  { v: 'gemini-2.5-flash', l: 'gemini-2.5-flash (recomendado, estable)' },
-  { v: 'gemini-3.8-flash', l: 'gemini-3.8-flash (nuevo)' },
+  { v: 'gemini-3.8-flash', l: 'gemini-3.8-flash (recomendado)' },
   { v: 'gemini-3.7-flash', l: 'gemini-3.7-flash' },
   { v: 'gemini-3.5-flash', l: 'gemini-3.5-flash' },
   { v: 'gemini-flash-latest', l: 'gemini-flash-latest (último)' },
@@ -61,7 +60,7 @@ function friendlyError(status, bodyText, kind) {
   const low = (apiMsg + ' ' + (kind || '')).toLowerCase();
 
   if (status === 400 && /api key|api_key|invalid/.test(low)) {
-    return new AIError('Tu API key no es válida. Revisa que esté copiada completa (empieza con "AIza...") en Ajustes → IA.', 'key');
+    return new AIError('Tu API key no es válida. Revisa que esté copiada completa en Ajustes → IA.', 'key');
   }
   if (status === 403) {
     return new AIError('La API rechazó la clave (403). Puede que la key esté restringida a otro dominio o que la API "Gemini API" no esté habilitada en Google AI Studio.', 'key');
@@ -81,12 +80,12 @@ function friendlyError(status, bodyText, kind) {
   return new AIError(apiMsg ? `Error de Gemini (${status}): ${apiMsg}` : `Error de Gemini (${status}).`, 'otro');
 }
 
-async function callGemini({ parts, apiKey, model, variant = 0 }) {
+async function callGemini({ parts, apiKey, model, variant = 0, attempt = 0 }) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   // variant 0 = completo · 1 = sin thinking · 2 = sin thinking ni responseMimeType
   const cfg = { temperature: 0.2 };
   if (variant < 2) cfg.responseMimeType = 'application/json';
-  if (variant < 1 && String(model).includes('2.5')) cfg.thinkingConfig = { thinkingBudget: 0 };
+  if (variant < 1 && /2\.5|3\./.test(String(model))) cfg.thinkingConfig = { thinkingBudget: 0 };
 
   let res;
   try {
@@ -108,6 +107,12 @@ async function callGemini({ parts, apiKey, model, variant = 0 }) {
     }
     if (res.status === 400 && variant < 2 && /mime/.test(low)) {
       return callGemini({ parts, apiKey, model, variant: 2 });
+    }
+    // error transitorio del servidor de Google: esperamos y reintentamos una vez
+    const transitorio = res.status === 500 || res.status === 503 || /overloaded|unavailable|internal/.test(low);
+    if (transitorio && attempt < 1) {
+      await new Promise(r => setTimeout(r, 2500));
+      return callGemini({ parts, apiKey, model, variant, attempt: attempt + 1 });
     }
     throw friendlyError(res.status, text, text);
   }
@@ -220,7 +225,7 @@ export async function analyzeMeal({ imageDataUrl, description, prompt, apiKey, m
 }
 
 /** Prueba rápida de la API key (devuelve true/false). */
-export async function testApiKey(apiKey, model = 'gemini-2.5-flash') {
+export async function testApiKey(apiKey, model = 'gemini-3.8-flash') {
   if (!navigator.onLine) return { ok: false, msg: 'Sin conexión a internet.' };
   if (!apiKey) return { ok: false, msg: 'Aún no has pegado una API key.' };
   try {

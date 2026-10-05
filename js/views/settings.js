@@ -41,7 +41,7 @@ export async function render(root) {
       <label class="field"><span class="lbl">Modelo</span>
         <select id="s-model">${modelOptions().map(m => `<option value="${m.v}" ${s.model === m.v ? 'selected' : ''}>${m.l}</option>`).join('')}</select></label>
       <label class="field"><span class="lbl">API key</span>
-        <input id="s-key" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…" value="${esc(s.apiKey || '')}"></label>
+            <input id="s-key" type="password" autocomplete="off" spellcheck="false" placeholder="pega aquí tu clave de Google AI" value="${esc(s.apiKey || '')}"></label>
       <div class="row wrap">
         <button class="btn btn-sm" id="s-key-show" type="button">Ver</button>
         <button class="btn btn-sm btn-primary" id="s-key-save" type="button">Guardar</button>
