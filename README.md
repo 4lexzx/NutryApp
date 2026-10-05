@@ -96,7 +96,7 @@ Esta es la forma recomendada: gratis, estable y con HTTPS (necesario para instal
 ### 3.2 Crea el repositorio
 
 1. Botón verde **+** (arriba a la derecha) → **New repository**.
-2. **Repository name**: `nutri-gym` (tiene que ser exactamente ese formato).
+2. **Repository name**: `NutryApp` (tiene que ser exactamente ese formato).
 3. Marca **Public** (obligatorio para Pages gratis).
 4. Marca **Add a README file**.
 5. **Create repository**.
@@ -118,7 +118,7 @@ git init
 git add .
 git commit -m "Nutri Gym v1"
 git branch -M main
-git remote add origin https://github.com/TU-USUARIO/nutri-gym.git
+git remote add origin https://github.com/4lexzx/NutryApp.git
 git push -u origin main
 ```
 
@@ -127,7 +127,7 @@ git push -u origin main
 1. En el repositorio → pestaña **Settings → Pages**.
 2. En **Source**: rama `main` y carpeta `/ (root)` → **Save**.
 3. Espera 1–2 minutos. Aparecerá un enlace verde:
-   `https://TU-USUARIO.github.io/nutri-gym/`
+   `https://4lexzx.github.io/NutryApp/`
 4. Ábrelo en el celular con **Chrome**: debería verse la app (pantalla “Hoy”).
 
 > Si ves una página en blanco: verifica que subiste `index.html` en la **raíz** del repositorio
@@ -154,7 +154,7 @@ Cualquiera de estas sirve igual: la app es HTML estático.
 
 ## 4. Instalarla en tu celular (pantalla de inicio)
 
-1. Abre la URL en **Chrome de Android** (`https://TU-USUARIO.github.io/nutri-gym/`).
+1. Abre la URL en **Chrome de Android** (`https://4lexzx.github.io/NutryApp/`).
 2. Toca **Instalar Nutri Gym** (dentro de Ajustes), o el menú **⋮ → Instalar aplicación /
    Añadir a pantalla de inicio**.
 3. Confirmas y el ícono 🟩 **Nutri Gym** aparece en tu pantalla: se abre a pantalla completa,
@@ -185,7 +185,7 @@ Para que nadie más pueda usarla aunque se filtre:
 1. En Google AI Studio (o en <https://console.cloud.google.com/apis/credentials>) abre tu clave.
 2. **Application restrictions → HTTP referrers → Add** y agrega:
    ```
-   https://TU-USUARIO.github.io/*
+   https://4lexzx.github.io/*
    ```
    (si usas Netlify/Cloudflare, pon el dominio que te hayan dado).
 3. **API restrictions → Restrict key → Gemini API** (solo esa API).
@@ -284,7 +284,7 @@ Ajustes → Restaurar.
 ### Opción A — PWABuilder (la más fácil, sin instalar nada)
 
 1. Sube la app a GitHub Pages (paso 3) y ten la URL viva:
-   `https://TU-USUARIO.github.io/nutri-gym/`
+   `https://4lexzx.github.io/NutryApp/`
 2. Entra a <https://pwabuilder.com> y pega tu URL → **Start**.
 3. Espera el análisis (debe detectar el manifest: si no, revisa que `manifest.webmanifest` cargue).
 4. **Package for stores → Android → Generate** (te puede pedir iniciar sesión con GitHub: es gratis).
@@ -303,7 +303,7 @@ Requiere **Node.js** y **Java (JDK 17)** instalados en tu PC:
 
 ```bash
 npm install -g @bubblewrap/cli
-bubblewrap init --manifest=https://TU-USUARIO.github.io/nutri-gym/manifest.webmanifest
+bubblewrap init --manifest=https://4lexzx.github.io/NutryApp/manifest.webmanifest
 bubblewrap build      # genera app-release-signed.apk
 ```
 
