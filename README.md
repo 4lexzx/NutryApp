@@ -1,0 +1,375 @@
+# 🏋️ Nutri Gym — Control de alimentación para gimnasio (PWA, 100% local)
+
+App para tu celular Android (y cualquier navegador) que registra lo que comes, calcula tus metas
+de **kcal / proteína / carbohidratos / grasas**, y puede analizar tus platos con **Gemini AI**
+(foto o descripción). Todos tus datos se guardan **solo en tu celular** (IndexedDB): sin cuentas,
+sin servidores propios, sin costos.
+
+> ⚠️ **Aviso**: los valores nutricionales son **estimaciones** generadas por IA y por una tabla de
+> referencia de alimentos. No sustituyen la opinión de un nutricionista.
+
+---
+
+## Índice
+
+1. [Qué es y cómo funciona por dentro](#1-qué-es-y-cómo-funciona-por-dentro)
+2. [Límites y cosas que debes saber](#2-límites-y-cosas-que-debes-saber)
+3. [Publicar la app GRATIS en GitHub Pages (paso a paso)](#3-publicar-la-app-gratis-en-github-pages-paso-a-paso)
+4. [Instalarla en tu celular (pantalla de inicio)](#4-instalarla-en-tu-celular-pantalla-de-inicio)
+5. [API key de Gemini gratis (Google AI Studio) y cómo restringirla](#5-api-key-de-gratuita-google-ai-studio-y-cómo-restringirla)
+6. [Primeros pasos dentro de la app](#6-primeros-pasos-dentro-de-la-app)
+7. [Uso diario](#7-uso-diario)
+8. [Respaldos, Excel y cambiar de celular](#8-respaldo-excel-y-cambiar-de-celular)
+9. [Generar un APK gratis (opcional)](#9-generar-un-apk-gratis-opcional)
+10. [Solución de problemas](#10-solución-de-problemas)
+11. [Estructura del proyecto y edición del código](#11-estructura-del-proyecto-y-edición-del-código)
+
+---
+
+## 1. Qué es y cómo funciona por dentro
+
+| Parte | Tecnología | ¿Necesita internet? |
+|---|---|---|
+| Interfaz (pantallas) | HTML + CSS + JavaScript puro (sin frameworks) | No |
+| Tus datos (perfil, comidas, pesos, favoritos) | **IndexedDB** (base de datos de tu navegador) | No |
+| Ver el día, el historial y los gráficos | Se lee de IndexedDB | No |
+| Guardar comidas, editar, favoritos | Se escribe en IndexedDB | No |
+| **Análisis de platos con IA** | API de **Gemini** (Google) | **Sí, solo eso** |
+| Guardar la app en el celular | Manifest + Service Worker (PWA) | No (una vez instalada) |
+
+**Archivos del proyecto**
+
+```
+APP_Nutri/
+├── index.html                 ← pantalla única (contenedor de todas las vistas)
+├── manifest.webmanifest       ← hace que sea instalable (ícono + pantalla completa)
+├── sw.js                      ← service worker: abre y funciona SIN internet
+├── .nojekyll                  ← le dice a GitHub Pages que sirva los archivos tal cual
+├── icons/                     ← íconos PNG (192, 512 y maskable)
+├── css/styles.css             ← diseño oscuro/claro, móvil primero, botones grandes
+└── js/
+    ├── app.js                 ← arranque, rutas (#/hoy, #/registrar, …), tema, instalación
+    ├── db.js                  ← IndexedDB (kv, meals, weights, favorites) + respaldos
+    ├── nutrition.js           ← fórmulas Mifflin-St Jeor, metas y tabla de alimentos
+    ├── ai.js                  ← llamada a Gemini, JSON estructurado y errores amigables
+    ├── editor.js              ← editor de plato (ingredientes 100% editables)
+    ├── charts.js              ← gráficos en canvas (peso, barras semana/mes)
+    ├── export.js              ← CSV para Excel + respaldo/restauración .json
+    ├── util.js                ← fechas, toasts, ventanas emergentes, imágenes
+    └── views/                 ← una pantalla por módulo (hoy, registro, historial…)
+```
+
+**No hay ningún build ni instalación de programas**: son archivos estáticos. Se sirven tal cual.
+
+---
+
+## 2. Límites y cosas que debes saber
+
+1. **Cuota gratuita de Gemini (Flash nivel gratis)** ≈ **10 peticiones/minuto** y **~250 por día**
+   (más un tope de tokens por minuto). Una **foto consume bastante más** que un texto.
+   Los valores exactos están en: <https://ai.google.dev/gemini-api/docs/rate-limits>.
+   **Con ~250 análisis/día te alcanza sobrado para uso personal.** Si llegas al límite, la app te
+   avisa: *“Espera ~1 minuto… la cuota diaria se renueva cada 24 h”*.
+2. **Costo: $0.** Mientras **no actives la facturación** en Google Cloud, solo existe la cuota
+   gratuita. Nunca actives Billing para esta app.
+3. **Tu API key vive en tu celular** (en IndexedDB, dentro de Ajustes). Como es una app web, si
+   alguien la consigue podría usarla: por eso en el paso 5 te explico cómo **restringirla** por
+   dominio.
+4. **Si borras los datos del navegador (o actualizas Android de forma agresiva), pierdes el
+   historial.** Haz respaldos `.json` seguido (paso 8).
+5. **Modo sin IA**: puedes usar la app entera escribiendo los platos a mano o reutilizando
+   favoritos. No se gasta cuota y no hace falta la API key.
+6. La app **no** manda tus datos a ningún servidor propio: la única conexión externa es la consulta
+   a Gemini (foto/texto) cuando tú lo pides.
+
+---
+
+## 3. Publicar la app GRATIS en GitHub Pages (paso a paso)
+
+Esta es la forma recomendada: gratis, estable y con HTTPS (necesario para instalar la PWA).
+
+### 3.1 Crea la cuenta (si no tienes)
+
+1. Entra a <https://github.com> → **Sign up** → correo, contraseña y usuario (gratis).
+2. Verifica tu correo.
+
+### 3.2 Crea el repositorio
+
+1. Botón verde **+** (arriba a la derecha) → **New repository**.
+2. **Repository name**: `nutri-gym` (tiene que ser exactamente ese formato).
+3. Marca **Public** (obligatorio para Pages gratis).
+4. Marca **Add a README file**.
+5. **Create repository**.
+
+### 3.3 Sube los archivos de la app
+
+**Opción A — desde la web (la más fácil si nunca has usado Git)**
+
+1. Dentro de tu repositorio, pulsa **Add file → Upload files**.
+2. Arrastra **todo el contenido de la carpeta `APP_Nutri`** (index.html, manifest.webmanifest,
+   sw.js, .nojekyll, css/, js/, icons/, README.md). Puedes subir varios archivos y carpetas a la vez.
+3. **Commit changes**.
+
+**Opción B — con la terminal (si ya tienes Git)**
+
+```bash
+cd "C:\Users\Alexander\Documents\Proyectos\_vender\APP_Nutri"
+git init
+git add .
+git commit -m "Nutri Gym v1"
+git branch -M main
+git remote add origin https://github.com/TU-USUARIO/nutri-gym.git
+git push -u origin main
+```
+
+### 3.4 Activa GitHub Pages
+
+1. En el repositorio → pestaña **Settings → Pages**.
+2. En **Source**: rama `main` y carpeta `/ (root)` → **Save**.
+3. Espera 1–2 minutos. Aparecerá un enlace verde:
+   `https://TU-USUARIO.github.io/nutri-gym/`
+4. Ábrelo en el celular con **Chrome**: debería verse la app (pantalla “Hoy”).
+
+> Si ves una página en blanco: verifica que subiste `index.html` en la **raíz** del repositorio
+> (no dentro de otra carpeta) y que existe el archivo `.nojekyll`.
+
+### 3.5 Otras opciones 100% gratuitas (si te atoras)
+
+| Servicio | Cómo | URL |
+|---|---|---|
+| **Netlify Drop** (el más rápido) | Arrastras la carpeta `APP_Nutri` a la página y en 10 segundos te da un enlace HTTPS | <https://app.netlify.com/drop> |
+| **Cloudflare Pages** | Conectas tu repo de GitHub o subes archivos | <https://pages.cloudflare.com> |
+| **Vercel** | Importas el repo de GitHub | <https://vercel.com> |
+
+Cualquiera de estas sirve igual: la app es HTML estático.
+
+### 3.6 Cómo actualizar la app después
+
+1. Cambia los archivos en tu PC.
+2. Vuelve a subirlos (o `git add . && git commit && git push`).
+3. En el celular, abre la app y recarga (menú ⋮ → **Actualizar**). El service worker descarga la
+   nueva versión automáticamente y te avisa *“Nueva versión lista”*.
+
+---
+
+## 4. Instalarla en tu celular (pantalla de inicio)
+
+1. Abre la URL en **Chrome de Android** (`https://TU-USUARIO.github.io/nutri-gym/`).
+2. Toca **Instalar Nutri Gym** (dentro de Ajustes), o el menú **⋮ → Instalar aplicación /
+   Añadir a pantalla de inicio**.
+3. Confirmas y el ícono 🟩 **Nutri Gym** aparece en tu pantalla: se abre a pantalla completa,
+   sin barra de direcciones, como una app normal.
+4. La primera vez que la abres con internet, el service worker guarda la app en caché: a partir de
+   ahí **puedes abrirla y ver tus datos sin conexión** (solo el análisis con IA necesita red).
+
+Si Chrome no ofrece “Instalar”, usa **⋮ → Agregar a pantalla de inicio** (también crea el ícono).
+
+---
+
+## 5. API key de Gemini gratis (Google AI Studio) y cómo restringirla
+
+### 5.1 Crear la clave (5 minutos, gratis, sin tarjeta)
+
+1. En tu PC o celular, entra a <https://aistudio.google.com> con tu cuenta de Google.
+2. Busca el botón **Get API key / Obtener clave de API** (arriba a la izquierda).
+3. **Create API key → Create API key in new project** (deja que cree el proyecto si te lo pide).
+4. Copia la clave (empieza con `AIza…`). Guárdala en un lugar seguro, por ejemplo un correo que te
+   envíes a ti mismo.
+5. En la app: **Ajustes → Inteligencia artificial → API key** → pega → **Guardar** → **Probar clave**.
+   Debe decir *“La clave funciona correctamente ✅”*.
+
+### 5.2 Restringir la clave (muy recomendado)
+
+Para que nadie más pueda usarla aunque se filtre:
+
+1. En Google AI Studio (o en <https://console.cloud.google.com/apis/credentials>) abre tu clave.
+2. **Application restrictions → HTTP referrers → Add** y agrega:
+   ```
+   https://TU-USUARIO.github.io/*
+   ```
+   (si usas Netlify/Cloudflare, pon el dominio que te hayan dado).
+3. **API restrictions → Restrict key → Gemini API** (solo esa API).
+4. **Guarda**. Espera unos minutos a que aplique.
+
+> ⚠️ Si restringes por referrer, la app **solo funcionará** desde ese dominio. Si un día abres
+> `index.html` desde tu PC con otro dominio o un servidor local, verás error 403: usa la URL de
+> GitHub Pages (o quita la restricción temporalmente).
+
+### 5.3 Notas de seguridad y costo
+
+- **No actives facturación** (Billing). Sin facturación no hay cobro posible: solo cuota gratuita.
+- Si algún día la activas, ve a **Billing → Budgets & alerts** y pon una alerta de **S/ 1 / $ 1**.
+- Puedes **borrar la clave** desde Ajustes cuando no la uses.
+
+---
+
+## 6. Primeros pasos dentro de la app
+
+1. **Perfil** (pestaña 💪): peso, estatura, edad, sexo, nivel de actividad y objetivo
+   (déficit / mantenimiento / superávit).
+2. Pulsa **“🧮 Calcular mis metas”**. Verás:
+   - tu **gasto calórico (TDEE)** y la fórmula usada paso a paso
+     (Mifflin-St Jeor × factor de actividad, luego −20% / 0% / +12% según el objetivo);
+   - metas de **kcal, proteína (g/kg), grasas (% de kcal) y carbohidratos (resto)**.
+3. Si quieres, pulsa **“Editar”** y escribe tus metas **a mano**; el badge cambiará a
+   *“editadas a mano”*. El botón *“Volver al cálculo”* restaura la fórmula.
+4. **Ajustes → Inteligencia artificial**: pega tu API key y prueba. En **Instrucciones de la IA**
+   (#/ia) puedes editar el prompt; el predeterminado ya trae:
+   - identificación de ingredientes con **porciones estimadas en gramos**,
+   - foco en **comida peruana** (lomo saltado, ají de gallina, arroz con pollo, tallarines verdes,
+     ceviche, causa, papa a la huancaína, tacu tacu, pollo a la brasa…),
+   - cálculo de **kcal, proteína, carbohidratos, grasas y fibra**,
+   - salida en **JSON estructurado** que la app transforma en una tabla editable.
+5. **Registrar peso** en 💪 para ver tu gráfico de evolución.
+
+---
+
+## 7. Uso diario
+
+### Registrar una comida (botón ＋)
+
+| Pestaña | Qué hace | ¿Gasta cuota de IA? |
+|---|---|---|
+| 📷 **Foto** | Tomas foto o eliges de galería (+ descripción opcional) → **Analizar con la IA** | Sí |
+| 📝 **Texto** | Escribes “1 lomo saltado con arroz, poco arroz” → **Analizar con la IA** | Sí |
+| ✋ **Manual** | Buscas en la tabla de alimentos, pones gramos → sin IA | **No** |
+| ⭐ **Favoritos** | Cargas un plato guardado con 2 toques → sin IA | **No** |
+
+**Antes de guardar siempre ves el editor**: lista de ingredientes con **gramos, kcal, proteína,
+carbos y grasas editables**. Si cambias los gramos, las macros se recalculan; si corriges una
+macro, la escala se mantiene. Puedes **quitar** ingredientes, **añadir** nuevos y los **totales**
+se actualizan solos. Eliges el tipo de comida (desayuno/almuerzo/cena/snack) y **Guardar**.
+
+- **⭐ Guardar favorito**: lo deja en Favoritos para reutilizarlo sin gastar IA.
+- Si la IA se equivoca (por ejemplo la porción), corrígela: es lo esperado, es una **estimación**.
+
+### Panel del día (📅 Hoy)
+
+- Navegas de día en día con **‹ ›** o tocando la fecha.
+- Ves **kcal consumidas vs meta** y **4 barras de progreso** con lo que falta de cada macro.
+- Lista de comidas del día con sus macros; puedes **Ver ingredientes / Editar / Eliminar**.
+- Contador de **agua** (vasos de 250 ml, configurable en Ajustes).
+
+### Historial (📊)
+
+- **Semana**: 7 días con barras de kcal, meta y promedio + resumen de promedios.
+- **Mes**: gráfico de barras del mes y lista de los días con comidas.
+- Tocas cualquier día y saltas a ese día en **Hoy**.
+
+---
+
+## 8. Respaldos, Excel y cambiar de celular
+
+Ve a **Ajustes → Datos y respaldo**:
+
+- **⬇ Descargar respaldo (.json)**: guarda TODO (perfil, comidas, pesos, favoritos, ajustes e IA).
+  Guárdalo en Google Drive, tu PC o mándatelo por correo. **Hazlo al menos 1 vez por semana.**
+- **⬆ Restaurar desde archivo**: elige un `.json` → reemplaza los datos del dispositivo
+  (te avisa antes; descarga primero un respaldo actual).
+- **CSV comidas / CSV pesos**: se abren en **Excel** o **Google Sheets** con coma como separador
+  (archivo UTF-8 con BOM: se ven bien los acentos).
+- **📄 Exportar todo en un CSV maestro**: una sola hoja con perfil, comidas, pesos y favoritos.
+- **🗑 Borrar TODOS los datos**: pide confirmación escribiendo `BORRAR`.
+
+**Para cambiar de celular**: respaldo `.json` en el celular nuevo → abrir la URL de la app →
+Ajustes → Restaurar.
+
+---
+
+## 9. Generar un APK gratis (opcional)
+
+**No es necesario**: la PWA instalada ya te da ícono y pantalla completa. Si aun así quieres un
+`.apk` para instalarlo/lookearlo, esta es la ruta gratis:
+
+### Opción A — PWABuilder (la más fácil, sin instalar nada)
+
+1. Sube la app a GitHub Pages (paso 3) y ten la URL viva:
+   `https://TU-USUARIO.github.io/nutri-gym/`
+2. Entra a <https://pwabuilder.com> y pega tu URL → **Start**.
+3. Espera el análisis (debe detectar el manifest: si no, revisa que `manifest.webmanifest` cargue).
+4. **Package for stores → Android → Generate** (te puede pedir iniciar sesión con GitHub: es gratis).
+5. Descargas un `.zip` que trae el **APK/AAB** y las instrucciones de firma. PWABuilder te da un
+   paso de **Signing** para crear tu keystore (gratis) y obtener el **APK firmado**.
+6. Copia el `.apk` al celular → en Android: **Ajustes → Aplicaciones → Instalar apps de orígenes
+   desconocidos** (permite el navegador que lo descargó) → abrir el archivo → **Instalar**.
+
+> Para que el APK se comporte 100% como app (sin barra de navegador) PWABuilder te pide subir un
+> archivo `assetlinks.json` a `/.well-known/` de tu dominio. Si no lo haces, el APK igual instala
+> y funciona, pero puede abrirse dentro de Chrome.
+
+### Opción B — Bubblewrap CLI (gratis, con más pasos)
+
+Requiere **Node.js** y **Java (JDK 17)** instalados en tu PC:
+
+```bash
+npm install -g @bubblewrap/cli
+bubblewrap init --manifest=https://TU-USUARIO.github.io/nutri-gym/manifest.webmanifest
+bubblewrap build      # genera app-release-signed.apk
+```
+
+### Opción C — Capacitor / Android Studio (gratis, más pesado)
+
+Crea un contenedor nativo con `npm create @capacitor/app` y apunta la URL de GitHub Pages.
+Útil solo si vas a publicar en la Play Store.
+
+---
+
+## 10. Solución de problemas
+
+| Problema | Solución |
+|---|---|
+| *“Tu API key no es válida”* | Copia la clave completa (`AIza…`) en Ajustes → IA → **Guardar** → **Probar clave**. Si cambiaste de clave, borra la anterior primero. |
+| *“403 / restringida a otro dominio”* | La key está restringida a un dominio distinto: edita las **HTTP referrers** en Google AI Studio o quita la restricción. |
+| *“Límite alcanzado”* | Es la **cuota gratuita** (≈10/min y ~250/día). Espera 1 minuto (o al día siguiente). Mientras tanto puedes registrar **manual**. |
+| *“El modelo no existe”* | Cambia el modelo en Ajustes → IA (usa `gemini-2.5-flash`). |
+| *“Sin conexión a internet”* | El análisis con IA necesita red. Ver historial/registrar manual funciona igual sin internet. |
+| La app no instala | Úsala en **Chrome** (no en Firefox/Samsung Internet si no ofrece instalar) y con **HTTPS** (GitHub Pages sí). O usa ⋮ → *Añadir a pantalla de inicio*. |
+| Se ve rara al abrir | Recarga: menú ⋮ → **Actualizar**. |
+| *“Ups, algo salió mal”* | Recarga la página. Si persiste, revisa la consola de Chrome (⋮ → Herramientas → Consola de JS) y los mensajes de error. |
+| **Borré los datos del navegador** | Si tenías un respaldo `.json`, restáuralo desde Ajustes. Si no, no hay forma de recuperarlos (no existe servidor). |
+| Cambié de celular | Restaura el respaldo `.json` en el nuevo (paso 8). |
+| ¿Se envían mis fotos a algún lado? | Solo a **Gemini (Google)** cuando tocas “Analizar con la IA”. No hay otro servidor. |
+| El iPhone no muestra la app | Safari → botón **Compartir → Añadir a pantalla de inicio**. |
+
+---
+
+## 11. Estructura del proyecto y edición del código
+
+La app es JavaScript estático con módulos ES (`<script type="module">`). No necesita `npm`,
+bundler ni servidor propio.
+
+**Rutas** (hash, funciona en cualquier hosting):
+
+```
+#/hoy          panel del día            #/registrar   foto / texto / manual / favoritos
+#/nuevo        editor de un plato nuevo  #/editar/:id  editar una comida guardada
+#/historial    semana y mes con gráficos #/perfil      datos, metas y peso
+#/ajustes      tema, IA, agua, datos     #/ia          prompt de Gemini
+```
+
+**Cambios rápidos**
+
+- **Tabla de alimentos**: `js/nutrition.js` (array `FOODS`, valores por 100 g).
+- **Prompt por defecto de la IA**: `js/ai.js` (constante `DEFAULT_PROMPT`).
+- **Fórmulas de metas**: `js/nutrition.js` (`calcTargets`).
+- **Colores/diseño**: `css/styles.css` (variables en `:root` y `[data-theme="light"]`).
+- **Nombre y colores del ícono**: `icons/` (PNG) y `manifest.webmanifest`.
+- **Versión de la app** (para forzar actualización): `js/views/settings.js` (`VERSION`) y el
+  nombre de caché `CACHE` en `sw.js` (súbelo a `nutri-gym-v2`, etc.).
+
+**Verla en local en tu PC** (opcional): necesitas un servidor porque los módulos ES y el service
+worker no corren desde `file://`:
+
+```bash
+cd APP_Nutri
+python -m http.server 8080
+# abre http://localhost:8080
+```
+
+---
+
+### Resumen en una frase
+
+Sube la carpeta a **GitHub Pages** (gratis), ábrela en Chrome y **Añadir a pantalla de inicio**
+(gratis), pega tu **API key de Google AI Studio** (gratis, con cuota diaria) y listo: tienes una
+app de control de alimentación con IA que corre **100% en tu celular**.
