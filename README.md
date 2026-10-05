@@ -214,13 +214,19 @@ Al abrir la app aparece un candado local (no usa servidor ni internet). Los dato
 | **Usuario** | `alexsu` |
 | **Contraseña** | `123456` |
 
-- Todo queda **solo en este dispositivo**: no hay cuentas ni datos en la nube.
+**Cada quien con su usuario:** si otra persona usa la app en su celular, que toque
+**“¿Primera vez? Crear usuario”**, escriba su usuario (ej. `camila`) y una contraseña de 4 o más
+caracteres, y ya queda creada **solo en ese dispositivo**. No hace falta exportar ni importar nada:
+
+- Todo queda **solo en el dispositivo donde se crea**: no hay cuentas ni datos en la nube.
 - Si te equivocas aparece *“Usuario o contraseña incorrectos.”* y puedes volver a intentarlo.
 - Para salir: **Ajustes → Cerrar sesión**; tus comidas, perfil y ajustes quedan guardados.
+- Si dos usuarios están en **el mismo celular**, ven los mismos datos (el candado separa quién entra,
+  no las comidas). En celulares distintos cada quien ve lo suyo.
 
 > ⚠️ Es un candado para curiosos, **no es seguridad real**: el usuario y la contraseña viajan dentro
 > del código de la app, que cualquiera puede leer en la web. Sirve para que nadie vea tu comida
-> agarrando tu celular, nada más.
+> agarrando tu celular, nada más. **Anota tu contraseña**: no hay “recuperar contraseña”.
 
 1. **Perfil** (pestaña 💪): peso, estatura, edad, sexo, nivel de actividad y objetivo
    (déficit / mantenimiento / superávit).

@@ -57,6 +57,22 @@ export async function seedUsers() {
   return next;
 }
 
+/* Crea un usuario nuevo en ESTE dispositivo (sin servidor, sin internet). */
+export async function createUser(username, password) {
+  const u = String(username || '').trim().toLowerCase();
+  const p = String(password || '');
+  if (!/^[\p{L}\p{N}._-]{3,20}$/u.test(u)) {
+    return { ok: false, msg: 'El usuario debe tener de 3 a 20 letras o números (sin espacios).' };
+  }
+  if (p.length < 4) return { ok: false, msg: 'La contraseña debe tener al menos 4 caracteres.' };
+  const list = await seedUsers();
+  if (list.some(x => x.u === u)) return { ok: false, msg: 'Ese usuario ya existe en este dispositivo.' };
+  const s = newSalt();
+  list.push({ u, s, h: await hash(p, s) });
+  await saveUsers(list);
+  return { ok: true, user: u };
+}
+
 export async function verify(username, password) {
   const list = await seedUsers();
   const u = String(username || '').trim().toLowerCase();

@@ -619,6 +619,12 @@ code.codeblock {
   color: var(--txt-3); font-size: .78rem; margin-top: 22px; line-height: 1.45;
 }
 .auth-hint .ic { width: 15px; height: 15px; flex: none; }
+.auth-link {
+  display: block; width: 100%; margin-top: 16px; padding: 9px;
+  background: transparent; border: 0; border-radius: 12px; cursor: pointer;
+  color: var(--accent); font-size: .92rem; font-weight: 600; text-align: center;
+}
+.auth-link:active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .shake { animation: shake .4s cubic-bezier(.36, .07, .19, .97); }
 @keyframes shake {
   10%, 90% { transform: translateX(-1px); }
