@@ -22,10 +22,11 @@ INSTRUCCIONES
    - Bebidas (leche, jugo, chicha): 150–250 g
 3. LA SUMA del plato ("porcion_total_g") debe quedar entre 250 y 600 g. Si pasa de 700 g es que exageraste: baja las porciones.
 4. En FOTOS usa el plato como referencia de tamaño: un plato de almuerzo lleno pesa 350–600 g con comida. Si la carne ocupa 1/4 del plato son unos 100 g, no 300 g. No cuentes lo que queda en la olla ni otras porciones de la mesa.
-5. Respeta las indicaciones del usuario ("poco arroz", "doble porción", "sin aceite", "para 2 personas"); si no dice nada, es UNA porción.
+5. Las cantidades que ESCRIBE el usuario mandan SOBRE tus rangos: si dice "200 g de chaufa", ese ingrediente son exactamente 200 g; si dice "poco arroz", "doble porción", "sin aceite" o "para 2 personas", respétalo. Si da un peso de un plato hecho ("200 g de chaufa", "350 g de lomo saltado"), ese peso es el TOTAL del plato: todos los ingredientes deben sumar como máximo ese número (cebolla, aceite y salsa se incluyen dentro, no se suman aparte). Si no da cantidades, estima con los rangos del punto 2 y siempre UNA porción (nunca la receta entera).
 6. Calcula por ingrediente: kcal, proteína, carbohidratos, grasas y fibra.
 7. Prioriza alimentos peruanos (lomo saltado, ají de gallina, arroz con pollo, tallarines verdes, ceviche, causa, papa a la huancaína, tacu tacu, estofado, seco de chivo, anticuchos, pollo a la brasa…). Si no conoces el plato, desglósalo en sus ingredientes base.
 8. Si falta información (no se ve el arroz), incluye el ingrediente con una estimación razonable y márcalo en "nota".
+9. Si el mensaje trae "Cantidades registradas", úsalas como TOPE: no aumentes ninguna (puedes bajarlas solo si exceden lo razonable para UN plato personal, máximo 600 g). Una foto no justifica subir cantidades que ya estaban declaradas.
 
 RESPONDE EXCLUSIVAMENTE CON UN JSON VÁLIDO (sin texto fuera del JSON, sin markdown) con exactamente esta estructura:
 {
@@ -52,6 +53,7 @@ REGLAS
 - "totales" debe ser la SUMA exacta de todos los ingredientes.
 - Un mínimo de 1 y máximo de 18 ingredientes.
 - Nunca redondees hacia arriba "por si acaso": es mejor subestimar (sobre todo aceite y grasas).
+- Si hay "Cantidades registradas", la suma final NO puede superarlas: solo puede mantenerse o bajar.
 - Un solo plato NO lleva 300 g de carne ni 400 g de arroz. Si el usuario no pidió doble porción, no la inventes.`;
 
 export class AIError extends Error {
@@ -224,9 +226,11 @@ function round1(v) { return Math.round((v || 0) * 10) / 10; }
 
 /**
  * Analiza foto y/o descripción con Gemini.
+ * @param {number} [opts.maxTotalG] tope máximo para la suma de gramos del plato
+ *   (si el usuario ya tenía registradas sus porciones, la IA no puede subirlas).
  * @returns {Promise<{name,totalG,comment,items}>}
  */
-export async function analyzeMeal({ imageDataUrl, description, prompt, apiKey, model }) {
+export async function analyzeMeal({ imageDataUrl, description, prompt, apiKey, model, maxTotalG }) {
   if (!navigator.onLine) throw new AIError('Sin conexión a internet. El análisis con IA necesita red; tus datos guardados sí se ven sin conexión.', 'sin-internet');
   if (!apiKey) throw new AIError('Falta tu API key de Gemini. Ve a Ajustes → IA y pégala (se guarda solo en tu celular).', 'sin-key');
 
@@ -251,7 +255,19 @@ export async function analyzeMeal({ imageDataUrl, description, prompt, apiKey, m
     });
     raw = extractJSON(retry);
   }
-  return normalizeResult(raw);
+  const out = normalizeResult(raw);
+  if (maxTotalG > 0) out.items = limitarTotal(out.items, maxTotalG);
+  return out;
+}
+
+/* Si el usuario ya tenía registradas sus porciones, la IA no puede subirlas:
+   si la suma pasa del tope, baja todas las porciones proporcionalmente. */
+function limitarTotal(items, maxG) {
+  const list = items || [];
+  const sum = list.reduce((a, i) => a + (Number(i.gramos) || 0), 0);
+  if (!(maxG > 0) || sum <= maxG || sum <= 0) return list;
+  const k = maxG / sum;
+  return list.map(i => ({ ...i, gramos: Math.max(1, Math.round((Number(i.gramos) || 0) * k)) }));
 }
 
 /** Prueba rápida de la API key (devuelve true/false). */

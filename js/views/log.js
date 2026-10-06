@@ -333,7 +333,15 @@ export async function renderEdit(root, args) {
     onSaveFavorite: d => saveFav(d),
     onReanalyze: async d => {
       const settings = await getSettings();
-      const desc = [d.name, d.note].filter(s => s && String(s).trim()).join('. ').trim();
+      const oldG = Math.round((d.items || []).reduce((a, i) => a + (Number(i.gramos) || 0), 0));
+      const prev = (d.items || []).filter(i => Number(i.gramos) > 0)
+        .map(i => `${Math.round(Number(i.gramos))} g de ${(i.nombre || '').trim()}`);
+      const partes = [d.name, d.note];
+      if (prev.length) {
+        partes.push(`Cantidades registradas actualmente: ${prev.join(', ')}.`);
+        partes.push('No aumentes estas cantidades: solo puedes bajarlas si son excesivas para UN plato personal.');
+      }
+      const desc = partes.filter(s => s && String(s).trim()).join('. ').trim();
       if (!d.photo && !desc) throw new Error('Este plato no tiene foto ni nombre para re-analizar.');
       const prompt = (await getPrompt()) || DEFAULT_PROMPT;
       const res = await analyzeMeal({
@@ -341,12 +349,17 @@ export async function renderEdit(root, args) {
         description: desc,
         prompt,
         apiKey: settings.apiKey,
-        model: settings.model
+        model: settings.model,
+        maxTotalG: oldG > 0 ? Math.round(oldG * 1.15) : 0
       });
       if (!res.items || !res.items.length) throw new Error('La IA no devolvió ingredientes.');
       d.items = res.items;
       const t = computeTotals(d.items);
-      toast(`Porciones recalculadas: ${Math.round(t.grams)} g y ${Math.round(t.kcal)} kcal. Revisa y guarda.`, 'ok');
+      if (oldG > 0 && t.grams > oldG + 15) {
+        toast(`Ojo: la IA subió las porciones de ${oldG} g a ${t.grams} g. Bájalas a mano si no te cuadran (${t.kcal} kcal).`, 'warn');
+      } else {
+        toast(`Porciones recalculadas: ${t.grams} g y ${t.kcal} kcal. Revisa y guarda.`, 'ok');
+      }
     }
   });
 }
