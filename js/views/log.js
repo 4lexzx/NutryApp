@@ -257,7 +257,12 @@ async function runAI({ date, hasKey, usePhoto }) {
     });
     if (targets) state.draft._kcalTarget = (profile.targets && profile.targets.kcal) || targets.kcal;
     state.desc = '';
-    toast('Plato detectado. Revisa y corrige antes de guardar.', 'ok');
+    const sumG = res.items.reduce((a, i) => a + (Number(i.gramos) || 0), 0);
+    if (sumG > 700) {
+      toast(`La IA estimó ${Math.round(sumG)} g para un solo plato: revisa los gramos antes de guardar.`, 'warn');
+    } else {
+      toast('Plato detectado. Revisa y corrige antes de guardar.', 'ok');
+    }
     location.hash = '#/nuevo';
   } catch (e) {
     if (cancelled) return;

@@ -4,29 +4,42 @@
 import { b64FromDataURL, esc } from './util.js';
 
 export const DEFAULT_PROMPT = `Eres un asistente de nutrición especializado en comida peruana y dietas para gimnasio.
-Tu tarea: analizar la foto y/o descripción del plato que te envío.
+Tu tarea: analizar la foto y/o descripción de UN plato (una sola porción para una persona).
 
 INSTRUCCIONES
-1. Identifica TODOS los ingredientes visibles o descritos del plato.
-2. Estima la porción de cada ingrediente en GRAMOS (razona platos típicos peruanos: por ejemplo, una porción de arroz en un plato de almuerzo suele ser 150–250 g; una presa de pollo a la brasa 150–200 g; un lomo saltado completo 350–500 g).
-3. Calcula por ingrediente: calorías (kcal), proteína (g), carbohidratos (g), grasas (g) y fibra (g) si es posible.
-4. Si el usuario escribió indicaciones como "poco arroz", "doble presa", "sin aceite", "solo una taza", AJUSTA las porciones según esas indicaciones.
-5. Prioriza alimentos peruanos: lomo saltado, ají de gallina, arroz con pollo, tallarines verdes, ceviche, tiradito, causa, papa a la huancaína, tacu tacu, estofado, seco de chivo, juane, anticuchos, pollo a la brasa, pan con chicharrón, causa, solterito, escabeche, picante de carne, chicharrón, papas a la huancaína, arroz con leche, picarones, etc. Si no conoces un plato, desglósalo en sus ingredientes base.
-6. Si falta información (por ejemplo no se ve el arroz), incluye el ingrediente con una estimación razonable y márcalo con "nota".
+1. Identifica TODOS los ingredientes visibles o descritos.
+2. Estima la porción de CADA ingrediente en GRAMOS de UNA porción de plato: no la receta entera, no la olla, no la orden completa.
+   Referencias para UN plato de almuerzo (plato hondo de 24–26 cm):
+   - Arroz blanco cocido: 100–180 g
+   - Carne de res (lomo, bistec, guiso): 70–130 g
+   - Pollo: 70–150 g (con hueso; sin hueso 70–120 g)
+   - Papa (sancochada, frita, al horno): 100–150 g (2–3 papas medianas)
+   - Camote, chaufa, tallarines, macarrones: 120–180 g
+   - Verduras, ensalada, tomate, cebolla: 50–120 g
+   - Frijoles, lentejas, maíz, palta: 50–100 g
+   - Aceite, mantequilla, grasa, salsa de soya: 5–15 g (cucharadita = 5 g)
+   - Queso, huevo, pan, chicharrón: 20–60 g
+   - Bebidas (leche, jugo, chicha): 150–250 g
+3. LA SUMA del plato ("porcion_total_g") debe quedar entre 250 y 600 g. Si pasa de 700 g es que exageraste: baja las porciones.
+4. En FOTOS usa el plato como referencia de tamaño: un plato de almuerzo lleno pesa 350–600 g con comida. Si la carne ocupa 1/4 del plato son unos 100 g, no 300 g. No cuentes lo que queda en la olla ni otras porciones de la mesa.
+5. Respeta las indicaciones del usuario ("poco arroz", "doble porción", "sin aceite", "para 2 personas"); si no dice nada, es UNA porción.
+6. Calcula por ingrediente: kcal, proteína, carbohidratos, grasas y fibra.
+7. Prioriza alimentos peruanos (lomo saltado, ají de gallina, arroz con pollo, tallarines verdes, ceviche, causa, papa a la huancaína, tacu tacu, estofado, seco de chivo, anticuchos, pollo a la brasa…). Si no conoces el plato, desglósalo en sus ingredientes base.
+8. Si falta información (no se ve el arroz), incluye el ingrediente con una estimación razonable y márcalo en "nota".
 
 RESPONDE EXCLUSIVAMENTE CON UN JSON VÁLIDO (sin texto fuera del JSON, sin markdown) con exactamente esta estructura:
 {
   "nombre_plato": "Nombre corto del plato",
-  "porcion_total_g": 450,
+  "porcion_total_g": 370,
   "ingredientes": [
     {
       "nombre": "Arroz blanco cocido",
-      "gramos": 200,
-      "kcal": 260,
-      "proteina": 5.4,
-      "carbohidratos": 56.4,
-      "grasas": 0.6,
-      "fibra": 0.8,
+      "gramos": 150,
+      "kcal": 195,
+      "proteina": 4.1,
+      "carbohidratos": 42.3,
+      "grasas": 0.5,
+      "fibra": 0.6,
       "nota": ""
     }
   ],
@@ -38,7 +51,8 @@ REGLAS
 - Usa números (no strings) para gramos y macros. Sin signos "+" ni palabras.
 - "totales" debe ser la SUMA exacta de todos los ingredientes.
 - Un mínimo de 1 y máximo de 18 ingredientes.
-- Sé realista con las porciones: es mejor subestimar el aceite que exagerar las calorías.`;
+- Nunca redondees hacia arriba "por si acaso": es mejor subestimar (sobre todo aceite y grasas).
+- Un solo plato NO lleva 300 g de carne ni 400 g de arroz. Si el usuario no pidió doble porción, no la inventes.`;
 
 export class AIError extends Error {
   constructor(msg, kind = 'otro') { super(msg); this.kind = kind; this.name = 'AIError'; }
@@ -264,15 +278,20 @@ export function promptHelpHTML() {
     <p class="small muted">Si rompes el formato, la app te avisará. Puedes volver al prompt original con el botón
       <b>“Restaurar predeterminado”</b>.</p>
     <code class="codeblock">{
-  "nombre_plato": "Lomo saltado",
-  "porcion_total_g": 520,
+  "nombre_plato": "Lomo saltado con arroz",
+  "porcion_total_g": 400,
   "ingredientes": [
-    { "nombre": "Lomo de res", "gramos": 150,
-      "kcal": 375, "proteina": 39, "carbohidratos": 0,
-      "grasas": 24, "fibra": 0, "nota": "" }
+    { "nombre": "Lomo de res", "gramos": 100,
+      "kcal": 250, "proteina": 26, "carbohidratos": 0,
+      "grasas": 15, "fibra": 0, "nota": "" },
+    { "nombre": "Arroz blanco cocido", "gramos": 150,
+      "kcal": 195, "proteina": 4.1, "carbohidratos": 42.3,
+      "grasas": 0.5, "fibra": 0.6, "nota": "" }
   ],
   "totales": { "kcal": 0, "proteina": 0, "carbohidratos": 0, "grasas": 0, "fibra": 0 },
   "comentario": "Buena fuente de proteína; cuidado con el aceite del salteado."
 }</code>
-    <p class="tiny muted" style="margin-top:10px">Escapado de HTML: ${esc('utiliza texto libre, sin código HTML dentro del prompt.')}</p>`;
+    <p class="tiny muted" style="margin-top:10px">Las porciones son de UN plato (250–600 g en total):
+      si la IA devuelve gramos exagerados, ajústalos tú en la tabla antes de guardar.</p>
+    <p class="tiny muted" style="margin-top:6px">Escapado de HTML: ${esc('utiliza texto libre, sin código HTML dentro del prompt.')}</p>`;
 }

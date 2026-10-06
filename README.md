@@ -241,7 +241,9 @@ caracteres, y ya queda creada **solo en ese dispositivo**. No hace falta exporta
    *“editadas a mano”*. El botón *“Volver al cálculo”* restaura la fórmula.
 4. **Ajustes → Inteligencia artificial**: pega tu API key y prueba. En **Instrucciones de la IA**
    (#/ia) puedes editar el prompt; el predeterminado ya trae:
-   - identificación de ingredientes con **porciones estimadas en gramos**,
+   - identificación de ingredientes con **porciones de UN solo plato en gramos**
+     (arroz 100–180 g, carne 70–130 g, papa 100–150 g, aceite 5–15 g; el plato completo
+     debe quedar entre 250 y 600 g — si la IA exagera, la app te avisa),
    - foco en **comida peruana** (lomo saltado, ají de gallina, arroz con pollo, tallarines verdes,
      ceviche, causa, papa a la huancaína, tacu tacu, pollo a la brasa…),
    - cálculo de **kcal, proteína, carbohidratos, grasas y fibra**,
