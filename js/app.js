@@ -190,6 +190,29 @@ function setupSW() {
   else window.addEventListener('load', registrar, { once: true });
 }
 
+/* ---------- Volver de segundo plano (cámara, galería u otra app) ---------- */
+function setupResume() {
+  let ocultoEn = 0;
+  const RUTAS_REFRESH = ['hoy', 'registrar', 'historial'];   // las demás tienen formularios
+  const refrescar = () => {
+    if (!window.__nutriListo) return;
+    try { log.alVolverDeFoto(); } catch (e) { /* nada */ }
+    if (document.querySelector('input[type="file"]')) return;   // selector de archivo aún abierto
+    if (document.querySelector('.sheet-back')) return;          // hoja abierta
+    const ruta = parseHash().path[0] || 'hoy';
+    if (RUTAS_REFRESH.indexOf(ruta) === -1) return;             // no pisar lo que estaba escribiendo
+    const y = window.scrollY;
+    route().then(() => window.scrollTo(0, y)).catch(() => {});
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { ocultoEn = Date.now(); return; }
+    const vuelta = ocultoEn ? Date.now() - ocultoEn : 0;
+    ocultoEn = 0;
+    if (vuelta >= 1200) refrescar();
+  });
+  window.addEventListener('pageshow', e => { if (e.persisted) refrescar(); });
+}
+
 /* ---------- Init ---------- */
 async function init() {
   await DB.open();
@@ -197,6 +220,7 @@ async function init() {
   setupInstall();
   setupNetwork();
   setupSW();
+  setupResume();
 
   document.getElementById('btn-theme').onclick = async () => {
     const cur = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
@@ -210,6 +234,7 @@ async function init() {
   window.addEventListener('hashchange', route);
   if (!location.hash) location.hash = '#/hoy';
   await route();
+  window.__nutriListo = true;
 }
 
 init().catch(e => {

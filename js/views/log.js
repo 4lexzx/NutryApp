@@ -190,13 +190,30 @@ function useFavorite(f, date, body) {
 }
 
 /* ---------- Foto + IA ---------- */
+/* El input del selector queda en la página hasta que llega la foto o se cancela:
+   si se quita de inmediato, al volver de la cámara/galería a veces no llega el evento
+   y la foto "no carga" hasta cerrar y abrir la app. */
+let pickerPendiente = null;
+
 function pickPhoto(capture, body, date, hasKey) {
+  if (pickerPendiente) pickerPendiente.cerrar();
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*';
   if (capture) input.capture = 'environment';
-  input.onchange = async () => {
+  input.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0';
+
+  let procesado = false;
+  const cerrar = () => {
+    if (pickerPendiente && pickerPendiente.input === input) pickerPendiente = null;
+    input.removeEventListener('change', procesar);
+    if (input.parentNode) input.remove();
+  };
+  const procesar = async () => {
+    if (procesado) return;
     const f = input.files && input.files[0];
     if (!f) return;
+    procesado = true;
+    cerrar();
     try {
       const raw = await fileToDataURL(f);
       state.photo = await resizeImage(raw, 1024, 0.78);
@@ -207,7 +224,24 @@ function pickPhoto(capture, body, date, hasKey) {
     }
     renderStart(viewRoot(), [], { d: date });
   };
-  document.body.appendChild(input); input.click(); input.remove();
+  input.addEventListener('change', procesar);
+  input.addEventListener('cancel', cerrar);
+  pickerPendiente = { input, cerrar };
+  document.body.appendChild(input);
+  input.click();
+}
+
+/* Al volver a la app (se abrió la cámara/galería y regresamos). */
+export function alVolverDeFoto() {
+  const p = pickerPendiente;
+  if (!p) return;
+  if (p.input.files && p.input.files.length) {
+    p.input.dispatchEvent(new Event('change'));   // el evento "change" no llegó solo
+    return;
+  }
+  setTimeout(() => {                              // volvió sin foto: el selector se canceló
+    if (pickerPendiente === p && !(p.input.files && p.input.files.length)) p.cerrar();
+  }, 1200);
 }
 
 async function runAI({ date, hasKey, usePhoto }) {
