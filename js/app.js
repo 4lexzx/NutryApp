@@ -145,24 +145,49 @@ function setupNetwork() {
 }
 
 /* ---------- Service worker (modo sin conexión) ---------- */
+/* Evita recargar mientras el usuario está escribiendo o con una hoja abierta. */
+function enFormulario() {
+  if (document.querySelector('.sheet-back')) return true;
+  const h = location.hash || '';
+  if (/^#\/(nuevo|editar)/.test(h)) return true;
+  if (/^#\/registrar/.test(h)) {
+    const el = document.querySelector('#view input[type="text"], #view textarea, #view input[type="search"]');
+    if (el && el.value && el.value.trim()) return true;
+  }
+  return false;
+}
+
 function setupSW() {
   if (!('serviceWorker' in navigator)) return;
   if (!/^https?:$/.test(location.protocol)) return;
-  const register = async () => {
+
+  const habiaControlador = !!navigator.serviceWorker.controller;
+  let primeraVez = true;
+  let recargando = false;
+
+  // Cuando una versión nueva toma el control, recargamos para verla.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (primeraVez) { primeraVez = false; if (!habiaControlador) return; }
+    if (recargando) return;
+    if (enFormulario()) {
+      toast('Nueva versión lista. Se aplicará al cerrar y volver a abrir la app.', 'ok');
+      return;
+    }
+    recargando = true;
+    location.reload();
+  });
+
+  const registrar = async () => {
     try {
       const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
-      reg.addEventListener('updatefound', () => {
-        const nw = reg.installing;
-        if (nw) nw.addEventListener('statechange', () => {
-          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-            toast('Nueva versión lista. Se actualizará al recargar.', 'ok');
-          }
-        });
-      });
+      const buscar = () => { if (navigator.onLine) reg.update().catch(() => {}); };
+      setTimeout(buscar, 3000);                       // al abrir
+      setInterval(buscar, 15 * 60 * 1000);            // cada 15 min
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) buscar(); });
     } catch (e) { console.warn('SW no registrado:', e); }
   };
-  if (document.readyState === 'complete') register();
-  else window.addEventListener('load', register, { once: true });
+  if (document.readyState === 'complete') registrar();
+  else window.addEventListener('load', registrar, { once: true });
 }
 
 /* ---------- Init ---------- */
