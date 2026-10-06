@@ -1,6 +1,6 @@
 /* Editor de plato: lista de ingredientes 100% editable con recálculo de totales. */
 
-import { TIPOS_COMIDA, ICONO_TIPO, esc, openSheet, $, $$, toast } from './util.js';
+import { TIPOS_COMIDA, ICONO_TIPO, esc, openSheet, $, $$, toast, confirmSheet } from './util.js';
 import { icon } from './icons.js';
 import { computeTotals, itemMacros, searchFoods, foodToItem, FOODS } from './nutrition.js';
 
@@ -140,6 +140,28 @@ export function mountEditor(root, draft, opts = {}) {
   const delBtn = q('#ed-del');
   if (delBtn && opts.onDelete) delBtn.addEventListener('click', () => opts.onDelete());
 
+  const reBtn = q('#ed-re');
+  if (reBtn && opts.onReanalyze) reBtn.addEventListener('click', async () => {
+    const ok = await confirmSheet({
+      title: '¿Re-analizar con la IA?',
+      msg: 'Se reemplazarán los ingredientes actuales por los que estime la IA (1 consulta de tu cuota diaria). Podrás editar todo antes de guardar.',
+      okText: 'Re-analizar'
+    });
+    if (!ok) return;
+    const old = reBtn.innerHTML;
+    reBtn.disabled = true;
+    reBtn.innerHTML = '<span class="spinner"></span> Reanalizando…';
+    try {
+      await opts.onReanalyze(draft);
+      renderItems();
+    } catch (e) {
+      toast((e && e.message) || 'No se pudo re-analizar.', 'err');
+    } finally {
+      reBtn.disabled = false;
+      reBtn.innerHTML = old;
+    }
+  });
+
   renderItems();
   return { updateTotals, renderItems };
 }
@@ -195,6 +217,7 @@ function editorHTML(draft, opts) {
       <button id="ed-add" class="btn btn-sm btn-outline" type="button">＋ Añadir</button>
     </div>
     <div id="ed-items"></div>
+    ${opts.onReanalyze ? `<button id="ed-re" class="btn btn-ghost btn-block" type="button" style="margin-top:8px">${icon('sparkles')} Re-analizar porciones con la IA</button>` : ''}
     <div id="ed-over" class="over-msg hidden"></div>
   </div>
 

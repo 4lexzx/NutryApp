@@ -270,6 +270,9 @@ se actualizan solos. Eliges el tipo de comida (desayuno/almuerzo/cena/snack) y *
 
 - **⭐ Guardar favorito**: lo deja en Favoritos para reutilizarlo sin gastar IA.
 - Si la IA se equivoca (por ejemplo la porción), corrígela: es lo esperado, es una **estimación**.
+- **✨ Re-analizar porciones con la IA**: al editar una comida ya guardada, la IA vuelve a
+  estimar los gramos con tu foto o con el nombre/nota del plato y **reemplaza los ingredientes**
+  (1 consulta de tu cuota diaria; te pide confirmación y puedes editar todo antes de Guardar).
 
 ### Panel del día (📅 Hoy)
 

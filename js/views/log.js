@@ -330,7 +330,24 @@ export async function renderEdit(root, args) {
       toast('Comida eliminada.', 'ok');
       location.hash = `#/hoy/${meal.date}`;
     },
-    onSaveFavorite: d => saveFav(d)
+    onSaveFavorite: d => saveFav(d),
+    onReanalyze: async d => {
+      const settings = await getSettings();
+      const desc = [d.name, d.note].filter(s => s && String(s).trim()).join('. ').trim();
+      if (!d.photo && !desc) throw new Error('Este plato no tiene foto ni nombre para re-analizar.');
+      const prompt = (await getPrompt()) || DEFAULT_PROMPT;
+      const res = await analyzeMeal({
+        imageDataUrl: d.photo || null,
+        description: desc,
+        prompt,
+        apiKey: settings.apiKey,
+        model: settings.model
+      });
+      if (!res.items || !res.items.length) throw new Error('La IA no devolvió ingredientes.');
+      d.items = res.items;
+      const t = computeTotals(d.items);
+      toast(`Porciones recalculadas: ${Math.round(t.grams)} g y ${Math.round(t.kcal)} kcal. Revisa y guarda.`, 'ok');
+    }
   });
 }
 
