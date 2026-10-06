@@ -44,13 +44,15 @@ export class AIError extends Error {
   constructor(msg, kind = 'otro') { super(msg); this.kind = kind; this.name = 'AIError'; }
 }
 
+/* Los modelos "-lite" regalan ~500 consultas por día en nivel gratuito;
+   los flash "normales" solo ~20 por día. De ahí el orden. */
 const MODELS = [
-  { v: 'gemini-3.8-flash', l: 'gemini-3.8-flash (recomendado)' },
-  { v: 'gemini-3.7-flash', l: 'gemini-3.7-flash' },
-  { v: 'gemini-3.5-flash', l: 'gemini-3.5-flash' },
-  { v: 'gemini-flash-latest', l: 'gemini-flash-latest (último)' },
-  { v: 'gemini-2.5-flash-lite', l: 'gemini-2.5-flash-lite (más económico)' },
-  { v: 'gemini-2.0-flash', l: 'gemini-2.0-flash (anterior)' }
+  { v: 'gemini-3.1-flash-lite', l: 'gemini-3.1-flash-lite (recomendado, ~500/día)' },
+  { v: 'gemini-3.5-flash-lite', l: 'gemini-3.5-flash-lite (~500/día)' },
+  { v: 'gemini-3.8-flash', l: 'gemini-3.8-flash (solo 20/día gratis)' },
+  { v: 'gemini-3.7-flash', l: 'gemini-3.7-flash (solo 20/día gratis)' },
+  { v: 'gemini-3.5-flash', l: 'gemini-3.5-flash (solo 20/día gratis)' },
+  { v: 'gemini-flash-latest', l: 'gemini-flash-latest (solo 20/día gratis)' }
 ];
 export function modelOptions() { return MODELS; }
 
@@ -69,7 +71,15 @@ function friendlyError(status, bodyText, kind) {
     return new AIError(`El modelo no existe o no está disponible con tu clave: ${apiMsg || 'revisa el modelo en Ajustes → IA'}.`, 'modelo');
   }
   if (status === 429 || /rate limit|quota|resource_exhausted|too many requests/.test(low)) {
-    return new AIError('Límite alcanzado: hiciste muchas consultas seguidas. Espera ~1 minuto y vuelve a intentar (la cuota diaria se renueva cada 24 h).', 'limite');
+    const lim = (apiMsg.match(/limit:\s*(\d+)/i) || [])[1];
+    const porDia = /per day|per_day|free_tier_requests|retry in \d+h/i.test(apiMsg);
+    if (porDia) {
+      return new AIError(
+        `Se acabó la cuota diaria gratuita de este modelo${lim ? ` (${lim} consultas por día)` : ''}. ` +
+        'Se renueva sola al día siguiente. Mientras tanto, en Ajustes → IA cambia a un modelo "-lite" ' +
+        '(da ~500 consultas por día) o sigue escribiendo los platos a mano.', 'limite');
+    }
+    return new AIError('Límite por minuto alcanzado: hiciste varias consultas seguidas. Espera ~1 minuto y vuelve a intentarlo.', 'limite');
   }
   if (status === 500 || status === 503 || /overloaded|unavailable|internal/.test(low)) {
     return new AIError('El servicio de Gemini está saturado ahora mismo. Intenta de nuevo en unos segundos.', 'servidor');
@@ -231,7 +241,7 @@ export async function analyzeMeal({ imageDataUrl, description, prompt, apiKey, m
 }
 
 /** Prueba rápida de la API key (devuelve true/false). */
-export async function testApiKey(apiKey, model = 'gemini-3.8-flash') {
+export async function testApiKey(apiKey, model = 'gemini-3.1-flash-lite') {
   if (!navigator.onLine) return { ok: false, msg: 'Sin conexión a internet.' };
   if (!apiKey) return { ok: false, msg: 'Aún no has pegado una API key.' };
   try {

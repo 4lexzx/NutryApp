@@ -136,18 +136,23 @@ export const DB = {
 export const DEFAULT_SETTINGS = {
   k: 'settings',
   apiKey: '',
-  model: 'gemini-3.8-flash',
+  model: 'gemini-3.1-flash-lite',
+  modelMigrated: false,
   theme: 'dark',
   waterGoal: 8,
   disclaimerSeen: false
 };
 
+/* Modelos con muy pocas consultas gratuitas por día (~20): pasamos al -lite (~500/día). */
+const MODELS_TO_LITE = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
+
 export async function getSettings() {
   const s = await DB.kvGet('settings');
   const merged = Object.assign({}, DEFAULT_SETTINGS, s || {});
-  // migración: gemini-2.5-flash ya no está disponible para cuentas nuevas
-  if (merged.model === 'gemini-2.5-flash') {
-    merged.model = 'gemini-3.8-flash';
+  // migración única: si venías en un modelo de 20 consultas/día, te movemos al -lite
+  if (!merged.modelMigrated) {
+    if (MODELS_TO_LITE.includes(merged.model)) merged.model = 'gemini-3.1-flash-lite';
+    merged.modelMigrated = true;
     await DB.kvSet(merged);
   }
   return merged;

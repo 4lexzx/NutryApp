@@ -65,11 +65,14 @@ APP_Nutri/
 
 ## 2. Límites y cosas que debes saber
 
-1. **Cuota gratuita de Gemini (Flash nivel gratis)** ≈ **10 peticiones/minuto** y **~250 por día**
-   (más un tope de tokens por minuto). Una **foto consume bastante más** que un texto.
-   Los valores exactos están en: <https://ai.google.dev/gemini-api/docs/rate-limits>.
-   **Con ~250 análisis/día te alcanza sobrado para uso personal.** Si llegas al límite, la app te
-   avisa: *“Espera ~1 minuto… la cuota diaria se renueva cada 24 h”*.
+1. **Cuota gratuita de Gemini (sin facturación)**: depende del modelo. Los modelos **`-lite` regalan
+   ~500 consultas por día** (`gemini-3.1-flash-lite`, `gemini-3.5-flash-lite`) mientras que los
+   flash “normales” (`3.8/3.7/3.6/3.5-flash`) solo regalan **20 consultas por día**. La app viene
+   con **`gemini-3.1-flash-lite`**, que es la que aguanta varios análisis por día para dos
+   personas. Una **foto consume bastante más tokens** que un texto. Los valores exactos de tu
+   cuenta los ves en Google AI Studio y en <https://ai.google.dev/gemini-api/docs/rate-limits>;
+   la cuota diaria se renueva sola cada día. Si llegas al límite, la app te avisa y puedes cambiar
+   de modelo en **Ajustes → IA** (o seguir a mano: no gasta cuota).
 2. **Costo: $0.** Mientras **no actives la facturación** en Google Cloud, solo existe la cuota
    gratuita. Nunca actives Billing para esta app.
 3. **Tu API key vive en tu celular** (en IndexedDB, dentro de Ajustes). Como es una app web, si
@@ -344,7 +347,8 @@ Crea un contenedor nativo con `npm create @capacitor/app` y apunta la URL de Git
 | *“Tu API key no es válida”* | Copia la clave completa (`AIza…`) en Ajustes → IA → **Guardar** → **Probar clave**. Si cambiaste de clave, borra la anterior primero. |
 | *“403 / restringida a otro dominio”* | La key está restringida a un dominio distinto: edita las **HTTP referrers** en Google AI Studio o quita la restricción. |
 | *“Límite alcanzado”* | Es la **cuota gratuita** (≈10/min y ~250/día). Espera 1 minuto (o al día siguiente). Mientras tanto puedes registrar **manual**. |
-| *“El modelo no existe”* | Cambia el modelo en Ajustes → IA (usa `gemini-3.8-flash`). |
+| *“El modelo no existe”* | Cambia el modelo en Ajustes → IA (usa `gemini-3.1-flash-lite`). |
+| *“Se acabó la cuota diaria gratuita”* | Ese modelo solo regala 20 consultas/día; en **Ajustes → IA** cámbialo por un modelo **`-lite`** (~500/día) o espera a que se renueve al día siguiente. |
 | *“Sin conexión a internet”* | El análisis con IA necesita red. Ver historial/registrar manual funciona igual sin internet. |
 | La app no instala | Úsala en **Chrome** (no en Firefox/Samsung Internet si no ofrece instalar) y con **HTTPS** (GitHub Pages sí). O usa ⋮ → *Añadir a pantalla de inicio*. |
 | Se ve rara al abrir | Recarga: menú ⋮ → **Actualizar**. |
