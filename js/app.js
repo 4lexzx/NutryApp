@@ -2,6 +2,7 @@
 
 import { getSettings, DB } from './db.js';
 import { toast } from './util.js';
+import { initSonidos, setSonidos } from './sound.js';
 import { seedUsers, isAuthed } from './auth.js';
 import { icon } from './icons.js';
 import * as today from './views/today.js';
@@ -217,6 +218,8 @@ function setupResume() {
 async function init() {
   await DB.open();
   await applyTheme();
+  initSonidos();
+  getSettings().then(s => setSonidos(s.sounds)).catch(() => {});
   setupInstall();
   setupNetwork();
   setupSW();

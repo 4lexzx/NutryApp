@@ -367,21 +367,25 @@ async function variantesGuardadas() {
 }
 
 /**
- * Pregunta las variantes pendientes de UNA vez y devuelve las aclaraciones
- * aplicables a este texto (las que ya estaban guardadas + las recién respondidas).
+ * Pregunta SIEMPRE las variantes que el texto no precisa (un día puede ser leche
+ * evaporada y otro entera), y devuelve SOLO las respuestas de esta vez.
+ * La última respuesta de cada variante queda guardada en el celular solo para
+ * el re-analizar (ahí no se pregunta, para no gastar cuota).
  */
 async function pedirAclaraciones(desc) {
-  const guardadas = await variantesGuardadas();
-  const pend = detectarAmbiguedades(desc).filter(a => guardadas[a.clave] === undefined);
-  const nuevas = {};
+  const pend = detectarAmbiguedades(desc);
+  const respuestas = {};
   for (const a of pend) {
     const r = await preguntarVariante(a);
-    if (r) { nuevas[a.clave] = r; guardadas[a.clave] = r; }
+    if (r) respuestas[a.clave] = r;
   }
-  if (Object.keys(nuevas).length) {
-    try { await DB.kvSet({ k: 'variantes', map: guardadas }); } catch (e) { console.warn('No se guardaron las variantes:', e); }
+  if (Object.keys(respuestas).length) {
+    try {
+      const guardadas = await variantesGuardadas();
+      await DB.kvSet({ k: 'variantes', map: { ...guardadas, ...respuestas } });
+    } catch (e) { console.warn('No se guardaron las variantes:', e); }
   }
-  return aclaracionesDe(desc, guardadas);
+  return respuestas;
 }
 
 /** Aclaraciones que aplican a este texto (sin preguntar nada). */
@@ -417,16 +421,21 @@ async function runAI({ date, hasKey, usePhoto }) {
 
   const desc = (state.desc || '').trim();
   const plan = planPorciones(desc);
-  const clave = desc && !usePhoto ? claveConsulta(desc) : '';
 
-  // 1) ¿ya lo analizamos antes? Entonces sale de la base local: mismo resultado y 0 cuota
+  // 1) lo que no especificaste se pregunta SIEMPRE (antes de mirar la base local:
+  //    un día puede ser leche evaporada y otro entera)
+  const aclar = await pedirAclaraciones(desc).catch(() => ({}));
+  const descFinal = anexarAclaraciones(desc, aclar);
+
+  // 2) ¿ya analizamos ESTA variante? Entonces sale de la base local: mismo resultado y 0 cuota
+  const clave = descFinal && !usePhoto ? claveConsulta(descFinal) : '';
   if (clave && plan.local) {
     const base = await buscarPlatoBase(clave).catch(() => null);
     if (base && base.items && base.items.length) {
       const items = aplicarMultiplicador(base.items, plan.mult);
       await montarDraftIA({
         date, name: base.nombre || desc, source: 'base', items, photo: '',
-        note: notaPlato(`Base local · sin gastar cuota${plan.mult !== 1 ? ` · × ${plan.mult}` : ''}`,
+        note: notaPlato(`Base local · sin gastar cuota${plan.mult !== 1 ? ` × ${plan.mult}` : ''}`,
           { supuestos: base.supuestos }),
         mult: plan.mult, baseClave: clave
       });
@@ -434,10 +443,6 @@ async function runAI({ date, hasKey, usePhoto }) {
       return;
     }
   }
-
-  // 2) si falta precisar una variante (¿qué leche?), preguntamos ANTES de llamar a la IA
-  const aclar = await pedirAclaraciones(desc).catch(() => ({}));
-  const descFinal = anexarAclaraciones(desc, aclar);
 
   body.innerHTML = `
     <div class="card loading-block">
@@ -588,8 +593,50 @@ function fusionarReanalisis(viejos, nuevos) {
   return { items, conservados };
 }
 
-/** Tipos de comida ya registrados en una fecha. */
-async function tiposDelDia(date) {
+/**
+ * Re-análisis con la IA desde el editor (plato nuevo o ya guardado):
+ * pide confirmación en el botón, conserva tus correcciones manuales y
+ * re-estima el resto con la foto/nombre/nota actuales.
+ */
+async function reanalizarDraft(d) {
+  const settings = await getSettings();
+  const oldG = Math.round((d.items || []).reduce((a, i) => a + (Number(i.gramos) || 0), 0));
+  const prev = (d.items || []).filter(i => Number(i.gramos) > 0)
+    .map(i => `${Math.round(Number(i.gramos))} g de ${(i.nombre || '').trim()}`);
+  const partes = [d.name, d.note];
+  if (prev.length) {
+    partes.push(`Cantidades registradas actualmente: ${prev.join(', ')}.`);
+    partes.push('No aumentes estas cantidades: solo puedes bajarlas si son excesivas para UN plato personal.');
+  }
+  let desc = partes.filter(s => s && String(s).trim()).join('. ').trim();
+  // tus aclaraciones guardadas (leche = evaporada…) también valen al re-analizar
+  const aclar = await aclaracionesDe([d.name, d.note, ...(d.items || []).map(i => i.nombre)].join(' ')).catch(() => ({}));
+  desc = anexarAclaraciones(desc, aclar);
+  if (!d.photo && !desc) throw new Error('Este plato no tiene foto ni nombre para re-analizar.');
+  const prompt = (await getPrompt()) || DEFAULT_PROMPT;
+  const res = await analyzeMeal({
+    imageDataUrl: d.photo || null,
+    description: desc,
+    prompt,
+    apiKey: settings.apiKey,
+    model: settings.model,
+    maxTotalG: oldG > 0 ? Math.round(oldG * 1.15) : 0
+  });
+  if (!res.items || !res.items.length) throw new Error('La IA no devolvió ingredientes.');
+  const fusion = fusionarReanalisis(d.items || [], res.items);
+  d.items = fusion.items;
+  const t = computeTotals(d.items);
+  const conservados = fusion.conservados
+    ? ` Mantuvimos ${fusion.conservados} corrección${fusion.conservados === 1 ? '' : 'es'} manual${fusion.conservados === 1 ? '' : 'es'}.`
+    : '';
+  if (oldG > 0 && t.grams > oldG + 15) {
+    toast(`Ojo: la IA subió las porciones de ${oldG} g a ${t.grams} g. Bájalas a mano si no te cuadran (${t.kcal} kcal).${conservados}`, 'warn');
+  } else {
+    toast(`Porciones recalculadas: ${t.grams} g y ${t.kcal} kcal.${conservados} Revisa y guarda.`, 'ok');
+  }
+}
+
+/** Tipos de comida ya registrados en una fecha. */async function tiposDelDia(date) {
   try {
     const meals = await DB.byDate('meals', date || todayISO());
     return meals.map(m => m.type).filter(Boolean);
@@ -631,7 +678,8 @@ export async function renderNew(root) {
     tipoHint: draft.id ? '' : (draft._hint || ''),
     onSave: d => saveMeal(d),
     onSaveFavorite: d => saveFav(d),
-    onGuardarBase: d => guardarBaseDesdeEditor(d)
+    onGuardarBase: d => guardarBaseDesdeEditor(d),
+    onReanalyze: d => reanalizarDraft(d)
   });
 }
 
@@ -658,43 +706,7 @@ export async function renderEdit(root, args) {
     },
     onSaveFavorite: d => saveFav(d),
     onGuardarBase: d => guardarBaseDesdeEditor(d),
-    onReanalyze: async d => {
-      const settings = await getSettings();
-      const oldG = Math.round((d.items || []).reduce((a, i) => a + (Number(i.gramos) || 0), 0));
-      const prev = (d.items || []).filter(i => Number(i.gramos) > 0)
-        .map(i => `${Math.round(Number(i.gramos))} g de ${(i.nombre || '').trim()}`);
-      const partes = [d.name, d.note];
-      if (prev.length) {
-        partes.push(`Cantidades registradas actualmente: ${prev.join(', ')}.`);
-        partes.push('No aumentes estas cantidades: solo puedes bajarlas si son excesivas para UN plato personal.');
-      }
-      let desc = partes.filter(s => s && String(s).trim()).join('. ').trim();
-      // tus aclaraciones guardadas (leche = evaporada…) también valen al re-analizar
-      const aclar = await aclaracionesDe([d.name, d.note, ...(d.items || []).map(i => i.nombre)].join(' ')).catch(() => ({}));
-      desc = anexarAclaraciones(desc, aclar);
-      if (!d.photo && !desc) throw new Error('Este plato no tiene foto ni nombre para re-analizar.');
-      const prompt = (await getPrompt()) || DEFAULT_PROMPT;
-      const res = await analyzeMeal({
-        imageDataUrl: d.photo || null,
-        description: desc,
-        prompt,
-        apiKey: settings.apiKey,
-        model: settings.model,
-        maxTotalG: oldG > 0 ? Math.round(oldG * 1.15) : 0
-      });
-      if (!res.items || !res.items.length) throw new Error('La IA no devolvió ingredientes.');
-      const fusion = fusionarReanalisis(d.items || [], res.items);
-      d.items = fusion.items;
-      const t = computeTotals(d.items);
-      const conservados = fusion.conservados
-        ? ` Mantuvimos ${fusion.conservados} corrección${fusion.conservados === 1 ? '' : 'es'} manual${fusion.conservados === 1 ? '' : 'es'}.`
-        : '';
-      if (oldG > 0 && t.grams > oldG + 15) {
-        toast(`Ojo: la IA subió las porciones de ${oldG} g a ${t.grams} g. Bájalas a mano si no te cuadran (${t.kcal} kcal).${conservados}`, 'warn');
-      } else {
-        toast(`Porciones recalculadas: ${t.grams} g y ${t.kcal} kcal.${conservados} Revisa y guarda.`, 'ok');
-      }
-    }
+    onReanalyze: d => reanalizarDraft(d)
   });
 }
 

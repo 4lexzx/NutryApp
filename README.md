@@ -56,6 +56,7 @@ APP_Nutri/
     ├── charts.js              ← gráficos en canvas (peso, barras semana/mes)
     ├── export.js              ← CSV para Excel + respaldo/restauración .json
     ├── util.js                ← fechas, toasts, ventanas emergentes, imágenes
+    ├── sound.js               ← clic suave de los botones (con interruptor en Ajustes)
     └── views/                 ← una pantalla por módulo (hoy, registro, historial…)
 ```
 
@@ -253,6 +254,8 @@ caracteres, y ya queda creada **solo en ese dispositivo**. No hace falta exporta
    - cálculo de **kcal, proteína, carbohidratos, grasas y fibra**,
    - salida en **JSON estructurado** que la app transforma en una tabla editable.
 5. **Registrar peso** en 💪 para ver tu gráfico de evolución.
+6. **Ajustes → Apariencia**:    eliges tema **oscuro/claro** y enciendes o apagas los **sonidos
+   suaves de los botones** (un clic bajito estilo Apple al tocar; viene encendido).
 
 ---
 
@@ -274,40 +277,56 @@ se actualizan solos. Eliges el tipo de comida (desayuno/almuerzo/cena/snack) y *
 
 - **⭐ Guardar favorito**: lo deja en Favoritos para reutilizarlo sin gastar IA.
 - Si la IA se equivoca (por ejemplo la porción), corrígela: es lo esperado, es una **estimación**.
-- **✨ Re-analizar porciones con la IA**: al editar una comida ya guardada, la IA vuelve a
-  estimar los gramos con tu foto o con el nombre/nota del plato y **actualiza los ingredientes**
-  (1 consulta de tu cuota diaria; te pide confirmación y puedes editar todo antes de Guardar).
+- **✨ Re-analizar con la IA**: el botón aparece al editar una comida guardada **y también recién
+  analizada** (por si te equivocaste al escribir un ingrediente: corrige el nombre y dale a
+  **Re-analizar** — la app te avisa *“Cambiaste el nombre de un ingrediente: pulsa arriba para que
+  la IA lo vuelva a mirar”*). La IA vuelve a estimar los gramos con tu foto o con el nombre/nota
+  del plato y **actualiza los ingredientes** (1 consulta de tu cuota diaria; te pide confirmación
+  y puedes editar todo antes de Guardar).
   **No sube tus porciones**: parte de los gramos que ya tienes registrados y solo puede
   mantenerlos o bajarlos (máximo +15%, y te avisa si la IA se pasa).
   **Tus correcciones manuales no se pierden**: lo que hayas cambiado a mano (gramos o nombre del
   ingrediente) se conserva tal cual; la IA solo re-estima el resto, y el aviso te dice cuántas
-  correcciones tuyas mantuvo.
+  correcciones tuyas mantuvo. Las preguntas de variantes no se repiten aquí: se aplican las
+  respuestas que diste al analizar.
 
-### Te pregunta antes de analizar (y aprende tus respuestas)
+### Te pregunta antes de analizar (siempre que no lo especifiques tú)
 
 Si lo que escribes puede significar varias cosas, la app **te pregunta primero** (antes de gastar
-cuota de IA) y con tu respuesta arma la consulta más precisa:
+cuota de IA **y antes de consultar tu base de platos**) y con tu respuesta arma la consulta más
+precisa. Pregunta por:
 
-- “leche con avena” → **¿Qué leche usaste?** (entera, evaporada, en polvo, descremada, de almendras)
-- “arroz con pollo” → **¿Qué arroz?** (blanco, tres segundos, integral)
-- También pregunta por **aceite**, **tipo de avena** y el **líquido del batido** (agua o leche).
-- Respondes con un toque, o **“Omitir (que la IA suponga)”** si prefieres; también puedes cerrar
-  la pregunta con la tecla Escape.
-- **La respuesta se guarda en tu celular** y no vuelve a salir para eso: la próxima vez que
-  analices algo parecido ya va sola con tu elección (“Aclaración del usuario: leche = entera”).
-- Si el texto ya la trae escrita (“leche de almendras”, “arroz integral”), **no pregunta**.
-- La aclaración también vale al **re-analizar** y en **favoritos** que salen de la IA.
+- **leche** (entera, evaporada, en polvo, descremada, de almendras…)
+- **tipo de avena** (en hojuelas, en polvo, cocida…) y **tipo de arroz** (blanco, tres segundos, integral)
+- **pollo** (pechuga, muslo, al horno…), **pan**, **queso**, **atún**, **yogurt** y **jugo**
+- **aceite** (oliva, canola…) y el **líquido del batido** (agua o leche)
+
+Reglas:
+
+- **No pregunta** si el texto ya lo trae escrito (“leche de almendras”, “arroz integral”): eso no
+  se pregunta, solo lo que quedó ambiguo.
+- Respondes con un toque, o **“Omitir (que la IA suponga)”**; también puedes cerrar la pregunta
+  con la tecla Escape.
+- **Siempre pregunta de nuevo** si lo vuelves a omitir: ayer pudiste usar leche entera y hoy
+  evaporada, así que la app no se adivina — tú eliges cada vez.
+- Como la aclaración viaja en la consulta, **cada variante aprende por separado**: “leche entera
+  con avena” y “leche evaporada con avena” quedan en filas distintas de tu base local.
+- Las respuestas se guardan en tu celular y se re-aplican **solo al re-analizar** (donde ya no
+  aparecen las preguntas), para que esa corrección no se pierda.
+- La aclaración también vale en **favoritos** que salen de la IA.
 
 ### ¿De qué comida es? La app lo adivina sola
 
 Al abrir el editor, el tipo de comida (desayuno/almuerzo/cena/snack) se elige según **3 cosas**:
 
-1. **La hora**: a la 1 p. m. es almuerzo, aunque no hayas desayunado.
+1. **La hora**: a la 1 p. m. es almuerzo, aunque no hayas desayunado; **las 5 p. m. ya es
+   merienda (snack), nunca cena** — la cena recién se sugiere **desde las 7 p. m.**
 2. **Lo que ya registraste hoy**: si ya desayunaste, nunca te vuelve a sugerir desayuno; lo que
    sigue es la que viene (desayuno → almuerzo → cena). Si una comida principal ya pasó y no la
-   registraste, el aviso te dice **“Falta registrar: desayuno”**.
+   registraste, el aviso te dice **“Falta registrar: desayuno”** (a las 5 p. m. te recuerda el
+   almuerzo si falta, y si ya almorzaste la merienda es un snack).
 3. **El tamaño**: los **snacks son cosas pequeñas** (café, fruta, galletas), no platos; un plato
-   completo no se clasifica como snack. De noche (9 p. m. en adelante) manda la cena si todavía
+   completo no se clasifica como snack. De noche (7 p. m. en adelante) manda la cena si todavía
    no cenaste.
 
 Los botones siguen siendo tuyos: si te equivoca, cambias el tipo a mano y el aviso pasa a
@@ -326,9 +345,11 @@ decirte que lo dejaste manual.
 - **✖️ “2 platos” = doble exacto**: la app guarda la porción base de 1 plato y la multiplica
   ella misma (los mismos gramos × 2), sin dejar que la IA invente cantidades distintas.
 - **📚 Base local de platos**: lo que analizas queda guardado en tu celular; la próxima vez que
-  escribas el mismo plato (aunque sea en otro orden: “avena con leche”) sale **igual y sin gastar
-  cuota**. En el editor, **“Usar como mi porción estándar”** guarda tus gramos corregidos como
-  la porción oficial de ese plato; puedes borrar la base en **Ajustes → Base de platos**.
+  escribas el mismo plato con las mismas respuestas (aunque sea en otro orden: “avena con leche”)
+  sale **igual y sin gastar cuota**. En el editor, **“Usar como mi porción estándar”** guarda tus
+  gramos corregidos como la porción oficial de ese plato. Y en **Ajustes → Mis porciones
+  estándar → Ver** ves la lista completa (nombre, ingredientes y gramos) y puedes **“Quitar”**
+  una porción que se guardó sin querer: la próxima vez que la consultes la IA la analiza de nuevo.
 - **🧪 Temperatura 0.2 + JSON validado**: respuestas consistentes; si el JSON viene malo, la app
   reintenta una vez y te avisa en vez de mostrar datos rotos.
 - **🥛 Contenedores y medidas**: el prompt identifica el recipiente de la foto o del texto y usa
@@ -344,7 +365,8 @@ decirte que lo dejaste manual.
 - Navegas de día en día con **‹ ›** o tocando la fecha.
 - Ves **kcal consumidas vs meta** y **4 barras de progreso** con lo que falta de cada macro.
 - Lista de comidas del día con sus macros; puedes **Ver ingredientes / Editar / Eliminar**.
-- Contador de **agua** (vasos de 250 ml, configurable en Ajustes).
+- Contador de **agua** (vasos de 250 ml): la tarjeta te dice la cuenta clara, por ejemplo
+  **“8 vasos = 2.00 L al día (1 vaso = 250 ml)”**, y la meta se cambia en Ajustes.
 
 ### Historial (📊)
 

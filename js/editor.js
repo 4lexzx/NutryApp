@@ -63,7 +63,12 @@ export function mountEditor(root, draft, opts = {}) {
       const i = Number(row.dataset.i);
       const it = draft.items[i];
       const nameIn = row.querySelector('.ing-name');
-      nameIn.addEventListener('input', e => { it.nombre = e.target.value; it.editado = true; });
+      nameIn.addEventListener('input', e => {
+        it.nombre = e.target.value;
+        it.editado = true;
+        const aviso = document.getElementById('ed-re-hint');
+        if (aviso) aviso.classList.remove('hidden');
+      });
 
       const gIn = row.querySelector('[data-k="g"]');
       gIn.addEventListener('input', e => {
@@ -148,7 +153,7 @@ export function mountEditor(root, draft, opts = {}) {
   if (reBtn && opts.onReanalyze) reBtn.addEventListener('click', async () => {
     const ok = await confirmSheet({
       title: '¿Re-analizar con la IA?',
-      msg: 'Se reemplazarán los ingredientes actuales por los que estime la IA (1 consulta de tu cuota diaria). Podrás editar todo antes de guardar.',
+      msg: 'La IA estimará otra vez los ingredientes con la foto/nombre actuales (1 consulta de tu cuota diaria). Tus correcciones manuales (gramos o nombres que cambiaste) se conservan y podrás editar todo antes de guardar.',
       okText: 'Re-analizar'
     });
     if (!ok) return;
@@ -235,7 +240,8 @@ function editorHTML(draft, opts) {
       <button id="ed-add" class="btn btn-sm btn-outline" type="button">＋ Añadir</button>
     </div>
     <div id="ed-items"></div>
-    ${opts.onReanalyze ? `<button id="ed-re" class="btn btn-ghost btn-block" type="button" style="margin-top:8px">${icon('sparkles')} Re-analizar porciones con la IA</button>` : ''}
+    ${opts.onReanalyze ? `<button id="ed-re" class="btn btn-ghost btn-block" type="button" style="margin-top:8px">${icon('sparkles')} Re-analizar con la IA</button>
+    <div id="ed-re-hint" class="tiny muted hidden" style="margin-top:6px">Cambiaste el nombre de un ingrediente: pulsa arriba para que la IA recalcule el plato (tus gramos corregidos se conservan).</div>` : ''}
     ${opts.onGuardarBase ? `<button id="ed-base" class="btn btn-ghost btn-block" type="button" style="margin-top:8px">${icon('book')} Usar como mi porción estándar</button>` : ''}
     <div id="ed-over" class="over-msg hidden"></div>
   </div>

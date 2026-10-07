@@ -90,7 +90,7 @@ export async function render(root, params) {
           <button class="btn btn-sm btn-ghost" id="w-less" type="button">−</button>
         </div>
       </div>
-      <div class="tiny muted" style="margin-top:8px">1 vaso = ${num(250 * waterGoal / 1000, 2)} L al día (ajustable en Ajustes).</div>
+      <div class="tiny muted" style="margin-top:8px">${waterGoal} vasos = ${num(250 * waterGoal / 1000, 2)} L al día (1 vaso = 250 ml · ajustable en Ajustes).</div>
     </div>
 
     ${ordered.length ? ordered.map(g => `

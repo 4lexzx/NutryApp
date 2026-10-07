@@ -97,8 +97,8 @@ export function claveConsulta(texto) {
 
 /* ============ Pregunta rápida ANTES de analizar (variantes de alimentos) ============
    Si lo que escribe puede significar varias cosas (leche entera/evaporada/en polvo…),
-   la app pregunta ANTES de llamar a la IA para que los gramos salgan precisos.
-   La respuesta se guarda en el celular y no se vuelve a preguntar. */
+   la app pregunta ANTES de llamar a la IA (y antes de la base local): un día puede ser
+   leche evaporada y otro entera. La última respuesta se guarda solo para el re-analizar. */
 const VARIANTES = [
   {
     clave: 'leche',
@@ -120,6 +120,48 @@ const VARIANTES = [
     ya: /\bavena\s+(en\s+hojuelas|bebible|instant[aá]a|en\s+polvo|molida)\b/i,
     titulo: '¿Qué tipo de avena?',
     opciones: ['en hojuelas', 'bebible instantánea', 'en polvo']
+  },
+  {
+    clave: 'pollo',
+    test: /\bpollo\b/i,
+    ya: /\bpollo\s+(pechuga|muslo|entero|a\s+la\s+brasa|al\s+horno|frito|deshebrado|guisado)\b/i,
+    titulo: '¿Qué parte de pollo?',
+    opciones: ['pechuga', 'muslo', 'pollo entero', 'pollo a la brasa']
+  },
+  {
+    clave: 'pan',
+    test: /\bpan\b|\bpanes\b/i,
+    ya: /\bpan(es)?\s+(blanco|integral|franc[ée]s|de\s+molde|de\s+cebolla|tostado|con\s+semillas)\b/i,
+    titulo: '¿Qué pan?',
+    opciones: ['blanco', 'integral', 'pan francés', 'pan de molde']
+  },
+  {
+    clave: 'queso',
+    test: /\bqueso\b/i,
+    ya: /\bqueso\s+(fresco|amarillo|parmesano|mozzarella|edam|panela|coste[ñn]o|rayado)\b/i,
+    titulo: '¿Qué queso?',
+    opciones: ['fresco', 'amarillo', 'parmesano', 'mozzarella']
+  },
+  {
+    clave: 'atún',
+    test: /\bat[uú]n\b/i,
+    ya: /\bat[uú]n\s+(al\s+agua|en\s+aceite|natural)\b/i,
+    titulo: '¿Atún en conserva?',
+    opciones: ['al agua', 'en aceite']
+  },
+  {
+    clave: 'yogurt',
+    test: /\byogurt\b|\byogur\b/i,
+    ya: /\byogur(?:t)?\s+(natural|bebible|griego|con\s+frutas?|descremado|batido)\b/i,
+    titulo: '¿Qué yogurt?',
+    opciones: ['natural', 'griego', 'bebible', 'con frutas']
+  },
+  {
+    clave: 'jugo',
+    test: /\bjugo\b/i,
+    ya: /\bjugo\s+(natural|en\s+polvo|con\s+pulpa|exprimido|de\s+caja)\b/i,
+    titulo: '¿Qué jugo?',
+    opciones: ['natural', 'en polvo', 'de caja']
   },
   {
     clave: 'aceite',

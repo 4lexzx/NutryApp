@@ -179,6 +179,7 @@ export const DEFAULT_SETTINGS = {
   modelMigrated: false,
   theme: 'dark',
   waterGoal: 8,
+  sounds: true,
   disclaimerSeen: false
 };
 

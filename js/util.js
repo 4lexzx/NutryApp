@@ -22,12 +22,17 @@ export const ICONO_TIPO = { desayuno: 'sunrise', almuerzo: 'utensils', cena: 'mo
  *    desayuno, lo que sigue es un snack (merienda), no otro desayuno.
  *  - Los snacks son cosas pequeñas: café/fruta no es plato (salvo el desayuno:
  *    un yogur a las 8 sí es desayuno).
- *  - De noche (21+) manda la cena si todavía no cenaste.
+ *  - 16:00–18:59 es merienda: si ya almorzaste es snack; si no, aún manda el almuerzo.
+ *  - La cena manda desde las 19:00 en adelante (a las 5 p. m. NO es cena).
  */
 export function elegirTipo(h, hechos, tam = '') {
   const tiene = t => Array.isArray(hechos) && hechos.includes(t);
-  if (h >= 21) return (!tiene('cena') && tam !== 'pequeno') ? 'cena' : 'snack';
-  const ventana = h < 11 ? 'desayuno' : h < 16 ? 'almuerzo' : 'cena';
+  if (h >= 19) return (!tiene('cena') && tam !== 'pequeno') ? 'cena' : 'snack';
+  const ventana = h < 11 ? 'desayuno' : h < 16 ? 'almuerzo' : 'merienda';
+  if (ventana === 'merienda') {
+    if (!tiene('almuerzo') && tam !== 'pequeno') return 'almuerzo';
+    return 'snack';
+  }
   if (tiene(ventana)) return 'snack';
   if (tam === 'pequeno' && ventana !== 'desayuno') return 'snack';
   return ventana;
@@ -39,7 +44,7 @@ export function faltanPorHora(h, hechos) {
   const f = [];
   if (h >= 11 && !tiene('desayuno')) f.push('desayuno');
   if (h >= 16 && !tiene('almuerzo')) f.push('almuerzo');
-  if (h >= 22 && !tiene('cena')) f.push('cena');
+  if (h >= 19 && !tiene('cena')) f.push('cena');
   return f;
 }
 

@@ -1,11 +1,12 @@
 /* Ajustes: instalación, tema, IA, agua, respaldo y datos. */
 
-import { DB, getSettings, saveSettings, getProfile, getPrompt, limpiarPlatosBase } from '../db.js';
+import { DB, getSettings, saveSettings, getProfile, getPrompt, limpiarPlatosBase, listarPlatosBase, borrarPlatoBase } from '../db.js';
 import { icon } from '../icons.js';
 import { exportMealsCSV, exportWeightsCSV, exportBackup, importBackup, backupSummary, dataHelpHTML } from '../export.js';
 import { testApiKey, modelOptions } from '../ai.js';
-import { esc, toast, confirmSheet, pickFile, downloadFile, todayISO } from '../util.js';
+import { esc, toast, confirmSheet, pickFile, downloadFile, todayISO, openSheet } from '../util.js';
 import { clearSession, currentUser } from '../auth.js';
+import { setSonidos, clic } from '../sound.js';
 
 const VERSION = '1.0.0';
 
@@ -36,6 +37,13 @@ export async function render(root) {
         <button class="btn btn-block ${s.theme === 'dark' ? 'btn-primary' : ''}" data-theme="dark" type="button">${icon('moon')} Oscuro</button>
         <button class="btn btn-block ${s.theme === 'light' ? 'btn-primary' : ''}" data-theme="light" type="button">${icon('sun')} Claro</button>
       </div>
+      <div class="divider"></div>
+      <b class="small">Sonidos al tocar los botones</b>
+      <div class="tiny muted" style="margin:2px 0 8px">Un clic suave y bajito, como en las apps de Apple.</div>
+      <div class="row">
+        <button class="btn btn-block ${s.sounds !== false ? 'btn-primary' : ''}" data-snd="on" type="button">Encendido</button>
+        <button class="btn btn-block ${s.sounds === false ? 'btn-primary' : ''}" data-snd="off" type="button">Apagado</button>
+      </div>
     </div>
 
     <div class="card">
@@ -63,12 +71,15 @@ export async function render(root) {
       <div class="divider"></div>
       <div class="spread">
         <div>
-          <b class="small">Base de platos (Piura)</b>
-          <div class="tiny muted">${nBase === 0
-            ? 'Sin platos aprendidos: los primeros análisis se repiten solo una vez'
-            : `${nBase} plato${nBase === 1 ? '' : 's'} aprendido${nBase === 1 ? '' : 's'} · se repiten sin gastar cuota y con los mismos gramos`}</div>
+          <b class="small">Mis porciones estándar (base de platos)</b>
+          <div class="tiny muted" id="s-base-count">${nBase === 0
+            ? 'Sin porciones guardadas: los primeros análisis se repiten solo una vez'
+            : `${nBase} porción${nBase === 1 ? '' : 'es'} guardada${nBase === 1 ? '' : 's'} · salen igual y sin gastar cuota`}</div>
         </div>
-        <button class="btn btn-sm btn-ghost" id="s-base-clear" type="button" ${nBase ? '' : 'disabled'}>Borrar</button>
+        <div class="row">
+          <button class="btn btn-sm btn-outline" id="s-base-ver" type="button">Ver</button>
+          <button class="btn btn-sm btn-ghost" id="s-base-clear" type="button" ${nBase ? '' : 'disabled'}>Borrar</button>
+        </div>
       </div>
       <p class="tiny muted" style="margin-top:10px">La clave se guarda <b>solo en tu celular</b> (IndexedDB). Solo se envía
         a los servidores de Google cuando pides un análisis.</p>
@@ -169,6 +180,16 @@ export async function render(root) {
     render(root);
   });
 
+  /* sonidos */
+  root.querySelectorAll('[data-snd]').forEach(b => b.onclick = async () => {
+    const on = b.dataset.snd === 'on';
+    await saveSettings({ sounds: on });
+    setSonidos(on);
+    if (on) clic();
+    toast(on ? 'Sonidos encendidos.' : 'Sonidos apagados.', 'ok');
+    render(root);
+  });
+
   /* IA */
   const keyIn = root.querySelector('#s-key');
   root.querySelector('#s-key-show').onclick = e => {
@@ -189,6 +210,55 @@ export async function render(root) {
     render(root);
   };
   root.querySelector('#s-model').onchange = async e => { await saveSettings({ model: e.target.value }); toast('Modelo: ' + e.target.value, 'ok'); };
+  /* ver mis porciones estándar (y poder revertir una guardada sin querer) */
+  const baseVer = root.querySelector('#s-base-ver');
+  if (baseVer) baseVer.onclick = async () => {
+    const lista = await listarPlatosBase().catch(() => []);
+    const filaHTML = p => {
+      const g = Math.round((p.items || []).reduce((a, i) => a + (Number(i.gramos) || 0), 0));
+      return `
+      <div class="spread" style="padding:10px 0;border-top:1px solid rgba(128,128,128,.25)">
+        <div>
+          <b class="small">${esc(p.nombre || p.clave)}</b>
+          <div class="tiny muted">${(p.items || []).length} ingrediente${(p.items || []).length === 1 ? '' : 's'} · ${g} g · ${p.fuente === 'usuario' ? 'tu porción' : 'analizada por IA'}</div>
+        </div>
+        <button class="btn btn-sm btn-ghost" data-del="${esc(p.clave)}" type="button">Quitar</button>
+      </div>`;
+    };
+    const s = openSheet(`
+      <h2>Mis porciones estándar</h2>
+      <p class="small muted">Platos analizados que salen siempre igual (y sin gastar cuota) cuando los vuelves a escribir.
+        Si guardaste uno sin querer, quítalo aquí y la próxima vez la IA lo analizará de nuevo.</p>
+      <div id="base-lista">
+        ${lista.length ? lista.map(filaHTML).join('')
+        : '<div class="empty" style="padding:16px">Todavía no guardas ninguna porción estándar.</div>'}
+      </div>
+      <button class="btn btn-block btn-ghost" id="base-cerrar" type="button" style="margin-top:14px">Cerrar</button>`);
+    const refrescarContador = () => {
+      const n = s.root.querySelectorAll('[data-del]').length;
+      const cnt = root.querySelector('#s-base-count');
+      if (cnt) cnt.textContent = n === 0
+        ? 'Sin porciones guardadas: los primeros análisis se repiten solo una vez'
+        : `${n} porción${n === 1 ? '' : 'es'} guardada${n === 1 ? '' : 's'} · salen igual y sin gastar cuota`;
+      const clear = root.querySelector('#s-base-clear');
+      if (clear) clear.disabled = n === 0;
+      if (!n) {
+        const vacio = s.root.querySelector('#base-lista');
+        if (vacio && !vacio.querySelector('.empty')) vacio.innerHTML = '<div class="empty" style="padding:16px">Todavía no guardas ninguna porción estándar.</div>';
+      }
+    };
+    s.root.querySelector('#base-cerrar').onclick = () => { s.close(); render(root); };
+    s.root.querySelectorAll('[data-del]').forEach(btn => {
+      btn.onclick = async () => {
+        await borrarPlatoBase(btn.dataset.del).catch(() => {});
+        const fila = btn.closest('.spread');
+        if (fila) fila.remove();
+        refrescarContador();
+        toast('Porción estándar quitada: la próxima consulta la IA la analizará de nuevo.', 'ok');
+      };
+    });
+  };
+
   root.querySelector('#s-base-clear').onclick = async () => {
     const ok = await confirmSheet({
       title: '¿Borrar la base de platos?',
