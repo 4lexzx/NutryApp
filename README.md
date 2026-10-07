@@ -474,8 +474,11 @@ bundler ni servidor propio.
 - **Fórmulas de metas**: `js/nutrition.js` (`calcTargets`).
 - **Colores/diseño**: `css/styles.css` (variables en `:root` y `[data-theme="light"]`).
 - **Nombre y colores del ícono**: `icons/` (PNG) y `manifest.webmanifest`.
-- **Versión de la app** (para forzar actualización): `js/views/settings.js` (`VERSION`) y el
-  nombre de caché `CACHE` en `sw.js` (súbelo a `nutri-gym-v2`, etc.).
+- **Versión de la app**: se ve en **Ajustes → Acerca de** (`js/views/settings.js`, constante
+  `VERSION`, formato `1.2.x`). **En cada cambio publicado sube el último dígito** (1.2.0 → 1.2.1
+  → 1.2.2…) para que el usuario sepa de un vistazo si ya tiene la última actualización.
+  Además sube el nombre de caché `CACHE` en `sw.js` (por ejemplo `nutri-gym-v15`) para forzar
+  la descarga de los archivos nuevos en el celular.
 
 **Verla en local en tu PC** (opcional): necesitas un servidor porque los módulos ES y el service
 worker no corren desde `file://`:
