@@ -3,61 +3,132 @@
 
 import { b64FromDataURL, esc } from './util.js';
 
-export const DEFAULT_PROMPT = `Eres un asistente de nutrición especializado en comida peruana y dietas para gimnasio.
-Tu tarea: analizar la foto y/o descripción de UN plato (una sola porción para una persona).
+export const DEFAULT_PROMPT = `Eres un asistente de nutrición especializado en la gastronomía del NORTE DEL PERÚ (Piura y Sullana) y en dietas para gimnasio.
+Tu tarea: analizar la foto y/o la descripción y devolver la BASE de UNA porción personal (la app multiplica sola si el usuario pidió varias).
 
-INSTRUCCIONES
-1. Identifica TODOS los ingredientes visibles o descritos.
-2. Estima la porción de CADA ingrediente en GRAMOS de UNA porción de plato: no la receta entera, no la olla, no la orden completa.
-   Referencias para UN plato de almuerzo (plato hondo de 24–26 cm):
-   - Arroz blanco cocido: 100–180 g
-   - Carne de res (lomo, bistec, guiso): 70–130 g
-   - Pollo: 70–150 g (con hueso; sin hueso 70–120 g)
-   - Papa (sancochada, frita, al horno): 100–150 g (2–3 papas medianas)
-   - Camote, chaufa, tallarines, macarrones: 120–180 g
-   - Verduras, ensalada, tomate, cebolla: 50–120 g
-   - Frijoles, lentejas, maíz, palta: 50–100 g
-   - Aceite, mantequilla, grasa, salsa de soya: 5–15 g (cucharadita = 5 g)
-   - Queso, huevo, pan, chicharrón: 20–60 g
-   - Bebidas (leche, jugo, chicha): 150–250 g
-3. LA SUMA del plato ("porcion_total_g") debe quedar entre 250 y 600 g. Si pasa de 700 g es que exageraste: baja las porciones.
-4. En FOTOS usa el plato como referencia de tamaño: un plato de almuerzo lleno pesa 350–600 g con comida. Si la carne ocupa 1/4 del plato son unos 100 g, no 300 g. No cuentes lo que queda en la olla ni otras porciones de la mesa.
-5. Las cantidades que ESCRIBE el usuario mandan SOBRE tus rangos: si dice "200 g de chaufa", ese ingrediente son exactamente 200 g; si dice "poco arroz", "doble porción", "sin aceite" o "para 2 personas", respétalo. Si da un peso de un plato hecho ("200 g de chaufa", "350 g de lomo saltado"), ese peso es el TOTAL del plato: todos los ingredientes deben sumar como máximo ese número (cebolla, aceite y salsa se incluyen dentro, no se suman aparte). Si no da cantidades, estima con los rangos del punto 2 y siempre UNA porción (nunca la receta entera).
-6. Calcula por ingrediente: kcal, proteína, carbohidratos, grasas y fibra.
-7. Prioriza alimentos peruanos (lomo saltado, ají de gallina, arroz con pollo, tallarines verdes, ceviche, causa, papa a la huancaína, tacu tacu, estofado, seco de chivo, anticuchos, pollo a la brasa…). Si no conoces el plato, desglósalo en sus ingredientes base.
-8. Si falta información (no se ve el arroz), incluye el ingrediente con una estimación razonable y márcalo en "nota".
-9. Si el mensaje trae "Cantidades registradas", úsalas como TOPE: no aumentes ninguna (puedes bajarlas solo si exceden lo razonable para UN plato personal, máximo 600 g). Una foto no justifica subir cantidades que ya estaban declaradas.
+CONTEXTO REGIONAL — PIURA Y SULLANA (norte del Perú)
+- El usuario vive en Piura. Interpreta los platos COMO SE PREPARAN ALLÍ, con sus ingredientes reales, no versiones genéricas de otra región.
+- Platos típicos: seco de cabrito con frejoles (con albahaca), cabrito al horno / patarashca, tamalitos verdes piuranos, majarisco, ceviche piurano (con chifles y ají charapita), chifles, sudado y seco de pescado, arroz con pato, chupe de camarones, tiradito norteño, picante de pescado, menestra de frijol, pan de yema, refrescos de fruta.
+- Cuidado con las confusiones de región: el "seco" del norte es de CABRITO con frejoles (no es el seco limeño de chivo); el ceviche piurano lleva CHIFLES.
+- Para cada plato: desglosa los ingredientes con gramos por porción personal y calcula kcal, proteína, carbohidratos y grasas.
+
+INTERPRETACIÓN LITERAL — REGLA DE ORO
+1. Lee literalmente lo que escribe el usuario. Si escribe "avena" es AVENA (hojuelas o bebible): NUNCA la reemplaces por café, maíz ni otro ingrediente parecido.
+2. "leche con avena" y "avena con leche" son la MISMA bebida: leche + avena. NO es café con leche.
+3. Nunca sustituyas un ingrediente por otro "similar". Si algo es ambiguo, elige la interpretación más probable, respétala y avísalo en "supuestos".
+4. Reconoce nombres coloquiales peruanos: frejoles = frijoles, choclo = maíz, sillao = salsa de soya, mazamorra, quinua, kiwicha, chicha, refresco, atado, etc.
+
+PORCIONES POR DEFECTO
+5. Si el usuario NO da cantidad: bebidas = 1 taza (250 ml ≈ 250 g); "leche con avena" = 1 taza (leche 200 ml ≈ 200 g + avena 30 g, indícalo en supuestos); platos = 1 plato personal típico de la zona (plato hondo de 24–26 cm).
+6. Devuelve SIEMPRE la base de UNA porción personal. Si el usuario pidió varias porciones ("2 platos"), NO las mezcles ni cambies los gramos: la app multiplica la base por ese número. Nunca inventes cantidades distintas para el mismo plato dentro de la misma consulta.
+7. Siempre lista en "supuestos" lo que asumiste (gramos de avena, tamaño del plato, qué se ve en la foto, etc.).
+
+RANGOS DE REFERENCIA (para UN plato de almuerzo, 24–26 cm)
+- Arroz blanco cocido: 100–180 g · Carne de res: 70–130 g · Pollo: 70–150 g (sin hueso 70–120 g)
+- Papa: 100–150 g · Camote, chaufa, tallarines, macarrones: 120–180 g · Verduras: 50–120 g
+- Frejoles, lentejas, maíz, palta: 50–100 g · Aceite/mantequilla/salsa: 5–15 g (cucharadita = 5 g)
+- Queso, huevo, pan, chicharrón: 20–60 g · Bebidas: 150–250 g · Avena seca: 20–40 g
+- La suma del plato ("porcion_total_g") debe quedar entre 250 y 600 g (bebidas: 150–300 g).
+
+OTRAS REGLAS
+8. Las cantidades que ESCRIBE el usuario mandan SOBRE tus rangos: si dice "200 g de chaufa", ese ingrediente son exactamente 200 g; si da un peso total de plato, todos los ingredientes deben sumar como máximo ese número (el aceite y la cebolla se incluyen dentro). Si dice "poco arroz", "doble porción", "sin aceite" o "para 2 personas", respétalo.
+9. En FOTOS usa el plato como referencia: un plato hondo lleno pesa 350–600 g; si la carne ocupa 1/4 del plato son unos 100 g. No cuentes la olla ni otras porciones de la mesa.
+10. Calcula por ingrediente: kcal, proteína, carbohidratos, grasas y fibra.
+11. Si falta información (no se ve el arroz), incluye el ingrediente con una estimación razonable y márcalo en "supuestos".
+12. Si el mensaje trae "Cantidades registradas", úsalas como TOPE: no aumentes ninguna; solo baja si excede lo razonable para UN plato personal.
 
 RESPONDE EXCLUSIVAMENTE CON UN JSON VÁLIDO (sin texto fuera del JSON, sin markdown) con exactamente esta estructura:
 {
   "nombre_plato": "Nombre corto del plato",
   "porcion_total_g": 370,
   "ingredientes": [
-    {
-      "nombre": "Arroz blanco cocido",
-      "gramos": 150,
-      "kcal": 195,
-      "proteina": 4.1,
-      "carbohidratos": 42.3,
-      "grasas": 0.5,
-      "fibra": 0.6,
-      "nota": ""
-    }
+    { "nombre": "Arroz blanco cocido", "gramos": 150, "kcal": 195, "proteina": 4.1, "carbohidratos": 42.3, "grasas": 0.5, "fibra": 0.6, "nota": "" }
   ],
   "totales": { "kcal": 0, "proteina": 0, "carbohidratos": 0, "grasas": 0, "fibra": 0 },
+  "supuestos": ["Tamaño del plato asumido: hondo de 25 cm", "Avena: 30 g en 1 taza de leche"],
+  "confianza": 0.85,
   "comentario": "Observación breve, máx. 180 caracteres"
 }
 
-REGLAS
+REGLAS DEL FORMATO
 - Usa números (no strings) para gramos y macros. Sin signos "+" ni palabras.
 - "totales" debe ser la SUMA exacta de todos los ingredientes.
-- Un mínimo de 1 y máximo de 18 ingredientes.
+- Mínimo 1 y máximo 18 ingredientes.
+- "supuestos": array de frases cortas (puede estar vacío si no asumiste nada). "confianza": número entre 0 y 1 (qué tan seguro estás del plato identificado).
 - Nunca redondees hacia arriba "por si acaso": es mejor subestimar (sobre todo aceite y grasas).
-- Si hay "Cantidades registradas", la suma final NO puede superarlas: solo puede mantenerse o bajar.
+- Si hay "Cantidades registradas", la suma final NO puede superarlas.
 - Un solo plato NO lleva 300 g de carne ni 400 g de arroz. Si el usuario no pidió doble porción, no la inventes.`;
+
 
 export class AIError extends Error {
   constructor(msg, kind = 'otro') { super(msg); this.kind = kind; this.name = 'AIError'; }
+}
+
+/* ================= Utilidades de texto (base local y porciones) ================= */
+export function sinAcentos(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+/**
+ * Clave normalizada de una consulta, para buscar/guardar en la base local.
+ * Ignora mayúsculas, acentos, puntuación, cantidades ("2 platos de") y el orden
+ * de las palabras: "leche con avena" y "avena con leche" dan la MISMA clave.
+ */
+export function claveConsulta(texto) {
+  let t = sinAcentos(texto || '');
+  t = t.replace(/[.,;:!?()"“”'’]/g, ' ');
+  t = t.replace(/\bx\s*\d+\b/g, ' ');
+  t = t.replace(/\b\d+\s*(platos?|porciones?)\s*(de|del|del plato)?\b/g, ' ');
+  t = t.replace(/\b(uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|media|medio)\s*(platos?|porciones?)\s*(de|del)?\b/g, ' ');
+  t = t.replace(/\b(platos?|porciones?)\s+(de|del)\b/g, ' ');
+  t = t.replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  return t.split(' ').sort().join(' ');
+}
+
+/** Cuántas porciones pidió el usuario (2 platos → 2, media porción → 0.5, nada → 1).
+    Solo cuenta platos/porciones: "2 vasos de chicha" NO multiplica el plato entero. */
+export function multiplicadorPorciones(texto) {
+  const t = sinAcentos(texto || '');
+  const palabras = { uno: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10 };
+  let m = null;
+  let g = t.match(/\b(2|3|4|5|6|7|8|9|10)\s*(platos?|porciones?)\b/);
+  if (g) m = Number(g[1]);
+  if (m == null) { g = t.match(/\b(uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(platos?|porciones?)\b/); if (g) m = palabras[g[1]]; }
+  if (m == null) { g = t.match(/\bx\s*(2|3|4|5|6|7|8|9|10)\b/); if (g) m = Number(g[1]); }
+  if (m == null && /\bdoble (porcion|plato)\b/.test(t)) m = 2;
+  if (m == null && /\btriple (porcion|plato)\b/.test(t)) m = 3;
+  if (m == null && /\b(media|medio) (porcion|plato)\b/.test(t)) m = 0.5;
+  if (m == null) m = 1;
+  return Math.max(0.5, Math.min(10, m));
+}
+
+/** Multiplica una porción base por el número pedido (2 platos = 2× exacto). */
+export function aplicarMultiplicador(items, mult) {
+  const m = Number(mult) || 1;
+  if (m === 1) return items;
+  return (items || []).map(it => ({
+    ...it,
+    gramos: Math.round((Number(it.gramos) || 0) * m * 10) / 10
+  }));
+}
+
+/**
+ * Plan de porciones de una consulta:
+ *  - mult: cuántas porciones pidió (2 platos → 2)
+ *  - local: si podemos multiplicar NOSOTROS (true) o hay más cosas en la frase
+ *    ("2 platos … y 1 vaso de chicha") y entonces el total lo arma la IA.
+ */
+export function planPorciones(texto) {
+  const mult = multiplicadorPorciones(texto);
+  if (mult === 1) return { mult: 1, local: true };
+  const t = sinAcentos(texto);
+  const resto = t
+    .replace(/\b\d+\s*(platos?|porciones?)\s*(de|del)?\b/g, ' ')
+    .replace(/\b(uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(platos?|porciones?)\s*(de|del)?\b/g, ' ');
+  const otraCantidad = /\b\d+\s*(vasos?|tazas?|cucharadas?|rebanadas?|presas?|pedazos?)\b/.test(resto)
+    || /\b(un|una|medio|media)\s+(vaso|taza|porcion|cucharada)\b/.test(resto);
+  return { mult, local: !otraCantidad };
 }
 
 /* Los modelos "-lite" regalan ~500 consultas por día en nivel gratuito;
@@ -215,25 +286,52 @@ export function normalizeResult(raw) {
   }
   if (!items.length) throw new AIError('No se pudieron leer los ingredientes de la respuesta.', 'json');
 
+  const supuestos = Array.isArray(raw.supuestos)
+    ? raw.supuestos.map(x => String(x).trim()).filter(Boolean).slice(0, 8) : [];
+  const confRaw = parseFloat(raw.confianza);
+  const confianza = isFinite(confRaw) ? Math.max(0, Math.min(1, confRaw)) : null;
+
   return {
     name: String(pick(raw, 'nombre_plato', 'nombre', 'name', 'title') || '').trim() || 'Plato detectado',
     totalG: n(pick(raw, 'porcion_total_g', 'total_g', 'gramos_totales')),
     comment: String(pick(raw, 'comentario', 'comment', 'observacion') || '').trim(),
+    supuestos,
+    confianza,
     items
   };
 }
 function round1(v) { return Math.round((v || 0) * 10) / 10; }
 
+/** Valida una respuesta normalizada antes de mostrarla (si algo no cuadra, no llega a la tabla). */
+export function validarResultado(r) {
+  if (!r || !String(r.name || '').trim()) throw new AIError('La IA no devolvió el nombre del plato.', 'json');
+  if (!Array.isArray(r.items) || !r.items.length) throw new AIError('La IA no devolvió ingredientes.', 'json');
+  if (r.items.length > 20) throw new AIError('La IA devolvió demasiados ingredientes para un plato.', 'json');
+  for (const it of r.items) {
+    const g = Number(it.gramos) || 0;
+    if (!(g > 0)) throw new AIError(`Ingrediente sin gramos válidos: ${it.nombre || '?'}.`, 'json');
+    if (g > 3000) throw new AIError(`Porción irreal en "${it.nombre}": ${g} g.`, 'json');
+    if (!it.per100 || !isFinite(Number(it.per100.k))) throw new AIError(`Valores nutricionales ilegibles en "${it.nombre}".`, 'json');
+  }
+  const sum = r.items.reduce((a, i) => a + (Number(i.gramos) || 0), 0);
+  if (sum > 4000) throw new AIError('La IA devolvió una porción irreal (más de 4 kg).', 'json');
+  return r;
+}
+
 /**
  * Analiza foto y/o descripción con Gemini.
  * @param {number} [opts.maxTotalG] tope máximo para la suma de gramos del plato
  *   (si el usuario ya tenía registradas sus porciones, la IA no puede subirlas).
- * @returns {Promise<{name,totalG,comment,items}>}
+ * @param {number} [opts.mult] porciones pedidas (2 platos → 2); la base se multiplica aquí.
+ * @param {boolean} [opts.multLocal] true = la multiplicación es exacta (la hace la app);
+ *   false = hay más elementos en la frase y el total lo arma la IA.
+ * @returns {Promise<{name,totalG,comment,supuestos,confianza,items}>}
  */
-export async function analyzeMeal({ imageDataUrl, description, prompt, apiKey, model, maxTotalG }) {
+export async function analyzeMeal({ imageDataUrl, description, prompt, apiKey, model, maxTotalG, mult = 1, multLocal = true }) {
   if (!navigator.onLine) throw new AIError('Sin conexión a internet. El análisis con IA necesita red; tus datos guardados sí se ven sin conexión.', 'sin-internet');
   if (!apiKey) throw new AIError('Falta tu API key de Gemini. Ve a Ajustes → IA y pégala (se guarda solo en tu celular).', 'sin-key');
 
+  const m = Number(mult) || 1;
   const parts = [];
   if (imageDataUrl) parts.push({ inline_data: { mime_type: 'image/jpeg', data: b64FromDataURL(imageDataUrl) } });
 
@@ -241,6 +339,11 @@ export async function analyzeMeal({ imageDataUrl, description, prompt, apiKey, m
   if (!/json/i.test(txt)) txt += '\n\nRecuerda: responde ÚNICAMENTE con JSON válido.';
   if (description && description.trim()) txt += `\n\nDescripción del usuario: ${description.trim()}`;
   if (!imageDataUrl) txt += '\n\nNo hay foto, basa tu análisis solo en la descripción de texto.';
+  if (m > 1 && multLocal) {
+    txt += `\n\nIMPORTANTE: aunque el usuario pidió ${m} platos, devuelve SOLO la base de UNA porción (la app la multiplica por ${m}).`;
+  } else if (m > 1) {
+    txt += `\n\nIMPORTANTE: el usuario pidió ${m} porciones en total. Devuelve el total ya multiplicado, usando los MISMOS gramos por porción (porción individual × ${m}).`;
+  }
   parts.push({ text: txt });
 
   const first = await callGemini({ parts, apiKey, model });
@@ -255,7 +358,13 @@ export async function analyzeMeal({ imageDataUrl, description, prompt, apiKey, m
     });
     raw = extractJSON(retry);
   }
-  const out = normalizeResult(raw);
+  const out = validarResultado(normalizeResult(raw));
+  if (m > 1 && multLocal) {
+    out.baseItems = out.items;          // la porción base (1 plato) para la base local
+    out.items = aplicarMultiplicador(out.items, m);
+    // red de seguridad: aunque la IA haya devuelto el doble ya multiplicado, nunca más de 600 g por porción
+    out.items = limitarTotal(out.items, Math.round(600 * m));
+  }
   if (maxTotalG > 0) out.items = limitarTotal(out.items, maxTotalG);
   return out;
 }
@@ -305,6 +414,8 @@ export function promptHelpHTML() {
       "grasas": 0.5, "fibra": 0.6, "nota": "" }
   ],
   "totales": { "kcal": 0, "proteina": 0, "carbohidratos": 0, "grasas": 0, "fibra": 0 },
+  "supuestos": ["Plato hondo de 25 cm"],
+  "confianza": 0.85,
   "comentario": "Buena fuente de proteína; cuidado con el aceite del salteado."
 }</code>
     <p class="tiny muted" style="margin-top:10px">Las porciones son de UN plato (250–600 g en total):

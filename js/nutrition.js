@@ -175,6 +175,20 @@ export const FOODS = [
   { n: 'Picarones', k: 250, p: 5, c: 45, f: 6, fi: 2 },
   { n: 'Chicha morada (vaso)', k: 60, p: 0.2, c: 15, f: 0, fi: 0.1 },
 
+  // Platos del norte — Piura y Sullana
+  { n: 'Seco de cabrito con frejoles', k: 175, p: 15.5, c: 12, f: 7.5, fi: 2 },
+  { n: 'Cabrito al horno / patarashca', k: 195, p: 23, c: 2, f: 10, fi: 0.3 },
+  { n: 'Tamalito verde (piurano)', k: 170, p: 6.5, c: 23, f: 6, fi: 2.2 },
+  { n: 'Majarisco (mariscos)', k: 95, p: 10, c: 6, f: 3, fi: 0.8 },
+  { n: 'Ceviche piurano con chifles', k: 95, p: 14, c: 7, f: 1.5, fi: 1 },
+  { n: 'Chifles (plátano frito)', k: 250, p: 1.5, c: 47, f: 6.5, fi: 3 },
+  { n: 'Arroz con pato', k: 195, p: 11, c: 22, f: 7, fi: 1.2 },
+  { n: 'Sudado de pescado', k: 120, p: 15, c: 4, f: 4.5, fi: 0.6 },
+  { n: 'Chupe de camarones', k: 90, p: 9, c: 6, f: 3.5, fi: 0.5 },
+  { n: 'Tiradito norteño', k: 92, p: 15, c: 4.5, f: 2, fi: 0.5 },
+  { n: 'Pan de yema (piurano)', k: 355, p: 8.5, c: 58, f: 10, fi: 2 },
+  { n: 'Refresco de fruta natural', k: 50, p: 0.5, c: 12, f: 0.1, fi: 0.2 },
+
   // Lácteos y huevos
   { n: 'Queso fresco', k: 250, p: 18, c: 4, f: 19, fi: 0 },
   { n: 'Queso amarillo (fetas)', k: 350, p: 24, c: 2, f: 28, fi: 0 },

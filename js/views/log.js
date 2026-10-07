@@ -1,8 +1,8 @@
 /* Registro de comidas: foto + IA, texto, manual y favoritos. También editor. */
 
-import { DB, getSettings, getProfile, getPrompt } from '../db.js';
+import { DB, getSettings, getProfile, getPrompt, buscarPlatoBase, guardarPlatoBase } from '../db.js';
 import { icon } from '../icons.js';
-import { analyzeMeal, DEFAULT_PROMPT } from '../ai.js';
+import { analyzeMeal, DEFAULT_PROMPT, claveConsulta, planPorciones, aplicarMultiplicador } from '../ai.js';
 import { mountEditor, newDraft, openAddSheet, pickGrams } from '../editor.js';
 import { calcTargets, computeTotals, searchFoods, FOODS } from '../nutrition.js';
 import {
@@ -344,6 +344,26 @@ async function runAI({ date, hasKey, usePhoto }) {
   if (usePhoto && !state.photo) { toast('Toma o elige una foto primero (o usa la pestaña Texto).', 'warn'); return; }
   if (!usePhoto && !state.desc.trim()) { toast('Escribe qué comiste primero.', 'warn'); return; }
 
+  const desc = (state.desc || '').trim();
+  const plan = planPorciones(desc);
+  const clave = desc && !usePhoto ? claveConsulta(desc) : '';
+
+  // 1) ¿ya lo analizamos antes? Entonces sale de la base local: mismo resultado y 0 cuota
+  if (clave && plan.local) {
+    const base = await buscarPlatoBase(clave).catch(() => null);
+    if (base && base.items && base.items.length) {
+      const items = aplicarMultiplicador(base.items, plan.mult);
+      await montarDraftIA({
+        date, name: base.nombre || desc, source: 'base', items, photo: '',
+        note: notaPlato(`Base local · sin gastar cuota${plan.mult !== 1 ? ` · × ${plan.mult}` : ''}`,
+          { supuestos: base.supuestos }),
+        mult: plan.mult, baseClave: clave
+      });
+      toast(`Tu base local: ${base.nombre || desc}${plan.mult !== 1 ? ` × ${plan.mult}` : ''} (sin consultar la IA).`, 'ok');
+      return;
+    }
+  }
+
   body.innerHTML = `
     <div class="card loading-block">
       <div class="spinner"></div>
@@ -363,27 +383,42 @@ async function runAI({ date, hasKey, usePhoto }) {
       description: state.desc,
       prompt,
       apiKey: settings.apiKey,
-      model: settings.model
+      model: settings.model,
+      mult: plan.mult,
+      multLocal: plan.local
     });
     if (cancelled) return;
 
-    const profile = await getProfile();
-    const targets = profile ? calcTargets(profile) : null;
-    state.draft = newDraft({
-      date, type: guessType(), name: res.name, source: 'ia',
+    // 2) lo aprendido queda guardado en la base local para no repetir la consulta
+    if (clave && plan.local) {
+      try {
+        await guardarPlatoBase({
+          clave,
+          consultas: [clave, claveConsulta(res.name)].filter(Boolean),
+          nombre: res.name,
+          items: res.baseItems || res.items,
+          fuente: 'ia',
+          confianza: res.confianza,
+          supuestos: res.supuestos
+        });
+      } catch (e) { console.warn('No se pudo guardar en la base local:', e); }
+    }
+
+    await montarDraftIA({
+      date, name: res.name, source: 'ia', items: res.items,
       photo: usePhoto ? state.photo : '',
-      note: res.comment || state.desc || '',
-      items: res.items
+      note: notaPlato(res.comment, res),
+      mult: plan.mult, baseClave: clave || claveConsulta(res.name)
     });
-    if (targets) state.draft._kcalTarget = (profile.targets && profile.targets.kcal) || targets.kcal;
-    state.desc = '';
+
     const sumG = res.items.reduce((a, i) => a + (Number(i.gramos) || 0), 0);
-    if (sumG > 700) {
+    if (plan.mult > 1) {
+      toast(`Plato × ${plan.mult}: ${Math.round(sumG)} g en total (misma porción por plato). Revisa antes de guardar.`, 'ok');
+    } else if (sumG > 700) {
       toast(`La IA estimó ${Math.round(sumG)} g para un solo plato: revisa los gramos antes de guardar.`, 'warn');
     } else {
       toast('Plato detectado. Revisa y corrige antes de guardar.', 'ok');
     }
-    location.hash = '#/nuevo';
   } catch (e) {
     if (cancelled) return;
     const msg = e && e.message ? e.message : 'Error desconocido.';
@@ -408,6 +443,41 @@ async function runAI({ date, hasKey, usePhoto }) {
   }
 }
 
+/** Arma el borrador del editor a partir de un análisis (IA o base local). */
+async function montarDraftIA(o) {
+  const profile = await getProfile();
+  const targets = profile ? calcTargets(profile) : null;
+  state.draft = newDraft({
+    date: o.date, type: guessType(), name: o.name, source: o.source,
+    photo: o.photo || '', note: o.note || '', items: o.items,
+    mult: o.mult || 1, baseClave: o.baseClave || ''
+  });
+  if (targets) state.draft._kcalTarget = (profile.targets && profile.targets.kcal) || targets.kcal;
+  state.desc = '';
+  location.hash = '#/nuevo';
+}
+
+/** Nota del plato: comentario de la IA + supuestos + confianza. */
+function notaPlato(comentario, res) {
+  const p = [];
+  if (comentario) p.push(String(comentario).slice(0, 140));
+  if (res && res.supuestos && res.supuestos.length) p.push('Supuestos: ' + res.supuestos.join('; ').slice(0, 140));
+  if (res && res.confianza != null) p.push(Math.round(res.confianza * 100) + '% seguro');
+  return p.join(' · ').slice(0, 240);
+}
+
+/** Guarda en la base local lo que el usuario corrigió en el editor ("esa avena es de 40 g"). */
+async function guardarBaseDesdeEditor(d) {
+  const mult = Number(d.mult) || 1;
+  const clave = d.baseClave || claveConsulta(d.name || '');
+  if (!clave) { toast('Ponle nombre al plato antes de guardarlo como estándar.', 'warn'); return; }
+  const items = mult !== 1
+    ? d.items.map(it => ({ ...it, gramos: Math.round((Number(it.gramos) || 0) / mult * 10) / 10 }))
+    : d.items;
+  await guardarPlatoBase({ clave, consultas: [clave, claveConsulta(d.name || '')].filter(Boolean), nombre: d.name, items, fuente: 'usuario' });
+  toast(`Porción estándar guardada: "${d.name}" (sin gastar cuota en tu próxima consulta).`, 'ok');
+}
+
 function guessType() {
   const h = new Date().getHours();
   if (h < 11) return 'desayuno';
@@ -425,7 +495,8 @@ export async function renderNew(root) {
   mountEditor(root, draft, {
     kcalTarget: draft._kcalTarget || (profile ? (profile.targets?.kcal || (targets && targets.kcal)) : 0),
     onSave: d => saveMeal(d),
-    onSaveFavorite: d => saveFav(d)
+    onSaveFavorite: d => saveFav(d),
+    onGuardarBase: d => guardarBaseDesdeEditor(d)
   });
 }
 
@@ -451,6 +522,7 @@ export async function renderEdit(root, args) {
       location.hash = `#/hoy/${meal.date}`;
     },
     onSaveFavorite: d => saveFav(d),
+    onGuardarBase: d => guardarBaseDesdeEditor(d),
     onReanalyze: async d => {
       const settings = await getSettings();
       const oldG = Math.round((d.items || []).reduce((a, i) => a + (Number(i.gramos) || 0), 0));
@@ -490,11 +562,13 @@ async function saveMeal(draft) {
     date: draft.date || todayISO(),
     type: draft.type || 'almuerzo',
     name: (draft.name || 'Plato').slice(0, 80),
-    note: (draft.note || '').slice(0, 160),
+    note: (draft.note || '').slice(0, 240),
     photo: draft.photo || '',
     items: draft.items,
     totals: computeTotals(draft.items),
     source: draft.source || 'manual',
+    mult: Number(draft.mult) || 1,
+    baseClave: draft.baseClave || '',
     favId: draft.favId || null,
     createdAt: draft.createdAt || Date.now(),
     updatedAt: Date.now()

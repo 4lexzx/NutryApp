@@ -1,6 +1,6 @@
 /* Ajustes: instalación, tema, IA, agua, respaldo y datos. */
 
-import { DB, getSettings, saveSettings, getProfile, getPrompt } from '../db.js';
+import { DB, getSettings, saveSettings, getProfile, getPrompt, limpiarPlatosBase } from '../db.js';
 import { icon } from '../icons.js';
 import { exportMealsCSV, exportWeightsCSV, exportBackup, importBackup, backupSummary, dataHelpHTML } from '../export.js';
 import { testApiKey, modelOptions } from '../ai.js';
@@ -14,6 +14,7 @@ export async function render(root) {
   const prof = await getProfile();
   const summary = await backupSummary();
   const promptSaved = !!(await getPrompt());
+  const nBase = await DB.count('platos').catch(() => 0);
 
   root.innerHTML = `
     <h1>Ajustes</h1>
@@ -58,6 +59,16 @@ export async function render(root) {
           <div class="tiny muted">${promptSaved ? `${icon('check')} Prompt personalizado` : 'Usando el predeterminado (comida peruana)'}</div>
         </div>
         <a class="btn btn-sm btn-outline" href="#/ia">Editar</a>
+      </div>
+      <div class="divider"></div>
+      <div class="spread">
+        <div>
+          <b class="small">Base de platos (Piura)</b>
+          <div class="tiny muted">${nBase === 0
+            ? 'Sin platos aprendidos: los primeros análisis se repiten solo una vez'
+            : `${nBase} plato${nBase === 1 ? '' : 's'} aprendido${nBase === 1 ? '' : 's'} · se repiten sin gastar cuota y con los mismos gramos`}</div>
+        </div>
+        <button class="btn btn-sm btn-ghost" id="s-base-clear" type="button" ${nBase ? '' : 'disabled'}>Borrar</button>
       </div>
       <p class="tiny muted" style="margin-top:10px">La clave se guarda <b>solo en tu celular</b> (IndexedDB). Solo se envía
         a los servidores de Google cuando pides un análisis.</p>
@@ -178,6 +189,17 @@ export async function render(root) {
     render(root);
   };
   root.querySelector('#s-model').onchange = async e => { await saveSettings({ model: e.target.value }); toast('Modelo: ' + e.target.value, 'ok'); };
+  root.querySelector('#s-base-clear').onclick = async () => {
+    const ok = await confirmSheet({
+      title: '¿Borrar la base de platos?',
+      msg: 'Se olvidarán los platos que la IA ya analizó: la próxima vez que consultes uno gastará 1 consulta de nuevo. Tus comidas guardadas NO se tocan.',
+      okText: 'Borrar', danger: true
+    });
+    if (!ok) return;
+    await limpiarPlatosBase();
+    toast('Base de platos borrada.', 'ok');
+    render(root);
+  };
   root.querySelector('#s-key-test').onclick = async e => {
     const btn = e.target, res = root.querySelector('#s-key-res');
     const key = keyIn.value.trim();

@@ -162,6 +162,19 @@ export function mountEditor(root, draft, opts = {}) {
     }
   });
 
+  const baseBtn = q('#ed-base');
+  if (baseBtn && opts.onGuardarBase) baseBtn.addEventListener('click', async () => {
+    const ok = await confirmSheet({
+      title: '¿Guardar como tu porción estándar?',
+      msg: 'La próxima vez que escribas este plato (o "2 platos de él") saldrá exactamente con estos gramos, sin gastar cuota de IA. Puedes borrarlo luego en Ajustes → Base de platos.',
+      okText: 'Guardar'
+    });
+    if (!ok) return;
+    baseBtn.disabled = true;
+    try { await opts.onGuardarBase(draft); } catch (e) { toast((e && e.message) || 'No se pudo guardar en la base local.', 'err'); }
+    finally { baseBtn.disabled = false; }
+  });
+
   renderItems();
   return { updateTotals, renderItems };
 }
@@ -193,7 +206,7 @@ function editorHTML(draft, opts) {
 
   <div class="card">
     <div class="card-title"><h2>${draft.id ? 'Editar plato' : 'Nuevo plato'}</h2>
-      ${draft.source ? `<span class="badge ai">${draft.source === 'ia' ? `${icon('sparkles')} IA` : draft.source === 'favorito' ? `${icon('star')} Favorito` : draft.source === 'texto' ? `${icon('note')} Texto` : `${icon('pencil')} Manual`}</span>` : ''}
+      ${draft.source ? `<span class="badge ${draft.source === 'base' ? 'ok' : 'ai'}">${draft.source === 'ia' ? `${icon('sparkles')} IA` : draft.source === 'base' ? `${icon('book')} Base local` : draft.source === 'favorito' ? `${icon('star')} Favorito` : draft.source === 'texto' ? `${icon('note')} Texto` : `${icon('pencil')} Manual`}</span>` : ''}
     </div>
     <div class="chips big" style="margin-bottom:12px">
       ${TIPOS_COMIDA.map(t => `<button type="button" class="chip ${draft.type === t ? 'active' : ''}" data-type="${t}">${icon(ICONO_TIPO[t])} ${t}</button>`).join('')}
@@ -218,6 +231,7 @@ function editorHTML(draft, opts) {
     </div>
     <div id="ed-items"></div>
     ${opts.onReanalyze ? `<button id="ed-re" class="btn btn-ghost btn-block" type="button" style="margin-top:8px">${icon('sparkles')} Re-analizar porciones con la IA</button>` : ''}
+    ${opts.onGuardarBase ? `<button id="ed-base" class="btn btn-ghost btn-block" type="button" style="margin-top:8px">${icon('book')} Usar como mi porción estándar</button>` : ''}
     <div id="ed-over" class="over-msg hidden"></div>
   </div>
 

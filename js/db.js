@@ -1,7 +1,7 @@
 /* Persistencia local 100% en el celular: IndexedDB (sin servidores). */
 
 const DB_NAME = 'nutri-gym';
-const DB_VER = 1;
+const DB_VER = 2;
 
 let _db = null;
 
@@ -22,6 +22,8 @@ function open() {
       }
       if (!db.objectStoreNames.contains('favorites')) db.createObjectStore('favorites', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('water')) db.createObjectStore('water', { keyPath: 'date' });
+      // base local de platos/ingredientes aprendidos por la IA (v2)
+      if (!db.objectStoreNames.contains('platos')) db.createObjectStore('platos', { keyPath: 'clave' });
     };
     req.onsuccess = () => { _db = req.result; resolve(_db); };
     req.onerror = () => reject(req.error);
@@ -105,7 +107,7 @@ export const DB = {
     return done(t);
   },
   async clearAll() {
-    const stores = ['kv', 'meals', 'weights', 'favorites', 'water'];
+    const stores = ['kv', 'meals', 'weights', 'favorites', 'water', 'platos'];
     const t = await tx(stores, 'readwrite');
     stores.forEach(s => t.objectStore(s).clear());
     return done(t);
@@ -113,15 +115,15 @@ export const DB = {
 
   /* ---- respaldo / restauración ---- */
   async exportAll() {
-    const [kv, meals, weights, favorites, water] = await Promise.all([
-      DB.kvAll(), DB.all('meals'), DB.all('weights'), DB.all('favorites'), DB.all('water')
+    const [kv, meals, weights, favorites, water, platos] = await Promise.all([
+      DB.kvAll(), DB.all('meals'), DB.all('weights'), DB.all('favorites'), DB.all('water'), DB.all('platos')
     ]);
-    return { app: 'nutri-gym', version: DB_VER, exportedAt: new Date().toISOString(), kv, meals, weights, favorites, water };
+    return { app: 'nutri-gym', version: DB_VER, exportedAt: new Date().toISOString(), kv, meals, weights, favorites, water, platos };
   },
   async importAll(data, { replace = true } = {}) {
     if (!data || data.app !== 'nutri-gym') throw new Error('El archivo no parece un respaldo de Nutri Gym.');
     if (replace) await DB.clearAll();
-    const stores = ['meals', 'weights', 'favorites', 'water'];
+    const stores = ['meals', 'weights', 'favorites', 'water', 'platos'];
     for (const s of stores) {
       const rows = Array.isArray(data[s]) ? data[s] : [];
       for (const row of rows) await DB.put(s, row);
@@ -131,6 +133,43 @@ export const DB = {
     return true;
   }
 };
+
+/* ---------- Base local de platos (autoaprendizaje de la IA) ----------
+   Guarda lo que la IA analizó una vez para no repetir la consulta:
+   { clave, nombre, consultas[], items[], fuente, confianza, supuestos[], fecha } */
+export async function buscarPlatoBase(clave) {
+  if (!clave) return null;
+  const all = await DB.all('platos');
+  return all.find(p => p.clave === clave || (p.consultas || []).includes(clave)) || null;
+}
+export async function guardarPlatoBase(reg) {
+  if (!reg || !reg.clave) return null;
+  const all = await DB.all('platos');
+  const queridas = [reg.clave, ...(reg.consultas || [])].filter(Boolean);
+  const coincide = p => queridas.includes(p.clave) || (p.consultas || []).some(c => queridas.includes(c));
+  const hits = all.filter(coincide);
+  const rec = hits[0] || { clave: reg.clave, consultas: [] };
+  let consultas = [...(rec.consultas || []), ...queridas];
+  for (const dup of hits.slice(1)) {        // fusiona duplicados: una sola entrada por plato
+    consultas = consultas.concat(dup.consultas || [], [dup.clave]);
+    await DB.del('platos', dup.clave);
+  }
+  rec.consultas = Array.from(new Set(consultas.filter(Boolean)));
+  rec.nombre = reg.nombre || rec.nombre || '';
+  rec.items = reg.items || rec.items || [];
+  rec.fuente = reg.fuente || 'ia';
+  if (reg.confianza != null) rec.confianza = reg.confianza;
+  if (Array.isArray(reg.supuestos)) rec.supuestos = reg.supuestos;
+  rec.fecha = Date.now();
+  await DB.put('platos', rec);
+  return rec.clave;
+}
+export async function listarPlatosBase() {
+  return (await DB.all('platos')).slice().sort((a, b) => (b.fecha || 0) - (a.fecha || 0));
+}
+export async function borrarPlatoBase(clave) { return DB.del('platos', clave); }
+export async function limpiarPlatosBase() { return DB.clear('platos'); }
+
 
 /* ---------- Ajustes (con valores por defecto) ---------- */
 export const DEFAULT_SETTINGS = {

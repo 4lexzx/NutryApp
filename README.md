@@ -280,6 +280,25 @@ se actualizan solos. Eliges el tipo de comida (desayuno/almuerzo/cena/snack) y *
   **No sube tus porciones**: parte de los gramos que ya tienes registrados y solo puede
   mantenerlos o bajarlos (máximo +15%, y te avisa si la IA se pasa).
 
+### Cómo analiza la IA (reglas nuevas)
+
+- **📍 Comida del norte (Piura y Sullana)**: el prompt está adaptado a la gastronomía de la
+  zona (seco de cabrito con frejoles, tamalitos verdes, majarisco, ceviche piurano con chifles,
+  chifles, sudado, arroz con pato, chupe de camarones…) y a cómo se preparan **allí**.
+- **🥣 Lectura literal**: si escribes “avena”, es avena — la IA **nunca** la cambia por café ni
+  por otro ingrediente parecido; “leche con avena” y “avena con leche” son lo mismo.
+- **🍽 Porciones por defecto**: si no pones cantidad, asume **1 taza de bebida (250 ml)** y
+  **1 plato personal** de la zona, y te lista lo que asumió en **“supuestos”** (más la
+  **confianza** del 0–100%) en la nota del plato.
+- **✖️ “2 platos” = doble exacto**: la app guarda la porción base de 1 plato y la multiplica
+  ella misma (los mismos gramos × 2), sin dejar que la IA invente cantidades distintas.
+- **📚 Base local de platos**: lo que analizas queda guardado en tu celular; la próxima vez que
+  escribas el mismo plato (aunque sea en otro orden: “avena con leche”) sale **igual y sin gastar
+  cuota**. En el editor, **“Usar como mi porción estándar”** guarda tus gramos corregidos como
+  la porción oficial de ese plato; puedes borrar la base en **Ajustes → Base de platos**.
+- **🧪 Temperatura 0.2 + JSON validado**: respuestas consistentes; si el JSON viene malo, la app
+  reintenta una vez y te avisa en vez de mostrar datos rotos.
+
 ### Panel del día (📅 Hoy)
 
 - Navegas de día en día con **‹ ›** o tocando la fecha.
@@ -299,8 +318,9 @@ se actualizan solos. Eliges el tipo de comida (desayuno/almuerzo/cena/snack) y *
 
 Ve a **Ajustes → Datos y respaldo**:
 
-- **⬇ Descargar respaldo (.json)**: guarda TODO (perfil, comidas, pesos, favoritos, ajustes e IA).
-  Guárdalo en Google Drive, tu PC o mándatelo por correo. **Hazlo al menos 1 vez por semana.**
+- **⬇ Descargar respaldo (.json)**: guarda TODO (perfil, comidas, pesos, favoritos, ajustes,
+  IA y tu base de platos). Guárdalo en Google Drive, tu PC o mándatelo por correo.
+  **Hazlo al menos 1 vez por semana.**
 - **⬆ Restaurar desde archivo**: elige un `.json` → reemplaza los datos del dispositivo
   (te avisa antes; descarga primero un respaldo actual).
 - **CSV comidas / CSV pesos**: se abren en **Excel** o **Google Sheets** con coma como separador
