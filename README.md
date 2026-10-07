@@ -56,7 +56,7 @@ APP_Nutri/
     ├── charts.js              ← gráficos en canvas (peso, barras semana/mes)
     ├── export.js              ← CSV para Excel + respaldo/restauración .json
     ├── util.js                ← fechas, toasts, ventanas emergentes, imágenes
-    ├── sound.js               ← clic suave de los botones (con interruptor en Ajustes)
+    ├── sound.js               ← tick suave solo en botones importantes (interruptor en Ajustes)
     └── views/                 ← una pantalla por módulo (hoy, registro, historial…)
 ```
 
@@ -254,8 +254,10 @@ caracteres, y ya queda creada **solo en ese dispositivo**. No hace falta exporta
    - cálculo de **kcal, proteína, carbohidratos, grasas y fibra**,
    - salida en **JSON estructurado** que la app transforma en una tabla editable.
 5. **Registrar peso** en 💪 para ver tu gráfico de evolución.
-6. **Ajustes → Apariencia**:    eliges tema **oscuro/claro** y enciendes o apagas los **sonidos
-   suaves de los botones** (un clic bajito estilo Apple al tocar; viene encendido).
+6. **Ajustes → Apariencia**: eliges tema **oscuro/claro** y enciendes o apagas los **sonidos
+   suaves de los botones** (un tick bajito estilo Apple, como el teclado del iPhone). Solo suena
+   en los botones que **hacen algo importante**: analizar, guardar, eliminar, confirmar,
+   respaldos… no en la navegación ni en las pestañas. Viene encendido.
 
 ---
 
