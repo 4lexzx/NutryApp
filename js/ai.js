@@ -31,7 +31,7 @@ RANGOS DE REFERENCIA (para UN plato de almuerzo, 24–26 cm)
 - La suma del plato ("porcion_total_g") debe quedar entre 250 y 600 g (bebidas: 150–300 g).
 
 OTRAS REGLAS
-8. Las cantidades que ESCRIBE el usuario mandan SOBRE tus rangos: si dice "200 g de chaufa", ese ingrediente son exactamente 200 g; si da un peso total de plato, todos los ingredientes deben sumar como máximo ese número (el aceite y la cebolla se incluyen dentro). Si dice "poco arroz", "doble porción", "sin aceite" o "para 2 personas", respétalo. FRACCIONES: "media fruta", "medio plátano" o "½ galleta" = la MITAD de lo normal, y si NO pone fracción la porción es ENTERA. Si el mensaje te pide "la base de UNA porción", devuelve la porción COMPLETA aunque él haya dicho media (la app la divide sola); si te pide el total ya ajustado, aplica tú la mitad y anota "½ porción (lo pidió el usuario)" en "supuestos".
+8. Las cantidades que ESCRIBE el usuario mandan SOBRE tus rangos: si dice "200 g de chaufa", ese ingrediente son exactamente 200 g; si da un peso total de plato, todos los ingredientes deben sumar como máximo ese número (el aceite y la cebolla se incluyen dentro). Si dice "poco arroz", "doble porción", "sin aceite" o "para 2 personas", respétalo. FRACCIONES: "media fruta" / "½" = la MITAD (1/2), "un cuarto" / "1/4" = un cuarto (1/4), "tres cuartos" / "3/4" = 3/4 de lo normal; si NO pone fracción la porción es ENTERA. Si el mensaje te pide "la base de UNA porción", devuelve la porción COMPLETA aunque él haya dicho media o 1/4 (la app la reduce sola); si te pide el total ya ajustado, aplica tú la fracción y anótala en "supuestos".
 9. En FOTOS usa el plato como referencia: un plato hondo lleno pesa 350–600 g; si la carne ocupa 1/4 del plato son unos 100 g. No cuentes la olla ni otras porciones de la mesa.
 10. Calcula por ingrediente: kcal, proteína, carbohidratos, grasas y fibra.
 11. Si falta información (no se ve el arroz), incluye el ingrediente con una estimación razonable y márcalo en "supuestos".
@@ -205,8 +205,13 @@ export function multiplicadorPorciones(texto) {
   // abstracciones como "a media tarde" o "a media hora")
   if (m == null && /\b(media|medio)\s+(?!tarde\b|manana\b|hora\b|sesion\b|cuenta\b|vida\b|semana\b|clase\b|reunion\b|racha\b|noche\b)[a-z]{3,}\b/.test(t)) m = 0.5;
   if (m == null && /(?:^|\s)(?:1\/2|½|0[.,]5)\s+(?:de\s+)?[a-z]{3,}/.test(t)) m = 0.5;
+  // cuartos: "1/4 chirimoya", "un cuarto de pan", "3/4 de galleta", "tres cuartos de pan"
+  if (m == null && /(?:^|\s)(?:1\/4|¼|0[.,]25)\s+(?:de\s+)?[a-z]{3,}/.test(t)) m = 0.25;
+  if (m == null && /(?:^|\s)(?:3\/4|¾|0[.,]75)\s+(?:de\s+)?[a-z]{3,}/.test(t)) m = 0.75;
+  if (m == null && /\b(?:un\s+)?cuarto\s+de\s+(?!hora\b|tarde\b|manana\b)[a-z]{3,}/.test(t)) m = 0.25;
+  if (m == null && /\b(?:tres\s+)?cuartos\s+de\s+(?!hora\b|tarde\b|manana\b)[a-z]{3,}/.test(t)) m = 0.75;
   if (m == null) m = 1;
-  return Math.max(0.5, Math.min(10, m));
+  return Math.max(0.25, Math.min(10, m));
 }
 
 /** Multiplica una porción base por el número pedido (2 platos = 2× exacto). */
@@ -233,7 +238,8 @@ export function planPorciones(texto) {
     .replace(/\b\d+\s*(platos?|porciones?)\s*(de|del)?\b/g, ' ')
     .replace(/\b(uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(platos?|porciones?)\s*(de|del)?\b/g, ' ');
   const otraCantidad = /\b\d+\s*(vasos?|tazas?|cucharadas?|rebanadas?|presas?|pedazos?)\b/.test(resto)
-    || /\b(un|una|medio|media)\s+(vaso|taza|porcion|cucharada)\b/.test(resto);
+    || /\b(un|una|medio|media|cuarto|cuartos)\s+(vaso|taza|porcion|cucharada)\b/.test(resto)
+    || /\b(?:cuarto|cuartos|1\/4|3\/4|¼|¾)\s+de\s+(?:un\s+)?(?:vaso|taza|cucharada|porcion)\b/.test(resto);
   return { mult, local: !otraCantidad };
 }
 
@@ -448,7 +454,7 @@ export async function analyzeMeal({ imageDataUrl, description, prompt, apiKey, m
   if (m !== 1 && multLocal) {
     txt += m > 1
       ? `\n\nIMPORTANTE: aunque el usuario pidió ${m} platos, devuelve SOLO la base de UNA porción (la app la multiplica por ${m}).`
-      : '\n\nIMPORTANTE: el usuario pidió MEDIA porción. Devuelve SOLO la base de la porción COMPLETA normal: NO la dividas tú, la app la reduce a la mitad sola.';
+      : `\n\nIMPORTANTE: el usuario pidió una FRACCIÓN de la porción (${m}). Devuelve SOLO la base de la porción COMPLETA normal: NO la dividas tú, la app la reduce sola.`;
   } else if (m !== 1) {
     txt += `\n\nIMPORTANTE: el usuario pidió ${m < 1 ? 'la MITAD de la porción (0.5)' : `${m} porciones`} en total. Devuelve el total YA ajustado × ${m}, usando los MISMOS gramos por porción.`;
   }
@@ -474,9 +480,11 @@ export async function analyzeMeal({ imageDataUrl, description, prompt, apiKey, m
     out.items = limitarTotal(out.items, Math.round(600 * m));
   }
   if (m < 1 && multLocal) {
-    out.baseItems = out.items;          // la porción COMPLETA para la base local (la mitad se aplica al consultar)
+    out.baseItems = out.items;          // la porción COMPLETA para la base local (la fracción se aplica al consultar)
     out.items = aplicarMultiplicador(out.items, m);
-    out.supuestos = [...(out.supuestos || []), '½ porción (lo pediste tú): los gramos ya salen a la mitad.'];
+    out.supuestos = [...(out.supuestos || []), m === 0.5
+      ? '½ porción (lo pediste tú): los gramos ya salen a la mitad.'
+      : `Porción ×${m} (lo pediste tú): los gramos ya salen ajustados.`];
   }
   if (maxTotalG > 0) out.items = limitarTotal(out.items, maxTotalG);
   return out;

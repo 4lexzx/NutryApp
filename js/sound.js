@@ -64,13 +64,28 @@ const IMPORTANTE = [
   '[data-ok]', '[data-ac]', '[data-ac-skip]'
 ].join(', ');
 
-/** Escucha los toques y suena solo en los botones importantes (si está encendido). */
+/** Escucha los toques: el clic suena solo si se PRESIONA un botón importante y
+    se levanta el dedo encima sin haberlo deslizado (los swipes no suenan). */
 export function initSonidos() {
   cargarSonido();
+  let presion = null; // { el, x, y, id } del último botón importante pulsado
   document.addEventListener('pointerdown', e => {
+    presion = null;
     if (!activos || !e.target || !e.target.closest) return;
     const el = e.target.closest(IMPORTANTE);
     if (!el || el.disabled) return;
+    presion = { el, x: e.clientX, y: e.clientY, id: e.pointerId };
+  }, { capture: true, passive: true });
+  document.addEventListener('pointerup', e => {
+    const p = presion; presion = null;
+    if (!p || !activos || e.pointerId !== p.id) return;
+    if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 12) return; // deslizar ≠ tocar
+    const el2 = e.target && e.target.closest ? e.target.closest(IMPORTANTE) : null;
+    if (el2 !== p.el) return; // soltó en otro lado
     clic();
+  }, { capture: true, passive: true });
+  document.addEventListener('pointercancel', () => { presion = null; }, { capture: true, passive: true });
+  document.addEventListener('pointerout', e => {
+    if (presion && e.target === presion.el && e.relatedTarget === null) presion = null;
   }, { capture: true, passive: true });
 }

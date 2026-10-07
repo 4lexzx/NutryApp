@@ -433,14 +433,13 @@ async function runAI({ date, hasKey, usePhoto }) {
     const base = await buscarPlatoBase(clave).catch(() => null);
     if (base && base.items && base.items.length) {
       const items = aplicarMultiplicador(base.items, plan.mult);
-      const etiqueta = plan.mult !== 1 ? (plan.mult < 1 ? ' × la mitad' : ` × ${plan.mult}`) : '';
+      const nm = nombreConCantidad(base.nombre || desc, plan.mult);
       await montarDraftIA({
         date, name: base.nombre || desc, source: 'base', items, photo: '',
-        note: notaPlato(`Base local · sin gastar cuota${etiqueta}`,
-          { supuestos: base.supuestos }),
+        note: notaPlato('Base local · sin gastar cuota', { supuestos: base.supuestos }),
         mult: plan.mult, baseClave: clave
       });
-      toast(`Tu base local: ${base.nombre || desc}${etiqueta} (sin consultar la IA).`, 'ok');
+      toast(`Tu base local: ${nm} (sin consultar la IA).`, 'ok');
       return;
     }
   }
@@ -496,7 +495,10 @@ async function runAI({ date, hasKey, usePhoto }) {
     if (plan.mult > 1) {
       toast(`Plato × ${plan.mult}: ${Math.round(sumG)} g en total (misma porción por plato). Revisa antes de guardar.`, 'ok');
     } else if (plan.mult < 1) {
-      toast(`Media porción: los gramos ya salen a la mitad (lo pediste tú). Revisa antes de guardar.`, 'ok');
+      const como = plan.mult === 0.5
+        ? 'Media porción: los gramos ya salen a la mitad'
+        : `Porción ×${plan.mult}: los gramos ya salen ajustados`;
+      toast(`${como} (lo pediste tú). Revisa antes de guardar.`, 'ok');
     } else if (sumG > 700) {
       toast(`La IA estimó ${Math.round(sumG)} g para un solo plato: revisa los gramos antes de guardar.`, 'warn');
     } else {
@@ -528,13 +530,36 @@ async function runAI({ date, hasKey, usePhoto }) {
   }
 }
 
+/** Quita el prefijo de cantidad ("1/2 Manzana" → "Manzana", "2 platos de Arroz
+    con pollo" → "Arroz con pollo") para que la cantidad nunca se duplique. */
+function sinCantidad(nombre) {
+  return String(nombre || '')
+    .replace(/^\s*(?:\d+\/\d+|[¼½¾])\s+/, '')
+    .replace(/^\s*\d+\s+platos?\s+de\s+/i, '')
+    .replace(/^\s*\d+(?:[.,]\d+)?\s*[×x]\s+/i, '')
+    .trim();
+}
+
+/** Nombre visible con la cantidad pedida: "1/2 Manzana", "1/4 Galleta",
+    "2 platos de Arroz con pollo". Sin cantidad (mult 1) el nombre queda tal cual. */
+function nombreConCantidad(nombre, m) {
+  const mult = Number(m) || 1;
+  const n = sinCantidad(nombre);
+  if (mult === 1 || !n) return String(nombre || '').trim();
+  if (mult === 0.5) return `1/2 ${n}`;
+  if (mult === 0.25) return `1/4 ${n}`;
+  if (mult === 0.75) return `3/4 ${n}`;
+  if (mult < 1) return `${mult}× ${n}`;
+  return `${mult} platos de ${n}`;
+}
+
 /** Arma el borrador del editor a partir de un análisis (IA o base local). */
 async function montarDraftIA(o) {
   const profile = await getProfile();
   const targets = profile ? calcTargets(profile) : null;
   const s = await sugerirTipo(o.date, o.items);
   state.draft = newDraft({
-    date: o.date, type: s.type, name: o.name, source: o.source,
+    date: o.date, type: s.type, name: nombreConCantidad(o.name, o.mult), source: o.source,
     photo: o.photo || '', note: o.note || '', items: o.items,
     mult: o.mult || 1, baseClave: o.baseClave || ''
   });
@@ -556,13 +581,14 @@ function notaPlato(comentario, res) {
 /** Guarda en la base local lo que el usuario corrigió en el editor ("esa avena es de 40 g"). */
 async function guardarBaseDesdeEditor(d) {
   const mult = Number(d.mult) || 1;
-  const clave = d.baseClave || claveConsulta(d.name || '');
+  const limpio = sinCantidad(d.name || '');   // la base guarda la porción COMPLETA con su nombre sin cantidad
+  const clave = d.baseClave || claveConsulta(limpio);
   if (!clave) { toast('Ponle nombre al plato antes de guardarlo como estándar.', 'warn'); return; }
   const items = mult !== 1
     ? d.items.map(it => ({ ...it, gramos: Math.round((Number(it.gramos) || 0) / mult * 10) / 10 }))
     : d.items;
-  await guardarPlatoBase({ clave, consultas: [clave, claveConsulta(d.name || '')].filter(Boolean), nombre: d.name, items, fuente: 'usuario' });
-  toast(`Porción estándar guardada: "${d.name}" (sin gastar cuota en tu próxima consulta).`, 'ok');
+  await guardarPlatoBase({ clave, consultas: [clave, claveConsulta(limpio)].filter(Boolean), nombre: limpio, items, fuente: 'usuario' });
+  toast(`Porción estándar guardada: "${limpio}" (sin gastar cuota en tu próxima consulta).`, 'ok');
 }
 
 /**

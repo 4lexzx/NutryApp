@@ -257,7 +257,8 @@ caracteres, y ya queda creada **solo en ese dispositivo**. No hace falta exporta
 6. **Ajustes → Apariencia**: eliges tema **oscuro/claro** y enciendes o apagas los **sonidos
    suaves de los botones** (un tick bajito estilo Apple, como el teclado del iPhone). Solo suena
    en los botones que **hacen algo importante**: analizar, guardar, eliminar, confirmar,
-   respaldos… no en la navegación ni en las pestañas. Viene encendido.
+   respaldos… no en la navegación ni en las pestañas. Suena cuando **presionas de verdad** (tocas
+   y levantas el dedo encima): **deslizar el dedo sobre un botón no suena**. Viene encendido.
 
 ---
 
@@ -346,9 +347,13 @@ decirte que lo dejaste manual.
   **confianza** del 0–100%) en la nota del plato.
 - **✖️ “2 platos” = doble exacto**: la app guarda la porción base de 1 plato y la multiplica
   ella misma (los mismos gramos × 2), sin dejar que la IA invente cantidades distintas.
-- **½ porción / media fruta**: si escribes **“media manzana”**, **“medio plátano”** o
-  **“½ galleta”**, la app calcula la **mitad** (los gramos salen divididos y la nota te avisa
-  *“½ porción (lo pediste tú)”*). Si **no** pones fracción, cuenta la porción **entera**.
+- **½ · ¼ · ¾ porción / cantidades visibles**: si escribes **“media manzana”**, **“½ galleta”**,
+  **“1/4 chirimoya”**, **“un cuarto de pan”** o **“3/4 de galleta”**, la app calcula la fracción
+  (gramos × ½, × ¼ o × ¾) y el nombre en el editor y en el historial **muestra la cantidad**:
+  *“1/2 Manzana”*, *“1/4 Galleta”* — así ves que está calculando bien. **“2 platos de arroz con
+  pollo”** aparece como *“2 platos de Arroz con pollo”* con los gramos exactos × 2. Si **no**
+  pones cantidad, la porción es **entera (1)** y el nombre queda tal cual; la nota te avisa
+  *“½ porción (lo pediste tú)”* (o *“Porción ×0.25 (lo pediste tú)”*) cuando hubo fracción.
 - **📚 Base local de platos**: lo que analizas queda guardado en tu celular; la próxima vez que
   escribas el mismo plato con las mismas respuestas (aunque sea en otro orden: “avena con leche”)
   sale **igual y sin gastar cuota**. En el editor, **“Usar como mi porción estándar”** guarda tus
