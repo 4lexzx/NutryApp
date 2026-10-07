@@ -275,10 +275,28 @@ se actualizan solos. Eliges el tipo de comida (desayuno/almuerzo/cena/snack) y *
 - **⭐ Guardar favorito**: lo deja en Favoritos para reutilizarlo sin gastar IA.
 - Si la IA se equivoca (por ejemplo la porción), corrígela: es lo esperado, es una **estimación**.
 - **✨ Re-analizar porciones con la IA**: al editar una comida ya guardada, la IA vuelve a
-  estimar los gramos con tu foto o con el nombre/nota del plato y **reemplaza los ingredientes**
+  estimar los gramos con tu foto o con el nombre/nota del plato y **actualiza los ingredientes**
   (1 consulta de tu cuota diaria; te pide confirmación y puedes editar todo antes de Guardar).
   **No sube tus porciones**: parte de los gramos que ya tienes registrados y solo puede
   mantenerlos o bajarlos (máximo +15%, y te avisa si la IA se pasa).
+  **Tus correcciones manuales no se pierden**: lo que hayas cambiado a mano (gramos o nombre del
+  ingrediente) se conserva tal cual; la IA solo re-estima el resto, y el aviso te dice cuántas
+  correcciones tuyas mantuvo.
+
+### Te pregunta antes de analizar (y aprende tus respuestas)
+
+Si lo que escribes puede significar varias cosas, la app **te pregunta primero** (antes de gastar
+cuota de IA) y con tu respuesta arma la consulta más precisa:
+
+- “leche con avena” → **¿Qué leche usaste?** (entera, evaporada, en polvo, descremada, de almendras)
+- “arroz con pollo” → **¿Qué arroz?** (blanco, tres segundos, integral)
+- También pregunta por **aceite**, **tipo de avena** y el **líquido del batido** (agua o leche).
+- Respondes con un toque, o **“Omitir (que la IA suponga)”** si prefieres; también puedes cerrar
+  la pregunta con la tecla Escape.
+- **La respuesta se guarda en tu celular** y no vuelve a salir para eso: la próxima vez que
+  analices algo parecido ya va sola con tu elección (“Aclaración del usuario: leche = entera”).
+- Si el texto ya la trae escrita (“leche de almendras”, “arroz integral”), **no pregunta**.
+- La aclaración también vale al **re-analizar** y en **favoritos** que salen de la IA.
 
 ### ¿De qué comida es? La app lo adivina sola
 
@@ -313,6 +331,13 @@ decirte que lo dejaste manual.
   la porción oficial de ese plato; puedes borrar la base en **Ajustes → Base de platos**.
 - **🧪 Temperatura 0.2 + JSON validado**: respuestas consistentes; si el JSON viene malo, la app
   reintenta una vez y te avisa en vez de mostrar datos rotos.
+- **🥛 Contenedores y medidas**: el prompt identifica el recipiente de la foto o del texto y usa
+  su capacidad estándar (vaso cheleero/pinta 500–600 ml, vaso americano 250–350 ml, lata 355 ml,
+  botella 625 ml, jarra 1 L, taza 250 ml, cuchara sopera 15 ml, scoop de proteína 30 g) en vez de
+  adivinar “a ojo”.
+- **🥤 Batidos de gimnasio desglosados**: un batido nunca sale como un bloque “batido 400 g”:
+  la IA lo abre ingrediente por ingrediente (scoop de proteína 30 g, avena 10 g por cucharada,
+  plátano 100–120 g, mantequilla de maní 15 g, leche 250 ml, miel 21 g, nueces 15–30 g, hielo 0 kcal).
 
 ### Panel del día (📅 Hoy)
 

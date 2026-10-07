@@ -63,7 +63,7 @@ export function mountEditor(root, draft, opts = {}) {
       const i = Number(row.dataset.i);
       const it = draft.items[i];
       const nameIn = row.querySelector('.ing-name');
-      nameIn.addEventListener('input', e => { it.nombre = e.target.value; });
+      nameIn.addEventListener('input', e => { it.nombre = e.target.value; it.editado = true; });
 
       const gIn = row.querySelector('[data-k="g"]');
       gIn.addEventListener('input', e => {
@@ -71,6 +71,7 @@ export function mountEditor(root, draft, opts = {}) {
         if (!isFinite(g) || g < 0) g = 0;
         if (g > 5000) g = 5000;
         it.gramos = g;
+        it.editado = true;
         const m = itemMacros(it);
         row.querySelector('[data-k="k"]').value = roundIt(m.k);
         row.querySelector('[data-k="p"]').value = roundIt(m.p);
@@ -84,6 +85,7 @@ export function mountEditor(root, draft, opts = {}) {
         inp.addEventListener('input', e => {
           let v = parseFloat(e.target.value);
           if (!isFinite(v) || v < 0) v = 0;
+          it.editado = true;
           const g = Number(it.gramos) || 0;
           if (g > 0) {
             // convertimos el valor de la porción a "por 100 g" para conservar la escala
@@ -304,7 +306,7 @@ export function pickGrams(food, s, draft, onChange) {
   $('#pk-back', s.sheet).addEventListener('click', () => { s.close(); openAddSheet(draft, onChange); });
   $('#pk-ok', s.sheet).addEventListener('click', () => {
     const g = Math.max(1, Math.min(3000, parseFloat($('#pk-g', s.sheet).value) || 100));
-    draft.items.push(foodToItem(food, g));
+    draft.items.push({ ...foodToItem(food, g), editado: true });
     s.close(); onChange();
   });
   setTimeout(() => { const i = $('#pk-g', s.sheet); if (i) { i.focus(); i.select(); } }, 60);
@@ -342,7 +344,8 @@ function customIngredient(s, draft, onChange) {
         c: roundIt((parseFloat($('#ci-c', s.sheet).value) || 0) * r),
         f: roundIt((parseFloat($('#ci-f', s.sheet).value) || 0) * r),
         fi: roundIt((parseFloat($('#ci-fi', s.sheet).value) || 0) * r)
-      }
+      },
+      editado: true
     });
     s.close(); onChange();
   });

@@ -37,6 +37,15 @@ OTRAS REGLAS
 11. Si falta información (no se ve el arroz), incluye el ingrediente con una estimación razonable y márcalo en "supuestos".
 12. Si el mensaje trae "Cantidades registradas", úsalas como TOPE: no aumentes ninguna; solo baja si excede lo razonable para UN plato personal.
 
+CONTENEDORES Y MEDIDAS (en fotos y en texto)
+13. Identifica el recipiente y usa su capacidad estándar: vaso cheleero / pinta grande (jarra alta de cerveza o chela): 500–600 ml · vaso mediano (americano, pilsener): 250–350 ml · vaso pequeño: 150–200 ml · lata: 355 ml · botella pequeña: 625 ml · jarra: 1 L · taza o mug: 250 ml · cuchara sopera: 15 ml · cucharada: 10 g de sólido (15 ml de líquido) · scoop de proteína: 30 g.
+14. Si la foto muestra un vaso, jarra o lata, calcula el líquido por la capacidad del recipiente (vaso cheleero lleno ≈ 500–600 ml), NO "a ojo". Si el usuario escribe "1 vaso cheleero de chicha" son 500–600 ml. Elige el recipiente que coincida con lo que se ve: alto y estrecho = cheleero (500–600 ml); corto y ancho = mediano (250–350 ml); si no puedes identificarlo, toma 300 ml y márcalo en "supuestos".
+15. Si el mensaje trae "Aclaración del usuario", es VERDAD ABSOLUTA y manda sobre tus rangos (ej. "leche = evaporada" → ese ingrediente es leche evaporada, no entera); anótalo en "supuestos".
+
+BATIDOS Y LICUADOS DE GIMNASIO
+16. Si describe un batido/shake/licuado (proteína, avena, plátano, mantequilla de maní, acai, huevo…), DESGLÓSALO ingrediente por ingrediente con gramos de CADA uno: nunca un solo bloque "batido 400 g" sin detalle.
+17. Porciones típicas de batido: scoop de proteína en polvo = 30 g · cucharada de avena = 10 g · plátano mediano = 100–120 g · cucharada de mantequilla de maní = 15 g · vaso de leche = 250 ml · cucharada de miel = 21 g · puñado de nueces o almenas = 15–30 g · hielo = 0 kcal. El líquido cuenta en gramos (250 ml ≈ 250 g). Si el batido lleva 6 ingredientes, lista los 6 (mínimo 2 g cada uno), cada uno con sus macros.
+
 RESPONDE EXCLUSIVAMENTE CON UN JSON VÁLIDO (sin texto fuera del JSON, sin markdown) con exactamente esta estructura:
 {
   "nombre_plato": "Nombre corto del plato",
@@ -84,6 +93,57 @@ export function claveConsulta(texto) {
   t = t.replace(/\s+/g, ' ').trim();
   if (!t) return '';
   return t.split(' ').sort().join(' ');
+}
+
+/* ============ Pregunta rápida ANTES de analizar (variantes de alimentos) ============
+   Si lo que escribe puede significar varias cosas (leche entera/evaporada/en polvo…),
+   la app pregunta ANTES de llamar a la IA para que los gramos salgan precisos.
+   La respuesta se guarda en el celular y no se vuelve a preguntar. */
+const VARIANTES = [
+  {
+    clave: 'leche',
+    test: /\bleche\b/i,
+    ya: /\bleche\s+(entera|evaporada|en\s+polvo|descremada|light|integral|semidescremada|de\s+(almendras|soya|avena|coco)|vegetal)\b/i,
+    titulo: '¿Qué leche usaste?',
+    opciones: ['entera', 'evaporada', 'en polvo', 'descremada', 'leche de almendras']
+  },
+  {
+    clave: 'arroz',
+    test: /\barroz\b/i,
+    ya: /\barroz\s+(blanco|tres\s+segundos|integral|salado|al\s+horno|chaufa|con\s+leche)\b/i,
+    titulo: '¿Qué arroz?',
+    opciones: ['blanco', 'tres segundos', 'integral']
+  },
+  {
+    clave: 'avena',
+    test: /\bavena\b/i,
+    ya: /\bavena\s+(en\s+hojuelas|bebible|instant[aá]a|en\s+polvo|molida)\b/i,
+    titulo: '¿Qué tipo de avena?',
+    opciones: ['en hojuelas', 'bebible instantánea', 'en polvo']
+  },
+  {
+    clave: 'aceite',
+    test: /\baceite\b/i,
+    ya: /\baceite\s+(de\s+oliva|oliva|canola|girasol|de\s+palta|de\s+coco)\b/i,
+    titulo: '¿Qué aceite?',
+    opciones: ['de oliva', 'canola', 'girasol']
+  },
+  {
+    clave: 'líquido del batido',
+    test: /\b(batido|shake|licuado|prote[ií]na\s+en\s+polvo)\b/i,
+    ya: /\b(con|de|en|y)\s+(agua|leche|jugo|agua\s+de|leche\s+de)\b/i,
+    titulo: '¿En qué líquido haces el batido?',
+    opciones: ['agua', 'leche', 'leche de almendras', 'leche de avena']
+  }
+];
+
+/** Variantes detectadas en el texto que todavía el usuario no precisó. */
+export function detectarAmbiguedades(texto) {
+  const t = String(texto || '');
+  if (!t.trim()) return [];
+  return VARIANTES
+    .filter(v => v.test.test(t) && !v.ya.test(t))
+    .map(v => ({ clave: v.clave, titulo: v.titulo, opciones: v.opciones }));
 }
 
 /** Cuántas porciones pidió el usuario (2 platos → 2, media porción → 0.5, nada → 1).

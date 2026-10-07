@@ -2,7 +2,7 @@
 
 import { DB, getSettings, getProfile, getPrompt, buscarPlatoBase, guardarPlatoBase } from '../db.js';
 import { icon } from '../icons.js';
-import { analyzeMeal, DEFAULT_PROMPT, claveConsulta, planPorciones, aplicarMultiplicador } from '../ai.js';
+import { analyzeMeal, DEFAULT_PROMPT, claveConsulta, planPorciones, aplicarMultiplicador, detectarAmbiguedades } from '../ai.js';
 import { mountEditor, newDraft, openAddSheet, pickGrams } from '../editor.js';
 import { calcTargets, computeTotals, searchFoods, FOODS } from '../nutrition.js';
 import {
@@ -339,6 +339,68 @@ export function alVolverDeFoto() {
   }, 1200);
 }
 
+/* ================= ACLARACIONES ANTES DE ANALIZAR ================= */
+/** Pregunta por escrito lo que falta (¿qué leche?) y resuelve con la opción elegida. */
+function preguntarVariante(a) {
+  return new Promise(resolve => {
+    const s = openSheet(`
+      <h2>Antes de analizar…</h2>
+      <p class="small muted">Una pregunta rápida para que los gramos salgan más precisos.
+        Lo guardamos en tu celular y no te lo volvemos a preguntar.</p>
+      <h3 style="margin-top:12px">${esc(a.titulo)}</h3>
+      <div class="chips big">
+        ${a.opciones.map(o => `<button type="button" class="chip" data-ac="${esc(o)}">${esc(o)}</button>`).join('')}
+      </div>
+      <button class="btn btn-ghost btn-block" type="button" data-ac-skip style="margin-top:12px">Omitir (que la IA suponga)</button>`,
+      { sticky: true });
+    const onEsc = e => { if (e.key === 'Escape') terminar(null); };
+    const terminar = v => { document.removeEventListener('keydown', onEsc); s.close(); resolve(v); };
+    document.addEventListener('keydown', onEsc);
+    s.root.querySelectorAll('[data-ac]').forEach(b => { b.onclick = () => terminar(b.dataset.ac); });
+    s.root.querySelector('[data-ac-skip]').onclick = () => terminar(null);
+  });
+}
+
+async function variantesGuardadas() {
+  try { const r = await DB.kvGet('variantes'); return (r && r.map) || {}; }
+  catch (e) { return {}; }
+}
+
+/**
+ * Pregunta las variantes pendientes de UNA vez y devuelve las aclaraciones
+ * aplicables a este texto (las que ya estaban guardadas + las recién respondidas).
+ */
+async function pedirAclaraciones(desc) {
+  const guardadas = await variantesGuardadas();
+  const pend = detectarAmbiguedades(desc).filter(a => guardadas[a.clave] === undefined);
+  const nuevas = {};
+  for (const a of pend) {
+    const r = await preguntarVariante(a);
+    if (r) { nuevas[a.clave] = r; guardadas[a.clave] = r; }
+  }
+  if (Object.keys(nuevas).length) {
+    try { await DB.kvSet({ k: 'variantes', map: guardadas }); } catch (e) { console.warn('No se guardaron las variantes:', e); }
+  }
+  return aclaracionesDe(desc, guardadas);
+}
+
+/** Aclaraciones que aplican a este texto (sin preguntar nada). */
+async function aclaracionesDe(desc, base) {
+  const guardadas = base || await variantesGuardadas();
+  const out = {};
+  for (const a of detectarAmbiguedades(desc)) {
+    if (guardadas[a.clave] !== undefined) out[a.clave] = guardadas[a.clave];
+  }
+  return out;
+}
+
+/** "…leche con avena" + {leche:'entera'} → "…leche con avena. Aclaración del usuario: leche = entera." */
+function anexarAclaraciones(desc, aclar) {
+  const partes = Object.entries(aclar || {}).filter(([, v]) => v).map(([k, v]) => `${k} = ${v}`);
+  if (!partes.length) return desc;
+  return `${desc}. Aclaración del usuario: ${partes.join('; ')}.`;
+}
+
 async function runAI({ date, hasKey, usePhoto }) {
   const root = viewRoot();
   const body = root.querySelector('#lg-body');
@@ -373,6 +435,10 @@ async function runAI({ date, hasKey, usePhoto }) {
     }
   }
 
+  // 2) si falta precisar una variante (¿qué leche?), preguntamos ANTES de llamar a la IA
+  const aclar = await pedirAclaraciones(desc).catch(() => ({}));
+  const descFinal = anexarAclaraciones(desc, aclar);
+
   body.innerHTML = `
     <div class="card loading-block">
       <div class="spinner"></div>
@@ -389,7 +455,7 @@ async function runAI({ date, hasKey, usePhoto }) {
     const prompt = (await getPrompt()) || DEFAULT_PROMPT;
     const res = await analyzeMeal({
       imageDataUrl: usePhoto ? state.photo : null,
-      description: state.desc,
+      description: descFinal,
       prompt,
       apiKey: settings.apiKey,
       model: settings.model,
@@ -491,6 +557,37 @@ async function guardarBaseDesdeEditor(d) {
   toast(`Porción estándar guardada: "${d.name}" (sin gastar cuota en tu próxima consulta).`, 'ok');
 }
 
+/**
+ * Une la respuesta de la IA con lo que ya corregiste a mano.
+ * Lo marcado como editado (nombre o gramos) MANDA sobre lo que devuelva la IA;
+ * lo demás se actualiza con la nueva estimación.
+ */
+function fusionarReanalisis(viejos, nuevos) {
+  const coincide = (a, b) => {
+    const ka = claveConsulta(a || ''), kb = claveConsulta(b || '');
+    if (!ka || !kb) return false;
+    if (ka === kb) return true;
+    const ta = ka.split(' '), tb = kb.split(' ');
+    const chico = ta.length <= tb.length ? ta : tb;
+    const grande = ta.length <= tb.length ? tb : ta;
+    return chico.every(x => grande.includes(x));
+  };
+  let conservados = 0;
+  const items = (nuevos || []).map(n => {
+    const m = (viejos || []).find(v => v.editado && coincide(v.nombre, n.nombre));
+    if (!m) return n;
+    conservados++;
+    return { ...n, nombre: m.nombre, gramos: m.gramos, per100: m.per100 || n.per100, nota: m.nota || n.nota, editado: true };
+  });
+  (viejos || []).forEach(v => {
+    if (v.editado && !(nuevos || []).some(n => coincide(v.nombre, n.nombre))) {
+      items.push(v);
+      conservados++;
+    }
+  });
+  return { items, conservados };
+}
+
 /** Tipos de comida ya registrados en una fecha. */
 async function tiposDelDia(date) {
   try {
@@ -571,7 +668,10 @@ export async function renderEdit(root, args) {
         partes.push(`Cantidades registradas actualmente: ${prev.join(', ')}.`);
         partes.push('No aumentes estas cantidades: solo puedes bajarlas si son excesivas para UN plato personal.');
       }
-      const desc = partes.filter(s => s && String(s).trim()).join('. ').trim();
+      let desc = partes.filter(s => s && String(s).trim()).join('. ').trim();
+      // tus aclaraciones guardadas (leche = evaporada…) también valen al re-analizar
+      const aclar = await aclaracionesDe([d.name, d.note, ...(d.items || []).map(i => i.nombre)].join(' ')).catch(() => ({}));
+      desc = anexarAclaraciones(desc, aclar);
       if (!d.photo && !desc) throw new Error('Este plato no tiene foto ni nombre para re-analizar.');
       const prompt = (await getPrompt()) || DEFAULT_PROMPT;
       const res = await analyzeMeal({
@@ -583,12 +683,16 @@ export async function renderEdit(root, args) {
         maxTotalG: oldG > 0 ? Math.round(oldG * 1.15) : 0
       });
       if (!res.items || !res.items.length) throw new Error('La IA no devolvió ingredientes.');
-      d.items = res.items;
+      const fusion = fusionarReanalisis(d.items || [], res.items);
+      d.items = fusion.items;
       const t = computeTotals(d.items);
+      const conservados = fusion.conservados
+        ? ` Mantuvimos ${fusion.conservados} corrección${fusion.conservados === 1 ? '' : 'es'} manual${fusion.conservados === 1 ? '' : 'es'}.`
+        : '';
       if (oldG > 0 && t.grams > oldG + 15) {
-        toast(`Ojo: la IA subió las porciones de ${oldG} g a ${t.grams} g. Bájalas a mano si no te cuadran (${t.kcal} kcal).`, 'warn');
+        toast(`Ojo: la IA subió las porciones de ${oldG} g a ${t.grams} g. Bájalas a mano si no te cuadran (${t.kcal} kcal).${conservados}`, 'warn');
       } else {
-        toast(`Porciones recalculadas: ${t.grams} g y ${t.kcal} kcal. Revisa y guarda.`, 'ok');
+        toast(`Porciones recalculadas: ${t.grams} g y ${t.kcal} kcal.${conservados} Revisa y guarda.`, 'ok');
       }
     }
   });
