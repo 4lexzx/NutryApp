@@ -31,7 +31,7 @@ RANGOS DE REFERENCIA (para UN plato de almuerzo, 24–26 cm)
 - La suma del plato ("porcion_total_g") debe quedar entre 250 y 600 g (bebidas: 150–300 g).
 
 OTRAS REGLAS
-8. Las cantidades que ESCRIBE el usuario mandan SOBRE tus rangos: si dice "200 g de chaufa", ese ingrediente son exactamente 200 g; si da un peso total de plato, todos los ingredientes deben sumar como máximo ese número (el aceite y la cebolla se incluyen dentro). Si dice "poco arroz", "doble porción", "sin aceite" o "para 2 personas", respétalo.
+8. Las cantidades que ESCRIBE el usuario mandan SOBRE tus rangos: si dice "200 g de chaufa", ese ingrediente son exactamente 200 g; si da un peso total de plato, todos los ingredientes deben sumar como máximo ese número (el aceite y la cebolla se incluyen dentro). Si dice "poco arroz", "doble porción", "sin aceite" o "para 2 personas", respétalo. FRACCIONES: "media fruta", "medio plátano" o "½ galleta" = la MITAD de lo normal, y si NO pone fracción la porción es ENTERA. Si el mensaje te pide "la base de UNA porción", devuelve la porción COMPLETA aunque él haya dicho media (la app la divide sola); si te pide el total ya ajustado, aplica tú la mitad y anota "½ porción (lo pidió el usuario)" en "supuestos".
 9. En FOTOS usa el plato como referencia: un plato hondo lleno pesa 350–600 g; si la carne ocupa 1/4 del plato son unos 100 g. No cuentes la olla ni otras porciones de la mesa.
 10. Calcula por ingrediente: kcal, proteína, carbohidratos, grasas y fibra.
 11. Si falta información (no se ve el arroz), incluye el ingrediente con una estimación razonable y márcalo en "supuestos".
@@ -201,6 +201,10 @@ export function multiplicadorPorciones(texto) {
   if (m == null && /\bdoble (porcion|plato)\b/.test(t)) m = 2;
   if (m == null && /\btriple (porcion|plato)\b/.test(t)) m = 3;
   if (m == null && /\b(media|medio) (porcion|plato)\b/.test(t)) m = 0.5;
+  // "media manzana", "medio plátano", "½ galleta": mitad de lo que sea (menos
+  // abstracciones como "a media tarde" o "a media hora")
+  if (m == null && /\b(media|medio)\s+(?!tarde\b|manana\b|hora\b|sesion\b|cuenta\b|vida\b|semana\b|clase\b|reunion\b|racha\b|noche\b)[a-z]{3,}\b/.test(t)) m = 0.5;
+  if (m == null && /(?:^|\s)(?:1\/2|½|0[.,]5)\s+(?:de\s+)?[a-z]{3,}/.test(t)) m = 0.5;
   if (m == null) m = 1;
   return Math.max(0.5, Math.min(10, m));
 }
@@ -441,10 +445,12 @@ export async function analyzeMeal({ imageDataUrl, description, prompt, apiKey, m
   if (!/json/i.test(txt)) txt += '\n\nRecuerda: responde ÚNICAMENTE con JSON válido.';
   if (description && description.trim()) txt += `\n\nDescripción del usuario: ${description.trim()}`;
   if (!imageDataUrl) txt += '\n\nNo hay foto, basa tu análisis solo en la descripción de texto.';
-  if (m > 1 && multLocal) {
-    txt += `\n\nIMPORTANTE: aunque el usuario pidió ${m} platos, devuelve SOLO la base de UNA porción (la app la multiplica por ${m}).`;
-  } else if (m > 1) {
-    txt += `\n\nIMPORTANTE: el usuario pidió ${m} porciones en total. Devuelve el total ya multiplicado, usando los MISMOS gramos por porción (porción individual × ${m}).`;
+  if (m !== 1 && multLocal) {
+    txt += m > 1
+      ? `\n\nIMPORTANTE: aunque el usuario pidió ${m} platos, devuelve SOLO la base de UNA porción (la app la multiplica por ${m}).`
+      : '\n\nIMPORTANTE: el usuario pidió MEDIA porción. Devuelve SOLO la base de la porción COMPLETA normal: NO la dividas tú, la app la reduce a la mitad sola.';
+  } else if (m !== 1) {
+    txt += `\n\nIMPORTANTE: el usuario pidió ${m < 1 ? 'la MITAD de la porción (0.5)' : `${m} porciones`} en total. Devuelve el total YA ajustado × ${m}, usando los MISMOS gramos por porción.`;
   }
   parts.push({ text: txt });
 
@@ -466,6 +472,11 @@ export async function analyzeMeal({ imageDataUrl, description, prompt, apiKey, m
     out.items = aplicarMultiplicador(out.items, m);
     // red de seguridad: aunque la IA haya devuelto el doble ya multiplicado, nunca más de 600 g por porción
     out.items = limitarTotal(out.items, Math.round(600 * m));
+  }
+  if (m < 1 && multLocal) {
+    out.baseItems = out.items;          // la porción COMPLETA para la base local (la mitad se aplica al consultar)
+    out.items = aplicarMultiplicador(out.items, m);
+    out.supuestos = [...(out.supuestos || []), '½ porción (lo pediste tú): los gramos ya salen a la mitad.'];
   }
   if (maxTotalG > 0) out.items = limitarTotal(out.items, maxTotalG);
   return out;

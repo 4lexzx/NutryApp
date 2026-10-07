@@ -1,11 +1,13 @@
-/* Sonido de botón suave (estilo Apple): un "tick" corto, nítido y bajito,
-   sintetizado en el momento (sin archivos de audio). Solo suena en los botones
+/* Sonido de botón bonito (estilo Apple): reproduce sfx/click.wav, un "tock"
+   corto y limpio incluido en la app (sin internet). Solo suena en los botones
    que hacen algo importante (analizar, guardar, confirmar…). Se apaga en Ajustes. */
 
 let activos = true;
 let ctx = null;
+let buf = null;
+let cargando = null;
 
-export function setSonidos(v) { activos = v !== false; }
+export function setSonidos(v) { activos = v !== false; if (activos) cargarSonido(); }
 export function sonidosActivos() { return activos; }
 
 function audioCtx() {
@@ -18,40 +20,34 @@ function audioCtx() {
   return ctx;
 }
 
-/** Tick corto y limpio: ráfaga de 30 ms filtrada (~3.6 kHz) + tono suave de 1.4 kHz.
-    Sin barrido grave: eso era lo que sonaba "barato". */
+/** Descarga y decodifica el clic una sola vez (queda listo antes del primer toque). */
+function cargarSonido() {
+  if (buf) return Promise.resolve(buf);
+  if (!cargando) {
+    cargando = fetch('./sfx/click.wav')
+      .then(r => (r && r.ok ? r.arrayBuffer() : Promise.reject(new Error('sin archivo'))))
+      .then(ab => new Promise((res, rej) => {
+        const c = audioCtx();
+        if (!c) rej(new Error('sin audio'));
+        else c.decodeAudioData(ab, res, rej);
+      }))
+      .then(b => { buf = b; return b; })
+      .catch(() => null);
+  }
+  return cargando;
+}
+
+/** Suena el clic (si está encendido y el archivo ya cargó). */
 export function clic() {
   try {
     const c = audioCtx();
-    if (!c) return;
-    const t = c.currentTime;
-
-    // 1) el "clic" nítido: ruido muy corto con envolvente rápida
-    const dur = 0.03;
-    const len = Math.max(1, Math.floor(c.sampleRate * dur));
-    const buf = c.createBuffer(1, len, c.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    if (!c || !buf) { cargarSonido(); return; }
     const src = c.createBufferSource();
     src.buffer = buf;
-    const bp = c.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.frequency.value = 3600;
-    bp.Q.value = 0.8;
     const g = c.createGain();
-    g.gain.value = 0.05;
-    src.connect(bp); bp.connect(g); g.connect(c.destination);
-    src.start(t);
-
-    // 2) el "cuerpo": tonito limpio que da calor sin sonar a juguete
-    const osc = c.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.value = 1400;
-    const g2 = c.createGain();
-    g2.gain.setValueAtTime(0.03, t);
-    g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-    osc.connect(g2); g2.connect(c.destination);
-    osc.start(t); osc.stop(t + 0.06);
+    g.gain.value = 0.6;
+    src.connect(g); g.connect(c.destination);
+    src.start();
   } catch (e) { /* silencio: el sonido jamás debe romper la app */ }
 }
 
@@ -70,6 +66,7 @@ const IMPORTANTE = [
 
 /** Escucha los toques y suena solo en los botones importantes (si está encendido). */
 export function initSonidos() {
+  cargarSonido();
   document.addEventListener('pointerdown', e => {
     if (!activos || !e.target || !e.target.closest) return;
     const el = e.target.closest(IMPORTANTE);

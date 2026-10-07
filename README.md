@@ -346,6 +346,9 @@ decirte que lo dejaste manual.
   **confianza** del 0–100%) en la nota del plato.
 - **✖️ “2 platos” = doble exacto**: la app guarda la porción base de 1 plato y la multiplica
   ella misma (los mismos gramos × 2), sin dejar que la IA invente cantidades distintas.
+- **½ porción / media fruta**: si escribes **“media manzana”**, **“medio plátano”** o
+  **“½ galleta”**, la app calcula la **mitad** (los gramos salen divididos y la nota te avisa
+  *“½ porción (lo pediste tú)”*). Si **no** pones fracción, cuenta la porción **entera**.
 - **📚 Base local de platos**: lo que analizas queda guardado en tu celular; la próxima vez que
   escribas el mismo plato con las mismas respuestas (aunque sea en otro orden: “avena con leche”)
   sale **igual y sin gastar cuota**. En el editor, **“Usar como mi porción estándar”** guarda tus

@@ -433,13 +433,14 @@ async function runAI({ date, hasKey, usePhoto }) {
     const base = await buscarPlatoBase(clave).catch(() => null);
     if (base && base.items && base.items.length) {
       const items = aplicarMultiplicador(base.items, plan.mult);
+      const etiqueta = plan.mult !== 1 ? (plan.mult < 1 ? ' × la mitad' : ` × ${plan.mult}`) : '';
       await montarDraftIA({
         date, name: base.nombre || desc, source: 'base', items, photo: '',
-        note: notaPlato(`Base local · sin gastar cuota${plan.mult !== 1 ? ` × ${plan.mult}` : ''}`,
+        note: notaPlato(`Base local · sin gastar cuota${etiqueta}`,
           { supuestos: base.supuestos }),
         mult: plan.mult, baseClave: clave
       });
-      toast(`Tu base local: ${base.nombre || desc}${plan.mult !== 1 ? ` × ${plan.mult}` : ''} (sin consultar la IA).`, 'ok');
+      toast(`Tu base local: ${base.nombre || desc}${etiqueta} (sin consultar la IA).`, 'ok');
       return;
     }
   }
@@ -479,7 +480,7 @@ async function runAI({ date, hasKey, usePhoto }) {
           items: res.baseItems || res.items,
           fuente: 'ia',
           confianza: res.confianza,
-          supuestos: res.supuestos
+          supuestos: (res.supuestos || []).filter(s => !/lo pediste tú/.test(s))
         });
       } catch (e) { console.warn('No se pudo guardar en la base local:', e); }
     }
@@ -494,6 +495,8 @@ async function runAI({ date, hasKey, usePhoto }) {
     const sumG = res.items.reduce((a, i) => a + (Number(i.gramos) || 0), 0);
     if (plan.mult > 1) {
       toast(`Plato × ${plan.mult}: ${Math.round(sumG)} g en total (misma porción por plato). Revisa antes de guardar.`, 'ok');
+    } else if (plan.mult < 1) {
+      toast(`Media porción: los gramos ya salen a la mitad (lo pediste tú). Revisa antes de guardar.`, 'ok');
     } else if (sumG > 700) {
       toast(`La IA estimó ${Math.round(sumG)} g para un solo plato: revisa los gramos antes de guardar.`, 'warn');
     } else {
