@@ -347,13 +347,13 @@ decirte que lo dejaste manual.
   **confianza** del 0–100%) en la nota del plato.
 - **✖️ “2 platos” = doble exacto**: la app guarda la porción base de 1 plato y la multiplica
   ella misma (los mismos gramos × 2), sin dejar que la IA invente cantidades distintas.
-- **½ · ¼ · ¾ porción / cantidades visibles**: si escribes **“media manzana”**, **“½ galleta”**,
+- **½ · ¼ · ¾ y cantidades en su cuadrito**: si escribes **“media manzana”**, **“½ galleta”**,
   **“1/4 chirimoya”**, **“un cuarto de pan”** o **“3/4 de galleta”**, la app calcula la fracción
-  (gramos × ½, × ¼ o × ¾) y el nombre en el editor y en el historial **muestra la cantidad**:
-  *“1/2 Manzana”*, *“1/4 Galleta”* — así ves que está calculando bien. **“2 platos de arroz con
-  pollo”** aparece como *“2 platos de Arroz con pollo”* con los gramos exactos × 2. Si **no**
-  pones cantidad, la porción es **entera (1)** y el nombre queda tal cual; la nota te avisa
-  *“½ porción (lo pediste tú)”* (o *“Porción ×0.25 (lo pediste tú)”*) cuando hubo fracción.
+  (gramos × ½, × ¼ o × ¾). El nombre queda **limpio** (“Manzana”) y la cantidad se ve en su
+  propio cuadrito **Cant.** al lado (estilo ingredientes): muestra **1** cuando no pediste nada,
+  **1/2**, **1/4** o **2** cuando sí — y es **editable**: cambias el número y los gramos y macros
+  se reescalan al instante. La nota te avisa *“½ porción (lo pediste tú)”* cuando hubo fracción.
+  **“2 platos de arroz con pollo”** sale con los gramos exactos × 2 y Cant. = 2.
 - **📚 Base local de platos**: lo que analizas queda guardado en tu celular; la próxima vez que
   escribas el mismo plato con las mismas respuestas (aunque sea en otro orden: “avena con leche”)
   sale **igual y sin gastar cuota**. En el editor, **“Usar como mi porción estándar”** guarda tus

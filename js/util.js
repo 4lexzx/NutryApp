@@ -240,3 +240,24 @@ export function uid() { return Date.now() + Math.floor(Math.random() * 100000); 
 export function debounce(fn, ms = 250) {
   let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
 }
+
+/** Texto de la cantidad para la cajita del editor: 0.5 → "1/2", 0.25 → "1/4", 2 → "2". */
+export function qtyTexto(m) {
+  const v = Number(m);
+  if (!isFinite(v) || v <= 0) return '1';
+  if (v === 0.5) return '1/2';
+  if (v === 0.25) return '1/4';
+  if (v === 0.75) return '3/4';
+  if (Math.abs(v - Math.round(v)) < 0.001) return String(Math.round(v));
+  return String(Math.round(v * 100) / 100);
+}
+
+/** "1/2", "0,5", "2" → número de porciones; null si no es válido. */
+export function parseCantidad(txt) {
+  const t = String(txt || '').trim().replace(/\s+/g, '').replace(',', '.');
+  let v = NaN;
+  if (/^\d+\/\d+$/.test(t)) { const p = t.split('/'); v = Number(p[1]) ? Number(p[0]) / Number(p[1]) : NaN; }
+  else if (/^\d+(\.\d+)?$/.test(t)) v = parseFloat(t);
+  if (!isFinite(v) || v <= 0 || v > 20) return null;
+  return Math.round(v * 100) / 100;
+}

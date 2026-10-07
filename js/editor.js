@@ -1,6 +1,6 @@
 /* Editor de plato: lista de ingredientes 100% editable con recálculo de totales. */
 
-import { TIPOS_COMIDA, ICONO_TIPO, esc, openSheet, $, $$, toast, confirmSheet } from './util.js';
+import { TIPOS_COMIDA, ICONO_TIPO, esc, openSheet, $, $$, toast, confirmSheet, qtyTexto, parseCantidad } from './util.js';
 import { icon } from './icons.js';
 import { computeTotals, itemMacros, searchFoods, foodToItem, FOODS } from './nutrition.js';
 
@@ -57,6 +57,23 @@ export function mountEditor(root, draft, opts = {}) {
     }
     updateTotals();
   };
+
+  // --- cantidad de porciones (el cuadrito "Cant." al lado del nombre) ---
+  // Cambiarlo reescala los gramos al instante: 1/2 → 2 duplica, 2 → 1 divide…
+  const qty = q('#ed-qty');
+  if (qty) qty.addEventListener('change', () => {
+    const viejo = Number(draft.mult) || 1;
+    const nuevo = parseCantidad(qty.value);
+    if (nuevo == null) { qty.value = qtyTexto(viejo); return; }
+    if (nuevo !== viejo) {
+      const f = nuevo / viejo;
+      draft.items = draft.items.map(it => ({ ...it, gramos: Math.round((Number(it.gramos) || 0) * f * 10) / 10 }));
+      draft.mult = nuevo;
+      renderItems();
+      toast(`Cantidad ${qtyTexto(nuevo)}: gramos y macros ajustados.`, 'ok');
+    }
+    qty.value = qtyTexto(draft.mult);
+  });
 
   function bindRows(wrap) {
     $$('.ing-row', wrap).forEach(row => {
@@ -221,8 +238,12 @@ function editorHTML(draft, opts) {
       ${TIPOS_COMIDA.map(t => `<button type="button" class="chip ${draft.type === t ? 'active' : ''}" data-type="${t}">${icon(ICONO_TIPO[t])} ${t}</button>`).join('')}
     </div>
     ${opts.tipoHint ? `<div class="hint" id="ed-tipo-hint" style="margin:-6px 0 12px">${icon('clock')} ${opts.tipoHint}</div>` : ''}
-    <label class="field"><span class="lbl">Nombre del plato</span>
-      <input id="ed-name" type="text" placeholder="Ej. Lomo saltado con arroz" value="${esc(draft.name || '')}"></label>
+    <div class="name-row">
+      <label class="field grow"><span class="lbl">Nombre del plato</span>
+        <input id="ed-name" type="text" placeholder="Ej. Lomo saltado con arroz" value="${esc(draft.name || '')}"></label>
+      <label class="field" style="flex:0 0 auto"><span class="lbl" style="text-align:center">Cant.</span>
+        <input id="ed-qty" class="num" type="text" inputmode="decimal" autocomplete="off" value="${qtyTexto(draft.mult)}" title="Cuántas porciones: 1, 1/2, 1/4, 2…" aria-label="Cantidad de porciones"></label>
+    </div>
     <label class="field"><span class="lbl">Nota opcional (porciones, aceite, etc.)</span>
       <input id="ed-note" type="text" placeholder="Ej. con poco arroz, sin papas" value="${esc(draft.note || '')}"></label>
 

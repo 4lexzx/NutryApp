@@ -396,6 +396,16 @@ input.num, .num { font-variant-numeric: tabular-nums; }
 }
 .ing-grid .f.g input { box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 55%, transparent); }
 
+/* Cantidad de porciones en su cuadrito al lado del nombre (estilo ingredientes) */
+.name-row { display: flex; gap: 8px; align-items: flex-end; }
+.name-row label.field { margin-bottom: 14px; }
+.name-row .grow { flex: 1; min-width: 0; }
+#ed-qty {
+  width: 78px; text-align: center; font-weight: 700; padding: 14px 4px;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 55%, transparent);
+}
+
 .totals-bar {
   display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
   background: var(--card); border: 1px solid color-mix(in srgb, var(--brand) 45%, transparent);

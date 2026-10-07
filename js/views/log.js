@@ -7,7 +7,7 @@ import { mountEditor, newDraft, openAddSheet, pickGrams } from '../editor.js';
 import { calcTargets, computeTotals, searchFoods, FOODS } from '../nutrition.js';
 import {
   todayISO, esc, num, toast, confirmSheet, openSheet, fileToDataURL, resizeImage,
-  TIPOS_COMIDA, ICONO_TIPO, fmtLongDate, uid, debounce, elegirTipo, faltanPorHora
+  TIPOS_COMIDA, ICONO_TIPO, fmtLongDate, uid, debounce, elegirTipo, faltanPorHora, qtyTexto
 } from '../util.js';
 
 const state = { draft: null, tab: 'foto', photo: null, desc: '', date: todayISO() };
@@ -433,13 +433,13 @@ async function runAI({ date, hasKey, usePhoto }) {
     const base = await buscarPlatoBase(clave).catch(() => null);
     if (base && base.items && base.items.length) {
       const items = aplicarMultiplicador(base.items, plan.mult);
-      const nm = nombreConCantidad(base.nombre || desc, plan.mult);
+      const suf = plan.mult !== 1 ? ` ×${qtyTexto(plan.mult)}` : '';
       await montarDraftIA({
         date, name: base.nombre || desc, source: 'base', items, photo: '',
         note: notaPlato('Base local · sin gastar cuota', { supuestos: base.supuestos }),
         mult: plan.mult, baseClave: clave
       });
-      toast(`Tu base local: ${nm} (sin consultar la IA).`, 'ok');
+      toast(`Tu base local: ${base.nombre || desc}${suf} (sin consultar la IA).`, 'ok');
       return;
     }
   }
@@ -530,8 +530,8 @@ async function runAI({ date, hasKey, usePhoto }) {
   }
 }
 
-/** Quita el prefijo de cantidad ("1/2 Manzana" → "Manzana", "2 platos de Arroz
-    con pollo" → "Arroz con pollo") para que la cantidad nunca se duplique. */
+/** Quita el prefijo de cantidad ("1/2 Manzana" → "Manzana") si el nombre la trae
+    pegada: la base local siempre guarda el nombre sin cantidad. */
 function sinCantidad(nombre) {
   return String(nombre || '')
     .replace(/^\s*(?:\d+\/\d+|[¼½¾])\s+/, '')
@@ -540,26 +540,14 @@ function sinCantidad(nombre) {
     .trim();
 }
 
-/** Nombre visible con la cantidad pedida: "1/2 Manzana", "1/4 Galleta",
-    "2 platos de Arroz con pollo". Sin cantidad (mult 1) el nombre queda tal cual. */
-function nombreConCantidad(nombre, m) {
-  const mult = Number(m) || 1;
-  const n = sinCantidad(nombre);
-  if (mult === 1 || !n) return String(nombre || '').trim();
-  if (mult === 0.5) return `1/2 ${n}`;
-  if (mult === 0.25) return `1/4 ${n}`;
-  if (mult === 0.75) return `3/4 ${n}`;
-  if (mult < 1) return `${mult}× ${n}`;
-  return `${mult} platos de ${n}`;
-}
-
-/** Arma el borrador del editor a partir de un análisis (IA o base local). */
+/** Arma el borrador del editor a partir de un análisis (IA o base local).
+    La cantidad NO va en el nombre: se muestra en la cajita "Cant." (#ed-qty). */
 async function montarDraftIA(o) {
   const profile = await getProfile();
   const targets = profile ? calcTargets(profile) : null;
   const s = await sugerirTipo(o.date, o.items);
   state.draft = newDraft({
-    date: o.date, type: s.type, name: nombreConCantidad(o.name, o.mult), source: o.source,
+    date: o.date, type: s.type, name: String(o.name || '').trim(), source: o.source,
     photo: o.photo || '', note: o.note || '', items: o.items,
     mult: o.mult || 1, baseClave: o.baseClave || ''
   });
@@ -629,9 +617,11 @@ function fusionarReanalisis(viejos, nuevos) {
  */
 async function reanalizarDraft(d) {
   const settings = await getSettings();
+  const mult = Number(d.mult) || 1;
   const oldG = Math.round((d.items || []).reduce((a, i) => a + (Number(i.gramos) || 0), 0));
+  // la IA trabaja con la porción BASE (1 unidad): le pasamos los gramos divididos por la cantidad
   const prev = (d.items || []).filter(i => Number(i.gramos) > 0)
-    .map(i => `${Math.round(Number(i.gramos))} g de ${(i.nombre || '').trim()}`);
+    .map(i => `${Math.round((Number(i.gramos) || 0) / mult)} g de ${(i.nombre || '').trim()}`);
   const partes = [d.name, d.note];
   if (prev.length) {
     partes.push(`Cantidades registradas actualmente: ${prev.join(', ')}.`);
@@ -649,7 +639,8 @@ async function reanalizarDraft(d) {
     prompt,
     apiKey: settings.apiKey,
     model: settings.model,
-    maxTotalG: oldG > 0 ? Math.round(oldG * 1.15) : 0
+    maxTotalG: oldG > 0 ? Math.round(oldG * 1.15) : 0,
+    mult, multLocal: true
   });
   if (!res.items || !res.items.length) throw new Error('La IA no devolvió ingredientes.');
   const fusion = fusionarReanalisis(d.items || [], res.items);
