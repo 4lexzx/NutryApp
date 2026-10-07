@@ -76,7 +76,7 @@ function renderFoto(body, date, hasKey) {
     </div>
   `;
   body.querySelector('#f-desc').oninput = e => { state.desc = e.target.value; };
-  body.querySelector('#f-shot').onclick = () => pickPhoto(true, body, date, hasKey);
+  body.querySelector('#f-shot').onclick = () => abrirCamara(date);
   body.querySelector('#f-gal').onclick = () => pickPhoto(false, body, date, hasKey);
   body.querySelector('#f-go').onclick = () => runAI({ date, hasKey, usePhoto: true });
   body.querySelector('#f-manual').onclick = () => { state.tab = 'manual'; renderStart(viewRoot(), [], { d: date }); };
@@ -190,6 +190,92 @@ function useFavorite(f, date, body) {
 }
 
 /* ---------- Foto + IA ---------- */
+/* Cámara DENTRO de la app: no hay que salir a otra aplicación, así que no se
+   pierde el evento de la foto al volver (el bug de "no carga hasta reiniciar"). */
+function abrirCamara(date) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    pickPhoto(true, viewRoot(), date, true);   // respaldo: selector del sistema
+    return;
+  }
+  let stream = null;
+  let facing = 'environment';
+  let cerrado = false;
+
+  const back = document.createElement('div');
+  back.className = 'cam-back';
+  back.innerHTML = `
+    <video class="cam-video" playsinline autoplay muted></video>
+    <div class="cam-aviso hidden">Pidiendo acceso a la cámara…</div>
+    <div class="cam-bar">
+      <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
+      <button class="cam-snap" type="button" data-snap aria-label="Tomar foto"><span></span></button>
+      <button class="btn btn-ghost" type="button" data-flip>Cambiar</button>
+    </div>`;
+  document.getElementById('modal-root').appendChild(back);
+
+  const video = back.querySelector('video');
+  const aviso = back.querySelector('.cam-aviso');
+  const onHide = () => { if (document.hidden) cerrar(); };
+
+  const cerrar = () => {
+    if (cerrado) return;
+    cerrado = true;
+    try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+    document.removeEventListener('visibilitychange', onHide);
+    document.removeEventListener('keydown', onKey);
+    back.remove();
+  };
+  const onKey = e => { if (e.key === 'Escape') cerrar(); };
+
+  const pedir = async () => {
+    if (stream) { try { stream.getTracks().forEach(t => t.stop()); } catch (e) {} stream = null; }
+    aviso.classList.remove('hidden');
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false });
+      video.srcObject = stream;
+      aviso.classList.add('hidden');
+      await video.play().catch(() => {});
+    } catch (e) {
+      cerrar();
+      const denegado = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError' || e.name === 'NotFoundError');
+      toast(denegado
+        ? 'No se pudo usar la cámara. Permite el acceso a la cámara o usa "Galería".'
+        : 'No se pudo abrir la cámara. Usa "Galería" para elegir una foto.', 'warn');
+      if (!denegado) pickPhoto(true, viewRoot(), date, true);
+    }
+  };
+
+  const capturar = async () => {
+    const w = video.videoWidth, h = video.videoHeight;
+    if (!w || !h) { toast('La cámara aún no está lista. Intenta otra vez.', 'warn'); return; }
+    const snap = back.querySelector('[data-snap]');
+    snap.disabled = true;
+    try {
+      const canvas = document.createElement('canvas');
+      const r = Math.min(1, 1024 / Math.max(w, h));
+      canvas.width = Math.round(w * r);
+      canvas.height = Math.round(h * r);
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      const raw = canvas.toDataURL('image/jpeg', 0.86);
+      state.photo = await resizeImage(raw, 1024, 0.78);
+      cerrar();
+      toast('Foto lista.', 'ok');
+      renderStart(viewRoot(), [], { d: date });
+    } catch (e) {
+      snap.disabled = false;
+      toast('No se pudo guardar la foto. Intenta otra vez.', 'err');
+    }
+  };
+
+  back.querySelector('[data-close]').onclick = cerrar;
+  back.querySelector('[data-snap]').onclick = capturar;
+  back.querySelector('[data-flip]').onclick = () => { facing = facing === 'environment' ? 'user' : 'environment'; pedir(); };
+  back.addEventListener('click', e => { if (e.target === back) cerrar(); });
+  document.addEventListener('visibilitychange', onHide);
+  document.addEventListener('keydown', onKey);
+  pedir();
+}
+
 /* El input del selector queda en la página hasta que llega la foto o se cancela:
    si se quita de inmediato, al volver de la cámara/galería a veces no llega el evento
    y la foto "no carga" hasta cerrar y abrir la app. */

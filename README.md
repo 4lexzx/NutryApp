@@ -232,11 +232,15 @@ caracteres, y ya queda creada **solo en ese dispositivo**. No hace falta exporta
 > agarrando tu celular, nada más. **Anota tu contraseña**: no hay “recuperar contraseña”.
 
 1. **Perfil** (pestaña 💪): peso, estatura, edad, sexo, nivel de actividad y objetivo
-   (déficit / mantenimiento / superávit).
+   (déficit / mantenimiento / ganar músculo sin ganar grasa / superávit).
 2. Pulsa **“🧮 Calcular mis metas”**. Verás:
-   - tu **gasto calórico (TDEE)** y la fórmula usada paso a paso
-     (Mifflin-St Jeor × factor de actividad, luego −20% / 0% / +12% según el objetivo);
-   - metas de **kcal, proteína (g/kg), grasas (% de kcal) y carbohidratos (resto)**.
+   - tu **gasto calórico (TDEE)** y la fórmula usada paso a paso (Mifflin-St Jeor × factor de
+     actividad, luego el % del objetivo: −20% déficit, 0% mantenimiento y recomposición,
+     +12% superávit);
+   - metas de **kcal, proteína (g/kg — 2.2 en recomposición, 2.0 en déficit…), grasas
+     (% de kcal) y carbohidratos (resto)**.
+   - **Ganar músculo sin ganar grasa (recomposición)**: calorías de mantenimiento con
+     proteína alta; el músculo lo construye el entrenamiento, no las calorías de más.
 3. Si quieres, pulsa **“Editar”** y escribe tus metas **a mano**; el badge cambiará a
    *“editadas a mano”*. El botón *“Volver al cálculo”* restaura la fórmula.
 4. **Ajustes → Inteligencia artificial**: pega tu API key y prueba. En **Instrucciones de la IA**
@@ -258,7 +262,7 @@ caracteres, y ya queda creada **solo en ese dispositivo**. No hace falta exporta
 
 | Pestaña | Qué hace | ¿Gasta cuota de IA? |
 |---|---|---|
-| 📷 **Foto** | Tomas foto o eliges de galería (+ descripción opcional) → **Analizar con la IA** | Sí |
+| 📷 **Foto** | **La cámara se abre dentro de la app** (no sales de la app) o eliges de galería; + descripción opcional → **Analizar con la IA** | Sí |
 | 📝 **Texto** | Escribes “1 lomo saltado con arroz, poco arroz” → **Analizar con la IA** | Sí |
 | ✋ **Manual** | Buscas en la tabla de alimentos, pones gramos → sin IA | **No** |
 | ⭐ **Favoritos** | Cargas un plato guardado con 2 toques → sin IA | **No** |

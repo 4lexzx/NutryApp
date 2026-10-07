@@ -198,7 +198,7 @@ function setupResume() {
     if (!window.__nutriListo) return;
     try { log.alVolverDeFoto(); } catch (e) { /* nada */ }
     if (document.querySelector('input[type="file"]')) return;   // selector de archivo aún abierto
-    if (document.querySelector('.sheet-back')) return;          // hoja abierta
+    if (document.querySelector('.sheet-back, .cam-back')) return;   // hoja o cámara abierta
     const ruta = parseHash().path[0] || 'hoy';
     if (RUTAS_REFRESH.indexOf(ruta) === -1) return;             // no pisar lo que estaba escribiendo
     const y = window.scrollY;

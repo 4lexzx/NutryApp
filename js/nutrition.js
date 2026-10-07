@@ -17,8 +17,12 @@ export const ACTIVIDADES = [
 export const OBJETIVOS = [
   { v: 'deficit', l: 'Déficit (bajar grasa)', f: 0.80, pct: -20 },
   { v: 'mantenimiento', l: 'Mantenimiento', f: 1.0, pct: 0 },
+  { v: 'recomp', l: 'Ganar músculo sin ganar grasa (recomposición)', f: 1.0, pct: 0, nota: 'calorías de mantenimiento con proteína alta: el músculo lo construye el entrenamiento, no las calorías de más' },
   { v: 'superavit', l: 'Superávit (ganar músculo)', f: 1.12, pct: 12 }
 ];
+
+/** Proteína diaria por kg de peso según el objetivo */
+const PROT_POR_KG = { deficit: 2.0, mantenimiento: 1.9, recomp: 2.2, superavit: 1.8 };
 
 /** BMR — fórmula de Mifflin-St Jeor */
 export function bmr(p) {
@@ -44,7 +48,7 @@ export function calcTargets(p) {
   let kcal = Math.round(T * obj.f);
   if (kcal < B) kcal = B; // nunca por debajo del metabolismo basal
 
-  const gKg = p.objective === 'deficit' ? 2.0 : p.objective === 'superavit' ? 1.8 : 1.9;
+  const gKg = PROT_POR_KG[p.objective] || 1.9;
   const weight = Number(p.weight) || 0;
   let prot = Math.round(weight * gKg);
   let grasKcal = Math.round(kcal * 0.25);
@@ -60,7 +64,7 @@ export function calcTargets(p) {
       ? '(10 × peso) + (6.25 × estatura) − (5 × edad) − 161'
       : '(10 × peso) + (6.25 × estatura) − (5 × edad) + 5'} = <b>${num_(B)} kcal</b>`,
     `<b>2) Gasto total (TDEE):</b> basal × ${num_(activity.v, 3)} (actividad ${activity.l}) = <b>${num_(T)} kcal</b>`,
-    `<b>3) Objetivo (${obj.l}):</b> ${obj.pct >= 0 ? '+' : ''}${obj.pct}% → <b>${num_(kcal)} kcal/día</b>`,
+    `<b>3) Objetivo (${obj.l}):</b> ${obj.pct >= 0 ? '+' : ''}${obj.pct}% → <b>${num_(kcal)} kcal/día</b>${obj.nota ? ` — ${obj.nota}` : ''}`,
     `<b>4) Proteína:</b> ${num_(gKg, 1)} g × ${num_(weight, 1)} kg = <b>${num_(prot)} g</b> (${num_(prot * 4)} kcal)`,
     `<b>5) Grasas:</b> 25% de las kcal (mín. 0.8 g/kg) = <b>${num_(gras)} g</b> (${num_(grasKcal)} kcal)`,
     `<b>6) Carbohidratos:</b> resto de las kcal ÷ 4 = <b>${num_(carb)} g</b>`
