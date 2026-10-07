@@ -9,6 +9,40 @@ import { icon } from './icons.js';
 
 export const ICONO_TIPO = { desayuno: 'sunrise', almuerzo: 'utensils', cena: 'moon', snack: 'apple' };
 
+/* ============ Sugerencia de comida: hora + lo que ya comiste hoy ============ */
+/**
+ * Sugiere a qué comida pertenece lo que vas a registrar.
+ *  h      : hora en decimal (13.5 = 1:30 p. m.)
+ *  hechos : tipos ya registrados ese día (['desayuno', ...])
+ *  tam    : 'plato' (comida completa), 'pequeno' (cosita) o '' (aún no sabemos)
+ *
+ * Reglas:
+ *  - Manda la hora: a la 1 p. m. es almuerzo aunque no hayas desayunado.
+ *  - Nunca repite una comida ya hecha: si ya desayunaste y aún es franja de
+ *    desayuno, lo que sigue es un snack (merienda), no otro desayuno.
+ *  - Los snacks son cosas pequeñas: café/fruta no es plato (salvo el desayuno:
+ *    un yogur a las 8 sí es desayuno).
+ *  - De noche (21+) manda la cena si todavía no cenaste.
+ */
+export function elegirTipo(h, hechos, tam = '') {
+  const tiene = t => Array.isArray(hechos) && hechos.includes(t);
+  if (h >= 21) return (!tiene('cena') && tam !== 'pequeno') ? 'cena' : 'snack';
+  const ventana = h < 11 ? 'desayuno' : h < 16 ? 'almuerzo' : 'cena';
+  if (tiene(ventana)) return 'snack';
+  if (tam === 'pequeno' && ventana !== 'desayuno') return 'snack';
+  return ventana;
+}
+
+/** Comidas principales cuya hora ya pasó y todavía no registraste (para avisar). */
+export function faltanPorHora(h, hechos) {
+  const tiene = t => Array.isArray(hechos) && hechos.includes(t);
+  const f = [];
+  if (h >= 11 && !tiene('desayuno')) f.push('desayuno');
+  if (h >= 16 && !tiene('almuerzo')) f.push('almuerzo');
+  if (h >= 22 && !tiene('cena')) f.push('cena');
+  return f;
+}
+
 export function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

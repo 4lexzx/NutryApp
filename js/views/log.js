@@ -7,7 +7,7 @@ import { mountEditor, newDraft, openAddSheet, pickGrams } from '../editor.js';
 import { calcTargets, computeTotals, searchFoods, FOODS } from '../nutrition.js';
 import {
   todayISO, esc, num, toast, confirmSheet, openSheet, fileToDataURL, resizeImage,
-  TIPOS_COMIDA, ICONO_TIPO, fmtLongDate, uid, debounce
+  TIPOS_COMIDA, ICONO_TIPO, fmtLongDate, uid, debounce, elegirTipo, faltanPorHora
 } from '../util.js';
 
 const state = { draft: null, tab: 'foto', photo: null, desc: '', date: todayISO() };
@@ -51,8 +51,8 @@ export async function renderStart(root, args, query) {
 
   if (state.tab === 'foto') renderFoto(body, date, hasKey);
   else if (state.tab === 'texto') renderTexto(body, date, hasKey);
-  else if (state.tab === 'manual') renderManual(body, date);
-  else renderFavoritos(body, date, favorites);
+  else if (state.tab === 'manual') await renderManual(body, date);
+  else await renderFavoritos(body, date, favorites);
 }
 
 function renderFoto(body, date, hasKey) {
@@ -96,9 +96,11 @@ function renderTexto(body, date, hasKey) {
   body.querySelector('#t-go').onclick = () => runAI({ date, hasKey, usePhoto: false });
 }
 
-function renderManual(body, date) {
+async function renderManual(body, date) {
   if (!state.draft || state.draft.id) {
-    state.draft = newDraft({ date, type: guessType(), source: 'manual', name: state.desc ? state.desc.slice(0, 60) : '' });
+    const s = await sugerirTipo(date, state.draft ? state.draft.items : null);
+    state.draft = newDraft({ date, type: s.type, source: 'manual', name: state.desc ? state.desc.slice(0, 60) : '' });
+    state.draft._hint = s.hint;
   }
   state.draft.date = date;
   const draw = () => {
@@ -137,8 +139,12 @@ function renderManual(body, date) {
   draw();
 }
 
-function renderFavoritos(body, date, favorites) {
-  if (!state.draft || state.draft.id) state.draft = newDraft({ date, type: guessType(), source: 'favorito' });
+async function renderFavoritos(body, date, favorites) {
+  if (!state.draft || state.draft.id) {
+    const s = await sugerirTipo(date, null);
+    state.draft = newDraft({ date, type: s.type, source: 'favorito' });
+    state.draft._hint = s.hint;
+  }
   state.draft.date = date;
   body.innerHTML = `
     <div class="card">
@@ -162,18 +168,20 @@ function renderFavoritos(body, date, favorites) {
   });
 }
 
-function useFavorite(f, date, body) {
+async function useFavorite(f, date, body) {
+  const sug = await sugerirTipo(date, f.items);
   const s = openSheet(`
     <h2>${esc(f.name)}</h2>
-    <p class="small muted">¿A qué comida la asignamos?</p>
+    <p class="small">¿A qué comida la asignamos?</p>
+    <p class="tiny muted" style="margin:-6px 0 8px">${sug.hint}</p>
     <div class="chips big" id="uf-t">
-      ${TIPOS_COMIDA.map(t => `<button class="chip ${guessType() === t ? 'active' : ''}" data-t="${t}" type="button">${icon(ICONO_TIPO[t])} ${t}</button>`).join('')}
+      ${TIPOS_COMIDA.map(t => `<button class="chip ${sug.type === t ? 'active' : ''}" data-t="${t}" type="button">${icon(ICONO_TIPO[t])} ${t}</button>`).join('')}
     </div>
     <div class="grid2" style="margin-top:14px">
       <button class="btn btn-primary" id="uf-ok" type="button">Cargar y editar</button>
       <button class="btn btn-ghost" id="uf-no" type="button">Cancelar</button>
     </div>`);
-  let type = guessType();
+  let type = sug.type;
   s.root.querySelectorAll('[data-t]').forEach(b => b.onclick = () => {
     type = b.dataset.t;
     s.root.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('active', x.dataset.t === type));
@@ -184,6 +192,7 @@ function useFavorite(f, date, body) {
       date, type, name: f.name, source: 'favorito', favId: f.id, photo: '',
       items: JSON.parse(JSON.stringify(f.items || []))
     });
+    state.draft._hint = sug.hint;
     s.close();
     location.hash = '#/nuevo';
   };
@@ -434,8 +443,10 @@ async function runAI({ date, hasKey, usePhoto }) {
         </div>
       </div>`;
     body.querySelector('#ai-retry').onclick = () => runAI({ date, hasKey, usePhoto });
-    body.querySelector('#ai-manual').onclick = () => {
-      state.draft = newDraft({ date, type: guessType(), source: 'manual', photo: usePhoto ? state.photo : '', note: state.desc });
+    body.querySelector('#ai-manual').onclick = async () => {
+      const s = await sugerirTipo(date, null);
+      state.draft = newDraft({ date, type: s.type, source: 'manual', photo: usePhoto ? state.photo : '', note: state.desc });
+      state.draft._hint = s.hint;
       state.tab = 'manual';
       renderStart(root, [], { d: date });
     };
@@ -447,11 +458,13 @@ async function runAI({ date, hasKey, usePhoto }) {
 async function montarDraftIA(o) {
   const profile = await getProfile();
   const targets = profile ? calcTargets(profile) : null;
+  const s = await sugerirTipo(o.date, o.items);
   state.draft = newDraft({
-    date: o.date, type: guessType(), name: o.name, source: o.source,
+    date: o.date, type: s.type, name: o.name, source: o.source,
     photo: o.photo || '', note: o.note || '', items: o.items,
     mult: o.mult || 1, baseClave: o.baseClave || ''
   });
+  state.draft._hint = s.hint;
   if (targets) state.draft._kcalTarget = (profile.targets && profile.targets.kcal) || targets.kcal;
   state.desc = '';
   location.hash = '#/nuevo';
@@ -478,12 +491,36 @@ async function guardarBaseDesdeEditor(d) {
   toast(`Porción estándar guardada: "${d.name}" (sin gastar cuota en tu próxima consulta).`, 'ok');
 }
 
-function guessType() {
-  const h = new Date().getHours();
-  if (h < 11) return 'desayuno';
-  if (h < 16) return 'almuerzo';
-  if (h < 21) return 'cena';
-  return 'snack';
+/** Tipos de comida ya registrados en una fecha. */
+async function tiposDelDia(date) {
+  try {
+    const meals = await DB.byDate('meals', date || todayISO());
+    return meals.map(m => m.type).filter(Boolean);
+  } catch (e) { return []; }
+}
+
+/** Tamaño estimado de lo que vas a registrar: ¿es plato o cosa pequeña? */
+function tamanioDe(items) {
+  if (!items || !items.length) return '';
+  const t = computeTotals(items);
+  if (t.kcal >= 350 || t.grams >= 350) return 'plato';
+  if (t.kcal <= 200) return 'pequeno';
+  return '';
+}
+
+/**
+ * Sugerencia de comida según la hora del día, lo que ya comiste hoy y el
+ * tamaño de lo que vas a registrar. Devuelve { type, hint }.
+ */
+async function sugerirTipo(date, items) {
+  const hechos = await tiposDelDia(date);
+  const now = new Date();
+  const h = now.getHours() + now.getMinutes() / 60;
+  const type = elegirTipo(h, hechos, tamanioDe(items));
+  const f = faltanPorHora(h, hechos);
+  let hint = 'Sugerido por la hora y por lo que ya comiste hoy.';
+  if (f.length) hint += ` Todavía no registras: <b>${f.join(', ')}</b>.`;
+  return { type, hint };
 }
 
 /* ================= EDITOR ================= */
@@ -494,6 +531,7 @@ export async function renderNew(root) {
   const draft = state.draft;
   mountEditor(root, draft, {
     kcalTarget: draft._kcalTarget || (profile ? (profile.targets?.kcal || (targets && targets.kcal)) : 0),
+    tipoHint: draft.id ? '' : (draft._hint || ''),
     onSave: d => saveMeal(d),
     onSaveFavorite: d => saveFav(d),
     onGuardarBase: d => guardarBaseDesdeEditor(d)

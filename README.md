@@ -280,6 +280,21 @@ se actualizan solos. Eliges el tipo de comida (desayuno/almuerzo/cena/snack) y *
   **No sube tus porciones**: parte de los gramos que ya tienes registrados y solo puede
   mantenerlos o bajarlos (máximo +15%, y te avisa si la IA se pasa).
 
+### ¿De qué comida es? La app lo adivina sola
+
+Al abrir el editor, el tipo de comida (desayuno/almuerzo/cena/snack) se elige según **3 cosas**:
+
+1. **La hora**: a la 1 p. m. es almuerzo, aunque no hayas desayunado.
+2. **Lo que ya registraste hoy**: si ya desayunaste, nunca te vuelve a sugerir desayuno; lo que
+   sigue es la que viene (desayuno → almuerzo → cena). Si una comida principal ya pasó y no la
+   registraste, el aviso te dice **“Falta registrar: desayuno”**.
+3. **El tamaño**: los **snacks son cosas pequeñas** (café, fruta, galletas), no platos; un plato
+   completo no se clasifica como snack. De noche (9 p. m. en adelante) manda la cena si todavía
+   no cenaste.
+
+Los botones siguen siendo tuyos: si te equivoca, cambias el tipo a mano y el aviso pasa a
+decirte que lo dejaste manual.
+
 ### Cómo analiza la IA (reglas nuevas)
 
 - **📍 Comida del norte (Piura y Sullana)**: el prompt está adaptado a la gastronomía de la

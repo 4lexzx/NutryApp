@@ -23,6 +23,8 @@ export function mountEditor(root, draft, opts = {}) {
   $$('.chip[data-type]', el).forEach(c => c.addEventListener('click', () => {
     draft.type = c.dataset.type;
     $$('.chip[data-type]', el).forEach(x => x.classList.toggle('active', x.dataset.type === draft.type));
+    const hint = q('#ed-tipo-hint');
+    if (hint) hint.innerHTML = `${icon('clock')} Dejado a mano: <b>${draft.type}</b>.`;
   }));
 
   q('#ed-name').addEventListener('input', e => { draft.name = e.target.value; });
@@ -211,6 +213,7 @@ function editorHTML(draft, opts) {
     <div class="chips big" style="margin-bottom:12px">
       ${TIPOS_COMIDA.map(t => `<button type="button" class="chip ${draft.type === t ? 'active' : ''}" data-type="${t}">${icon(ICONO_TIPO[t])} ${t}</button>`).join('')}
     </div>
+    ${opts.tipoHint ? `<div class="hint" id="ed-tipo-hint" style="margin:-6px 0 12px">${icon('clock')} ${opts.tipoHint}</div>` : ''}
     <label class="field"><span class="lbl">Nombre del plato</span>
       <input id="ed-name" type="text" placeholder="Ej. Lomo saltado con arroz" value="${esc(draft.name || '')}"></label>
     <label class="field"><span class="lbl">Nota opcional (porciones, aceite, etc.)</span>
