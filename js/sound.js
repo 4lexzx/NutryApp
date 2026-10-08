@@ -6,8 +6,10 @@ let activos = true;
 let ctx = null;
 let buf = null;
 let cargando = null;
+let bufCheck = null;
+let cargandoCheck = null;
 
-export function setSonidos(v) { activos = v !== false; if (activos) cargarSonido(); }
+export function setSonidos(v) { activos = v !== false; if (activos) { cargarSonido(); cargarCheck(); } }
 export function sonidosActivos() { return activos; }
 
 function audioCtx() {
@@ -37,8 +39,49 @@ function cargarSonido() {
   return cargando;
 }
 
+/** Descarga y decodifica el "check" (confirmación al agregar ingredientes). */
+function cargarCheck() {
+  if (bufCheck) return Promise.resolve(bufCheck);
+  if (!cargandoCheck) {
+    cargandoCheck = fetch('./sfx/check.wav')
+      .then(r => (r && r.ok ? r.arrayBuffer() : Promise.reject(new Error('sin archivo'))))
+      .then(ab => new Promise((res, rej) => {
+        const c = audioCtx();
+        if (!c) rej(new Error('sin audio'));
+        else c.decodeAudioData(ab, res, rej);
+      }))
+      .then(b => { bufCheck = b; return b; })
+      .catch(() => null);
+  }
+  return cargandoCheck;
+}
+
+function tocar(buffer, gain) {
+  try {
+    const c = audioCtx();
+    if (!c || !buffer) return;
+    const src = c.createBufferSource();
+    src.buffer = buffer;
+    const g = c.createGain();
+    g.gain.value = gain;
+    src.connect(g); g.connect(c.destination);
+    src.start();
+  } catch (e) { /* silencio: el sonido jamás debe romper la app */ }
+}
+
+/** Suena el "check" (dos notas ascendentes) — usado al agregar al batido. */
+export function check() {
+  if (!activos) return;
+  try {
+    const c = audioCtx();
+    if (!c || !bufCheck) { cargarCheck(); return; }
+    tocar(bufCheck, 0.65);
+  } catch (e) { /* silencio */ }
+}
+
 /** Suena el clic (si está encendido y el archivo ya cargó). */
 export function clic() {
+  if (!activos) return;
   try {
     const c = audioCtx();
     if (!c || !buf) { cargarSonido(); return; }
@@ -56,7 +99,7 @@ export function clic() {
 const IMPORTANTE = [
   '#t-go', '#f-go', '#ai-retry',
   '#ed-save', '#ed-re', '#ed-base', '#ed-fav', '#ed-del',
-  '#pk-ok', '#ci-ok',
+  '#pk-ok', '#ci-ok', '#bt-use', '#gy-save',
   '#s-key-save', '#s-key-test', '#s-water-save',
   '#s-install', '#s-backup', '#s-restore', '#s-csv1', '#s-csv2', '#s-csvall', '#s-clear',
   '#p-save', '#m-save', '#w-add', '#we-ok', '#we-del',
@@ -68,6 +111,7 @@ const IMPORTANTE = [
     se levanta el dedo encima sin haberlo deslizado (los swipes no suenan). */
 export function initSonidos() {
   cargarSonido();
+  cargarCheck();
   let presion = null; // { el, x, y, id } del último botón importante pulsado
   document.addEventListener('pointerdown', e => {
     presion = null;

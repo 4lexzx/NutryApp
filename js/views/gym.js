@@ -1,7 +1,9 @@
-/* Gimnasio del día: si fui, horas, músculos y cardio → suma kcal a la meta. */
+/* Gimnasio del día: si fui, horas, músculos y cardio → suma kcal a la meta.
+   Se guarda SIEMPRE el registro (también "No fui") para distinguirlo de
+   "Sin registrar". */
 
 import { DB, getProfile } from '../db.js';
-import { bonusGymKcal } from '../nutrition.js';
+import { bonusGymKcal, detalleGym } from '../nutrition.js';
 import { icon } from '../icons.js';
 import { todayISO, esc, num, toast, fmtLongDate, dayLabel } from '../util.js';
 
@@ -23,18 +25,6 @@ export function fmtHoras(v) {
   return num(n, Math.abs(n - Math.round(n)) < 0.05 ? 0 : 1);
 }
 
-/** Línea de resumen del gimnasio (músculos y cardio en palabras). */
-export function gymResumen(reg) {
-  if (!reg || !reg.ido) return '';
-  const mus = (reg.musculos || []).map(v => (MUSCULOS.find(m => m.v === v) || {}).l || v).join(', ');
-  const car = (reg.cardio || []).map(v => (CARDIO.find(c => c.v === v) || {}).l || v).join(', ');
-  return [
-    `${icon('dumbbell')} ${fmtHoras(reg.horas)} h de entreno`,
-    mus ? `Trabajaste: <b>${esc(mus)}</b>` : '',
-    car ? `Cardio: <b>${esc(car)}</b>` : ''
-  ].filter(Boolean).join('<br>');
-}
-
 export async function render(root, args, query) {
   let date = (query && query.d) || (args && args[0]) || todayISO();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
@@ -44,12 +34,11 @@ export async function render(root, args, query) {
 
   const form = {
     ido: !!(reg && reg.ido),
+    marcado: !!reg,                          // ya pasó por aquí (aunque haya dicho "No")
     horas: reg && reg.horas != null ? Number(reg.horas) : 1,
     musculos: (reg && reg.musculos || []).slice(),
     cardio: (reg && reg.cardio || []).slice()
   };
-
-  const chip = (v, l, on, attr) => `<button type="button" class="chip ${on ? 'active' : ''}" ${attr}="${v}">${esc(l)}</button>`;
 
   root.innerHTML = `
     <div class="spread" style="margin-bottom:12px">
@@ -58,53 +47,83 @@ export async function render(root, args, query) {
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>¿Fuiste al gimnasio?</h3></div>
-      <div class="chips big" id="gy-ido">
-        ${chip('si', 'Sí, fui', form.ido, 'data-ido')}
-        ${chip('no', 'No hoy', !form.ido, 'data-ido')}
+      <div class="card-title"><h3>¿Fuiste al gimnasio este día?</h3>
+        <span class="badge ${form.marcado ? (form.ido ? 'ok' : 'warn') : ''}" id="gy-estado">${form.marcado ? (form.ido ? 'Sí fui' : 'No fui') : 'Sin marcar'}</span></div>
+
+      <div class="gym-pick" id="gy-ido">
+        <button type="button" class="gym-opt ${form.ido ? 'active' : ''}" data-ido="si">
+          <span class="go-ico">${icon('dumbbell')}</span>
+          <b>Sí, fui</b>
+          <small>Suma kcal a la meta de hoy</small>
+        </button>
+        <button type="button" class="gym-opt ${form.marcado && !form.ido ? 'active' : ''}" data-ido="no">
+          <span class="go-ico">${icon('moon')}</span>
+          <b>No hoy</b>
+          <small>La meta sigue igual</small>
+        </button>
       </div>
 
-      <div id="gy-form" class="${form.ido ? '' : 'hidden'}" style="margin-top:14px">
-        <div class="lbl" style="margin-bottom:6px">¿Cuántas horas entrenaste?</div>
-        <div class="chips" id="gy-h-quick" style="margin-bottom:8px">
-          ${[0.5, 1, 1.5, 2, 3].map(h => `<button type="button" class="chip ${form.horas === h ? 'active' : ''}" data-h="${h}">${fmtHoras(h)} h</button>`).join('')}
-        </div>
-        <label class="field"><span class="lbl">Horas (puedes escribirlo)</span>
-          <input id="gy-h" type="number" inputmode="decimal" min="0.25" max="8" step="0.25" value="${form.horas}"></label>
-
-        <div class="lbl" style="margin:10px 0 6px">¿Qué músculos trabajaste?</div>
-        <div class="chips" id="gy-mus">
-          ${MUSCULOS.map(m => chip(m.v, m.l, form.musculos.indexOf(m.v) >= 0, 'data-mus')).join('')}
+      <div id="gy-form" class="${form.ido ? '' : 'hidden'}" style="margin-top:16px">
+        <div class="gym-sec">
+          <div class="gym-sec-title"><span class="gym-num">1</span> ¿Cuántas horas entrenaste?</div>
+          <div class="chips" id="gy-h-quick" style="margin-bottom:8px">
+            ${[0.5, 1, 1.5, 2, 3].map(h => `<button type="button" class="chip ${form.horas === h ? 'active' : ''}" data-h="${h}">${fmtHoras(h)} h</button>`).join('')}
+          </div>
+          <label class="field"><span class="lbl">Horas (puedes escribirlas)</span>
+            <input id="gy-h" type="number" inputmode="decimal" min="0.25" max="8" step="0.25" value="${form.horas}"></label>
         </div>
 
-        <div class="lbl" style="margin:10px 0 6px">¿Hiciste cardio?</div>
-        <div class="chips" id="gy-cardio">
-          ${CARDIO.map(c => chip(c.v, c.l, c.v === 'ninguno' ? form.cardio.length === 0 : form.cardio.indexOf(c.v) >= 0, 'data-cardio')).join('')}
+        <div class="gym-sec">
+          <div class="gym-sec-title"><span class="gym-num">2</span> ¿Qué músculos trabajaste?</div>
+          <div class="chips" id="gy-mus">
+            ${MUSCULOS.map(m => `<button type="button" class="chip ${form.musculos.indexOf(m.v) >= 0 ? 'active' : ''}" data-mus="${m.v}">${esc(m.l)}</button>`).join('')}
+          </div>
         </div>
 
-        <div class="note" id="gy-est" style="margin-top:12px"></div>
+        <div class="gym-sec">
+          <div class="gym-sec-title"><span class="gym-num">3</span> ¿Hiciste cardio?</div>
+          <div class="chips" id="gy-cardio">
+            ${CARDIO.map(c => `<button type="button" class="chip ${c.v === 'ninguno' ? (form.cardio.length === 0 ? 'active' : '') : (form.cardio.indexOf(c.v) >= 0 ? 'active' : '')}" data-cardio="${c.v}">${esc(c.l)}</button>`).join('')}
+          </div>
+        </div>
+
+        <div class="gym-bonus" id="gy-est"></div>
       </div>
 
       <button class="btn btn-primary btn-lg btn-block" id="gy-save" type="button" style="margin-top:14px">${icon('check')} Guardar gimnasio</button>
+      <div class="hint" style="margin-top:8px">Si dices “No hoy” también se guarda el registro, así ves que marcaste el día.</div>
     </div>
 
-    <div class="tiny muted">Los días con gimnasio tu meta de kcal sube ≈ <b>peso × horas × intensidad</b> (fuerza y cardio con valores MET). Si no marcaste peso en tu perfil se estima a 250 kcal por hora.</div>
+    <div class="tiny muted">La meta de kcal de esos días sube ≈ <b>peso × horas × intensidad</b> (fuerza y cardio con valores MET). Sin peso en el perfil se estima a 250 kcal por hora.</div>
   `;
 
   const q = s => root.querySelector(s);
   const est = q('#gy-est');
+
   const updEst = () => {
-    if (!form.ido) { est.innerHTML = ''; return; }
-    const b = bonusGymKcal({ ido: 1, horas: form.horas, musculos: form.musculos, cardio: form.cardio }, peso);
-    est.innerHTML = b > 0
-      ? `${icon('sparkles')} Esta sesión suma <b>+${num(b)} kcal</b> a tu meta de hoy${peso ? '' : ' (estimado sin peso en el perfil)'}`
-      : 'Agrega horas para ver cuánto suma a tu meta.';
+    if (!form.ido) { est.classList.add('hidden'); return; }
+    est.classList.remove('hidden');
+    const reg2 = { ido: 1, horas: form.horas, musculos: form.musculos, cardio: form.cardio };
+    const d = detalleGym(reg2, peso);
+    est.innerHTML = d.kcal > 0
+      ? `<div class="gb-big">+${num(d.kcal)} <small>kcal</small></div>
+         <div class="gb-sub">suman a tu meta de hoy</div>
+         <div class="gb-formula">${icon('calculator')} ${esc(d.formula)}</div>`
+      : `<div class="gb-sub">Agrega horas para ver cuánto suma a tu meta.</div>`;
+  };
+
+  const updEstado = () => {
+    const b = q('#gy-estado');
+    b.textContent = form.marcado ? (form.ido ? 'Sí fui' : 'No fui') : 'Sin marcar';
+    b.className = 'badge ' + (form.marcado ? (form.ido ? 'ok' : 'warn') : '');
   };
 
   q('#gy-ido').querySelectorAll('[data-ido]').forEach(b => b.onclick = () => {
     form.ido = b.dataset.ido === 'si';
+    form.marcado = true;
     q('#gy-ido').querySelectorAll('[data-ido]').forEach(x => x.classList.toggle('active', (x.dataset.ido === 'si') === form.ido));
     q('#gy-form').classList.toggle('hidden', !form.ido);
+    updEstado();
     updEst();
   });
 
@@ -139,16 +158,20 @@ export async function render(root, args, query) {
   });
 
   q('#gy-save').onclick = async () => {
+    // Se guarda SIEMPRE (también "No fui") para poder distinguirlo de "Sin registrar".
+    await DB.kvSet({
+      k: 'gym:' + date, date, ido: form.ido,
+      horas: form.horas, musculos: form.musculos, cardio: form.cardio
+    });
     if (form.ido) {
-      await DB.kvSet({ k: 'gym:' + date, date, ido: true, horas: form.horas, musculos: form.musculos, cardio: form.cardio });
       const b = bonusGymKcal({ ido: 1, horas: form.horas, musculos: form.musculos, cardio: form.cardio }, peso);
       toast(b > 0 ? `Gimnasio guardado: +${num(b)} kcal a tu meta.` : 'Gimnasio guardado.', 'ok');
     } else {
-      await DB.kvDel('gym:' + date);
-      toast('Gimnasio marcado como "No hoy".', 'ok');
+      toast('Gimnasio guardado: hoy no fuiste. La meta sigue igual.', 'ok');
     }
     location.hash = '#/hoy/' + date;
   };
 
+  updEstado();
   updEst();
 }

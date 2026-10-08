@@ -279,10 +279,20 @@ macro, la escala se mantiene. Puedes **quitar** ingredientes, **añadir** nuevos
 se actualizan solos. Eliges el tipo de comida (desayuno/almuerzo/cena/snack) y **Guardar**.
 
 - **⭐ Guardar favorito**: lo deja en Favoritos para reutilizarlo sin gastar IA.
-- **🥤 Arma tu batido** (botón arriba de las pestañas): una **licuadora gráfica** que se va llenando
-  mientras agregas leche, agua, yogur, plátano, avena, miel, algarrobina, cacao o **proteína
-  (opcional)**. Ves los **ml vs 700 ml** con barra de capacidad (y aviso si se desborda), las
-  **kcal y macros en vivo**, y subes/bajas porciones con **＋ / −** (máx. 10 c/u). Al tocar
+- **🥤 Arma tu batido** (botón arriba de las pestañas): una **licuadora gráfica** con **marcas de
+  ml en el vaso (200, 400, 600 y 700)** que se va llenando capa por capa, con **sonido de check**
+  al agregar. Cada ingrediente trae su **unidad de medida real**: leche y agua en **medio vaso
+  (125 ml)**, yogur y avena **por cucharada (20 g y 10 g)**, plátano **por unidad (120 g)**,
+  almendras y hielo **por pieza (1.2 g y 20 g)**, miel/maní/cacao/algarrobina por cucharada y
+  **proteína (opcional)** por scoop. En **la propia lista** ves cuántos llevas y quitas o agregas
+  con **＋ / − sin tener que bajar** (el contador *“N agregados · kcal”* está en el título de la
+  tarjeta). Ves los **ml vs 700 ml** con barra de capacidad y aviso si se desborda, más las **kcal
+  y macros en vivo**.
+- **📝 Descripción (opcional)** en el batido: escribes algo como *“medio vaso de leche, 2
+  cucharadas de avena, 3 almendras, 200 g de plátano”* y al tocar **Aplicar y recalcular** la app
+  **ajusta (y agrega) los ingredientes que reconoce, en tu celular y sin IA**; el texto se guarda
+  como nota del plato.
+- **➕ Ingrediente que no está**: si te falta algo lo agregas tú (nombre, gramos y kcal). Al tocar
   **Usar en el plato** se abre el editor con el batido listo para guardar, **sin gastar IA**.
 - Si la IA se equivoca (por ejemplo la porción), corrígela: es lo esperado, es una **estimación**.
 - **✨ Re-analizar con la IA**: el botón aparece al editar una comida guardada **y también recién
@@ -382,12 +392,15 @@ decirte que lo dejaste manual.
 - Lista de comidas del día con sus macros; puedes **Ver ingredientes / Editar / Eliminar**.
 - Contador de **agua** (vasos de 250 ml): la tarjeta te dice la cuenta clara, por ejemplo
   **“8 vasos = 2.00 L al día (1 vaso = 250 ml)”**, y la meta se cambia en Ajustes.
-- **🏋️ Gimnasio del día**: la tarjeta **Gimnasio** marca si fuiste (Sí/No), las **horas**, los
-  **músculos** trabajados (pecho, espalda, hombros, brazos, piernas, glúteos, abdomen o cuerpo
-  completo) y el **cardio** (bicicleta, caminadora, saltar la cuerda, elíptica, remo, natación…).
-  Ese día tu **meta de kcal sube solo** ≈ *peso × horas × intensidad* (fuerza y cardio con valores
-  MET; sin peso en el perfil se estima a 250 kcal/h) y en la cabecera te avisa **“+X kcal por
-  gym”**. Se guarda por día, entra al respaldo y puedes editarlo para días pasados desde ‹ ›.
+- **🏋️ Gimnasio del día**: la tarjeta **Gimnasio** (con icono y estado claro: **Sí fui**, **No fui**
+  o **Sin registrar** — marcar “No hoy” **también se guarda**, ya no se pierde el registro) muestra
+  las horas, los trabajos del día y las etiquetas de **músculos** (pecho, espalda, hombros, brazos,
+  piernas, glúteos, abdomen, cuerpo completo) y **cardio** (bicicleta, caminadora, saltar la cuerda,
+  elíptica, remo, natación…). El formulario usa **dos tarjetas grandes Sí/No** y **3 pasos
+  numerados** (horas, músculos, cardio) con una **vista previa “+X kcal” en grande y la fórmula**
+  (peso × horas × intensidad MET) antes de guardar. Ese día tu **meta de kcal sube sola** ≈ *peso ×
+  horas × intensidad* (sin peso en el perfil se estima a 250 kcal/h) y en la cabecera te avisa
+  **“+X por gym”**. Se guarda por día, entra al respaldo y puedes editarlo para días pasados desde ‹ ›.
 
 ### Historial (📊)
 

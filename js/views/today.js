@@ -3,7 +3,7 @@
 import { DB, getProfile, getSettings } from '../db.js';
 import { icon } from '../icons.js';
 import { calcTargets, computeTotals, bonusGymKcal } from '../nutrition.js';
-import { gymResumen, fmtHoras } from './gym.js';
+import { fmtHoras, MUSCULOS, CARDIO } from './gym.js';
 import {
   todayISO, addDays, dayLabel, relDayTitle, fmtLongDate, TIPOS_COMIDA, ICONO_TIPO,
   esc, num, toast, confirmSheet, openSheet, fromISODate, DIAS
@@ -85,14 +85,7 @@ export async function render(root, params) {
       <a class="btn btn-primary btn-lg btn-block" href="#/registrar?d=${date}">${icon('camera')} Registrar comida</a>
     </div>
 
-    <div class="card">
-      <div class="card-title"><h3>${icon('dumbbell')} Gimnasio</h3>
-        ${gym && gym.ido ? `<span class="badge ok">Sí · ${fmtHoras(gym.horas)} h${gymBonus ? ` · +${num(gymBonus)} kcal` : ''}</span>`
-      : `<span class="badge">Sin registrar</span>`}</div>
-      <div class="small muted" style="margin-bottom:10px">${gym && gym.ido ? gymResumen(gym)
-      : 'Marca si fuiste: las horas, músculos y cardio suman kcal a tu meta de hoy.'}</div>
-      <a class="btn btn-sm btn-outline" href="#/gym?d=${date}">${gym && gym.ido ? 'Editar' : 'Registrar gym'}</a>
-    </div>
+    ${gymCard(gym, date, gymBonus)}
 
     <div class="card">
       <div class="card-title"><h3>${icon('droplet')} Agua</h3><span class="badge">${waterG}/${waterGoal} vasos</span></div>
@@ -162,6 +155,38 @@ export async function render(root, params) {
     const meal = meals.find(m => String(m.id) === b.dataset.items);
     if (meal) showItems(meal);
   });
+}
+
+function etiquetasGym(reg) {
+  const mus = (reg.musculos || []).map(v => (MUSCULOS.find(m => m.v === v) || {}).l || v);
+  const car = (reg.cardio || []).filter(v => v !== 'ninguno').map(v => (CARDIO.find(c => c.v === v) || {}).l || v);
+  return mus.concat(car);
+}
+
+function gymCard(gym, date, bonus) {
+  const estado = gym && gym.ido ? 'si' : gym ? 'no' : null;
+  const pills = etiquetasGym(gym || {}).map(l => `<span class="chip pill">${esc(l)}</span>`).join('');
+  return `
+  <div class="card gym-card">
+    <div class="gym-head">
+      <span class="gym-ico">${icon('dumbbell')}</span>
+      <div class="gym-t"><h3>Gimnasio</h3><div class="tiny muted">${esc(fmtLongDate(date))}</div></div>
+      ${estado === 'si' ? `<span class="badge ok">Sí fui${bonus ? ` · +${num(bonus)} kcal` : ''}</span>`
+      : estado === 'no' ? `<span class="badge warn">No fui</span>`
+      : `<span class="badge">Sin registrar</span>`}
+    </div>
+    ${estado === 'si' ? `
+      <div class="gym-stats">
+        <div class="gs"><div class="gs-v">${fmtHoras(gym.horas)}<small> h</small></div><div class="gs-k">entreno</div></div>
+        <div class="gs"><div class="gs-v">+${num(bonus)}</div><div class="gs-k">kcal a la meta</div></div>
+        <div class="gs"><div class="gs-v">${(gym.musculos || []).length + (gym.cardio || []).filter(c => c !== 'ninguno').length}</div><div class="gs-k">trabajos</div></div>
+      </div>
+      ${pills ? `<div class="chips" style="margin-top:10px">${pills}</div>` : ''}`
+    : estado === 'no'
+      ? `<p class="small muted" style="margin:10px 0 0">Marcaste que <b>no fuiste</b> este día. Si entrenaste después, edítalo y la meta se ajusta solita.</p>`
+      : `<p class="small muted" style="margin:10px 0 0">Aún no marcas este día: horas, músculos y cardio suman kcal a tu meta.</p>`}
+    <a class="btn btn-sm btn-outline btn-block" style="margin-top:12px" href="#/gym?d=${date}">${estado ? 'Editar' : 'Registrar gym'}</a>
+  </div>`;
 }
 
 function bar(key, label, val, goal, unit, dec) {

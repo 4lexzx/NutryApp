@@ -88,6 +88,15 @@ export const MET_CARDIO = {
   remo: 7, natacion: 8, otro: 6
 };
 
+/** MET promedio de la sesión: fuerza = 5; el cardio entra con su MET. */
+function metPromedio(reg) {
+  const mets = [];
+  if ((reg.musculos || []).length) mets.push(5);
+  (reg.cardio || []).forEach(c => { if (MET_CARDIO[c]) mets.push(MET_CARDIO[c]); });
+  if (!mets.length) mets.push(4);
+  return { met: mets.reduce((a, b) => a + b, 0) / mets.length, mets };
+}
+
 /**
  * kcal extra por el gimnasio de un día: MET × peso (kg) × horas.
  * Fuerza ≈ MET 5; si además marcaste cardio se promedia con el MET de cada uno.
@@ -98,12 +107,20 @@ export function bonusGymKcal(reg, peso) {
   const h = Number(reg.horas) || 0;
   if (h <= 0) return 0;
   const w = Number(peso) || 0;
-  const mets = [];
-  if ((reg.musculos || []).length) mets.push(5);
-  (reg.cardio || []).forEach(c => { if (MET_CARDIO[c]) mets.push(MET_CARDIO[c]); });
-  if (!mets.length) mets.push(4);
-  const met = mets.reduce((a, b) => a + b, 0) / mets.length;
+  const { met } = metPromedio(reg);
   return Math.max(0, Math.round(w > 0 ? w * h * met : h * 250));
+}
+
+/** Lo mismo que bonusGymKcal pero con la fórmula explicada para mostrar en pantalla. */
+export function detalleGym(reg, peso) {
+  const w = Number(peso) || 0;
+  const h = (reg && Number(reg.horas)) || 0;
+  const { met } = metPromedio(reg || {});
+  const kcal = bonusGymKcal(reg, w);
+  const formula = w > 0
+    ? `${num_(w)} kg × ${num_(h, 2)} h × ${num_(Math.round(met * 100) / 100, 2)} de intensidad (MET)`
+    : `${num_(h, 2)} h × 250 kcal (estimado: guarda tu peso para afinar)`;
+  return { kcal, met, formula };
 }
 
 /* ---------- Comidas / ingredientes ---------- */
