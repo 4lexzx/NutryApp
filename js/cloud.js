@@ -200,7 +200,7 @@ async function empujar() {
       data: f.op === 'del' ? null : f.data,
       borrado: f.op === 'del'
     }));
-    await rest('/nutri_rows?on_conflict=user_id,tienda,fila_id', {
+    await rest('/datos?on_conflict=user_id,tienda,fila_id', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: lote
@@ -255,7 +255,7 @@ async function bajar(completo = false) {
   const me = uidSesion();
   if (!me) throw new Error('Sesión de la nube inválida: vuelve a conectar.');
   const desde = (ult && ult.v) ? '&actualizado=gt.' + encodeURIComponent(ult.v) : '';
-  const base = '/nutri_rows?select=*&user_id=eq.' + me + '&order=actualizado.asc&limit=5000';
+  const base = '/datos?select=*&user_id=eq.' + me + '&order=actualizado.asc&limit=5000';
   const [vivas, muertas] = await Promise.all([
     rest(base + '&borrado=eq.false' + desde),
     rest(base + '&borrado=eq.true&limit=1000' + desde)
@@ -321,7 +321,7 @@ export async function contarLocal() {
   return c;
 }
 async function contarNube() {
-  const r = await rest('/nutri_rows?select=tienda&borrado=eq.false&limit=10000');
+  const r = await rest('/datos?select=tienda&borrado=eq.false&limit=10000');
   const filas = r.d || [];
   const c = { meals: 0, weights: 0, favorites: 0, water: 0, platos: 0, kv: 0 };
   for (const f of filas) if (c[f.tienda] !== undefined) c[f.tienda]++;
@@ -350,7 +350,7 @@ export async function subirTodo() {
     const lote = filas.slice(i, i + 40).map(f => ({
       user_id: me, tienda: f.tienda, fila_id: f.fila_id, data: f.data, borrado: false
     }));
-    await rest('/nutri_rows?on_conflict=user_id,tienda,fila_id', {
+    await rest('/datos?on_conflict=user_id,tienda,fila_id', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: lote
