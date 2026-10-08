@@ -672,3 +672,20 @@ code.codeblock {
   body { font-size: 17.5px; }
   .view { padding-top: 24px; }
 }
+
+/* ===== Licuadora (Arma tu batido) ===== */
+.bpart { fill: color-mix(in srgb, var(--txt-3) 70%, transparent); }
+.bjar {
+  fill: color-mix(in srgb, #ffffff 6%, transparent);
+  stroke: color-mix(in srgb, var(--txt-3) 75%, transparent);
+  stroke-width: 3;
+}
+.bmark { stroke: color-mix(in srgb, var(--txt-3) 55%, transparent); stroke-width: 2; stroke-linecap: round; }
+.bblade { stroke: color-mix(in srgb, var(--txt-3) 80%, transparent); stroke-width: 3; stroke-linecap: round; }
+.bbase { fill: color-mix(in srgb, var(--txt-3) 30%, var(--card-2)); }
+.bbtn { fill: var(--brand); }
+.bfill { transition: y .45s ease, height .45s ease; }
+#bt-liq { opacity: .93; }
+#bt-svg { max-width: 100%; height: auto; }
+.note.warn { border-left-color: var(--warn); }
+.note.warn b { color: var(--warn); }

@@ -13,6 +13,10 @@ import {
 const state = { draft: null, tab: 'foto', photo: null, desc: '', date: todayISO() };
 const viewRoot = () => document.getElementById('view');
 
+/** Acceso al borrador actual desde otras vistas (ej. Arma tu batido). */
+export function getDraft() { return state.draft; }
+export function setDraft(d) { state.draft = d; }
+
 /* ================= INICIO (registrar) ================= */
 export async function renderStart(root, args, query) {
   const date = (query && query.d) || todayISO();
@@ -26,6 +30,10 @@ export async function renderStart(root, args, query) {
     <div class="spread" style="margin-bottom:12px">
       <div><h1>Registrar comida</h1><div class="tiny muted">${esc(fmtLongDate(date))}</div></div>
       <a class="btn btn-sm btn-ghost" href="#/hoy/${date}">Volver al día</a>
+    </div>
+
+    <div class="hero-actions" style="margin-bottom:12px">
+      <a class="btn btn-block btn-outline" href="#/batido?d=${date}">${icon('cup')} Arma tu batido</a>
     </div>
 
     <div class="tabs" id="lg-tabs">
@@ -676,7 +684,7 @@ function tamanioDe(items) {
  * Sugerencia de comida según la hora del día, lo que ya comiste hoy y el
  * tamaño de lo que vas a registrar. Devuelve { type, hint }.
  */
-async function sugerirTipo(date, items) {
+export async function sugerirTipo(date, items) {
   const hechos = await tiposDelDia(date);
   const now = new Date();
   const h = now.getHours() + now.getMinutes() / 60;

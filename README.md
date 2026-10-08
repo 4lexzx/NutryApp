@@ -279,6 +279,11 @@ macro, la escala se mantiene. Puedes **quitar** ingredientes, **añadir** nuevos
 se actualizan solos. Eliges el tipo de comida (desayuno/almuerzo/cena/snack) y **Guardar**.
 
 - **⭐ Guardar favorito**: lo deja en Favoritos para reutilizarlo sin gastar IA.
+- **🥤 Arma tu batido** (botón arriba de las pestañas): una **licuadora gráfica** que se va llenando
+  mientras agregas leche, agua, yogur, plátano, avena, miel, algarrobina, cacao o **proteína
+  (opcional)**. Ves los **ml vs 700 ml** con barra de capacidad (y aviso si se desborda), las
+  **kcal y macros en vivo**, y subes/bajas porciones con **＋ / −** (máx. 10 c/u). Al tocar
+  **Usar en el plato** se abre el editor con el batido listo para guardar, **sin gastar IA**.
 - Si la IA se equivoca (por ejemplo la porción), corrígela: es lo esperado, es una **estimación**.
 - **✨ Re-analizar con la IA**: el botón aparece al editar una comida guardada **y también recién
   analizada** (por si te equivocaste al escribir un ingrediente: corrige el nombre y dale a
@@ -377,6 +382,12 @@ decirte que lo dejaste manual.
 - Lista de comidas del día con sus macros; puedes **Ver ingredientes / Editar / Eliminar**.
 - Contador de **agua** (vasos de 250 ml): la tarjeta te dice la cuenta clara, por ejemplo
   **“8 vasos = 2.00 L al día (1 vaso = 250 ml)”**, y la meta se cambia en Ajustes.
+- **🏋️ Gimnasio del día**: la tarjeta **Gimnasio** marca si fuiste (Sí/No), las **horas**, los
+  **músculos** trabajados (pecho, espalda, hombros, brazos, piernas, glúteos, abdomen o cuerpo
+  completo) y el **cardio** (bicicleta, caminadora, saltar la cuerda, elíptica, remo, natación…).
+  Ese día tu **meta de kcal sube solo** ≈ *peso × horas × intensidad* (fuerza y cardio con valores
+  MET; sin peso en el perfil se estima a 250 kcal/h) y en la cabecera te avisa **“+X kcal por
+  gym”**. Se guarda por día, entra al respaldo y puedes editarlo para días pasados desde ‹ ›.
 
 ### Historial (📊)
 

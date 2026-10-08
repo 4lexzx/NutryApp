@@ -232,7 +232,7 @@ function editorHTML(draft, opts) {
 
   <div class="card">
     <div class="card-title"><h2>${draft.id ? 'Editar plato' : 'Nuevo plato'}</h2>
-      ${draft.source ? `<span class="badge ${draft.source === 'base' ? 'ok' : 'ai'}">${draft.source === 'ia' ? `${icon('sparkles')} IA` : draft.source === 'base' ? `${icon('book')} Base local` : draft.source === 'favorito' ? `${icon('star')} Favorito` : draft.source === 'texto' ? `${icon('note')} Texto` : `${icon('pencil')} Manual`}</span>` : ''}
+      ${draft.source ? `<span class="badge ${draft.source === 'base' ? 'ok' : 'ai'}">${draft.source === 'ia' ? `${icon('sparkles')} IA` : draft.source === 'base' ? `${icon('book')} Base local` : draft.source === 'favorito' ? `${icon('star')} Favorito` : draft.source === 'texto' ? `${icon('note')} Texto` : draft.source === 'batido' ? `${icon('cup')} Batido` : `${icon('pencil')} Manual`}</span>` : ''}
     </div>
     <div class="chips big" style="margin-bottom:12px">
       ${TIPOS_COMIDA.map(t => `<button type="button" class="chip ${draft.type === t ? 'active' : ''}" data-type="${t}">${icon(ICONO_TIPO[t])} ${t}</button>`).join('')}

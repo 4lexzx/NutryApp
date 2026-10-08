@@ -81,6 +81,31 @@ function num_(v, d = 0) {
   return Number(v).toLocaleString('es-PE', { maximumFractionDigits: d, minimumFractionDigits: 0 });
 }
 
+/* ---------- Gimnasio: kcal extra que suma al goal del día ---------- */
+/** Intensidad (MET) de cada cardio según el compendio clásico de actividades. */
+export const MET_CARDIO = {
+  bicicleta: 6.5, caminadora: 5, cuerda: 9, eliptica: 5.5,
+  remo: 7, natacion: 8, otro: 6
+};
+
+/**
+ * kcal extra por el gimnasio de un día: MET × peso (kg) × horas.
+ * Fuerza ≈ MET 5; si además marcaste cardio se promedia con el MET de cada uno.
+ * Sin peso en el perfil se estima a ~250 kcal por hora.
+ */
+export function bonusGymKcal(reg, peso) {
+  if (!reg || !reg.ido) return 0;
+  const h = Number(reg.horas) || 0;
+  if (h <= 0) return 0;
+  const w = Number(peso) || 0;
+  const mets = [];
+  if ((reg.musculos || []).length) mets.push(5);
+  (reg.cardio || []).forEach(c => { if (MET_CARDIO[c]) mets.push(MET_CARDIO[c]); });
+  if (!mets.length) mets.push(4);
+  const met = mets.reduce((a, b) => a + b, 0) / mets.length;
+  return Math.max(0, Math.round(w > 0 ? w * h * met : h * 250));
+}
+
 /* ---------- Comidas / ingredientes ---------- */
 /** item: { nombre, gramos, per100: {k,p,c,f,fi} } (k kcal, p proteína, c carbohidratos, f grasas, fi fibra) */
 export function itemMacros(item) {

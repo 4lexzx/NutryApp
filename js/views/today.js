@@ -2,7 +2,8 @@
 
 import { DB, getProfile, getSettings } from '../db.js';
 import { icon } from '../icons.js';
-import { calcTargets, computeTotals } from '../nutrition.js';
+import { calcTargets, computeTotals, bonusGymKcal } from '../nutrition.js';
+import { gymResumen, fmtHoras } from './gym.js';
 import {
   todayISO, addDays, dayLabel, relDayTitle, fmtLongDate, TIPOS_COMIDA, ICONO_TIPO,
   esc, num, toast, confirmSheet, openSheet, fromISODate, DIAS
@@ -12,12 +13,15 @@ export async function render(root, params) {
   let date = params && params[0] ? params[0] : todayISO();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
 
-  const [profile, settings, meals, water] = await Promise.all([
-    getProfile(), getSettings(), DB.byDate('meals', date), DB.kvGet('water:' + date, null)
+  const [profile, settings, meals, water, gym] = await Promise.all([
+    getProfile(), getSettings(), DB.byDate('meals', date), DB.kvGet('water:' + date, null),
+    DB.kvGet('gym:' + date, null)
   ]);
 
   const targets = profile ? calcTargets(profile) : null;
-  const goalKcal = targets ? (profile.targets && profile.targets.kcal ? Number(profile.targets.kcal) : targets.kcal) : 0;
+  const baseKcal = targets ? (profile.targets && profile.targets.kcal ? Number(profile.targets.kcal) : targets.kcal) : 0;
+  const gymBonus = bonusGymKcal(gym, profile ? profile.weight : 0);
+  const goalKcal = baseKcal + gymBonus;
   const goalP = targets ? (profile.targets && profile.targets.protein ? Number(profile.targets.protein) : targets.protein) : 0;
   const goalC = targets ? (profile.targets && profile.targets.carbs ? Number(profile.targets.carbs) : targets.carbs) : 0;
   const goalF = targets ? (profile.targets && profile.targets.fat ? Number(profile.targets.fat) : targets.fat) : 0;
@@ -56,7 +60,7 @@ export async function render(root, params) {
     <div class="card">
       <div class="macro-hero">
         <div class="big">${num(total.kcal)}<span style="font-size:1.1rem;font-weight:700"> ${goalKcal ? '/ ' + num(goalKcal) : ''}</span></div>
-        <div class="lbl">kcal consumidas${goalKcal ? ' de tu meta' : ''}</div>
+        <div class="lbl">kcal consumidas${goalKcal ? ' de tu meta' : ''}${gymBonus ? ` ${icon('dumbbell')} +${num(gymBonus)} por gym` : ''}</div>
         <div class="rest">${goalKcal
       ? (total.kcal <= goalKcal ? `Te faltan <b>${num(goalKcal - total.kcal)} kcal</b>` : `Superaste la meta en <b>${num(total.kcal - goalKcal)} kcal</b>`)
       : 'Configura tu perfil para ver metas'}</div>
@@ -79,6 +83,15 @@ export async function render(root, params) {
 
     <div class="hero-actions">
       <a class="btn btn-primary btn-lg btn-block" href="#/registrar?d=${date}">${icon('camera')} Registrar comida</a>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><h3>${icon('dumbbell')} Gimnasio</h3>
+        ${gym && gym.ido ? `<span class="badge ok">Sí · ${fmtHoras(gym.horas)} h${gymBonus ? ` · +${num(gymBonus)} kcal` : ''}</span>`
+      : `<span class="badge">Sin registrar</span>`}</div>
+      <div class="small muted" style="margin-bottom:10px">${gym && gym.ido ? gymResumen(gym)
+      : 'Marca si fuiste: las horas, músculos y cardio suman kcal a tu meta de hoy.'}</div>
+      <a class="btn btn-sm btn-outline" href="#/gym?d=${date}">${gym && gym.ido ? 'Editar' : 'Registrar gym'}</a>
     </div>
 
     <div class="card">

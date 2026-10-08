@@ -12,6 +12,8 @@ import * as profile from './views/profile.js';
 import * as settings from './views/settings.js';
 import * as ia from './views/ia.js';
 import * as login from './views/login.js';
+import * as gym from './views/gym.js';
+import * as batido from './views/batido.js';
 
 const view = () => document.getElementById('view');
 
@@ -28,7 +30,7 @@ function parseHash() {
   return { path, query };
 }
 
-const NAV_OF = { hoy: 'hoy', registrar: 'registrar', nuevo: 'registrar', editar: 'registrar', historial: 'historial', perfil: 'perfil', ajustes: 'ajustes', ia: 'ajustes' };
+const NAV_OF = { hoy: 'hoy', registrar: 'registrar', nuevo: 'registrar', editar: 'registrar', historial: 'historial', perfil: 'perfil', ajustes: 'ajustes', ia: 'ajustes', gym: 'hoy', batido: 'registrar' };
 
 async function route() {
   const { path, query } = parseHash();
@@ -68,6 +70,8 @@ async function route() {
       case 'perfil': await profile.render(root, path.slice(1), query); break;
       case 'ajustes': await settings.render(root, path.slice(1), query); break;
       case 'ia': await ia.render(root, path.slice(1), query); break;
+      case 'gym': await gym.render(root, path.slice(1), query); break;
+      case 'batido': await batido.render(root, path.slice(1), query); break;
       default:
         location.hash = '#/hoy';
     }
@@ -150,7 +154,7 @@ function setupNetwork() {
 function enFormulario() {
   if (document.querySelector('.sheet-back')) return true;
   const h = location.hash || '';
-  if (/^#\/(nuevo|editar)/.test(h)) return true;
+  if (/^#\/(nuevo|editar|gym)/.test(h)) return true;
   if (/^#\/registrar/.test(h)) {
     const el = document.querySelector('#view input[type="text"], #view textarea, #view input[type="search"]');
     if (el && el.value && el.value.trim()) return true;
