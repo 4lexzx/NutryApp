@@ -9,6 +9,6 @@ function cfgLocal() {
 }
 const local = cfgLocal();
 
-export const SUPABASE_URL = (local && local.url) || '';
-export const SUPABASE_ANON_KEY = (local && local.anon) || '';
+export const SUPABASE_URL = (local && local.url) || 'https://uyrhoxcdizondvakxoug.supabase.co';
+export const SUPABASE_ANON_KEY = (local && local.anon) || 'sb_publishable_gCimKRKCqDEdC-FT1xsJvQ_KNbXSNGs';
 export function nubeConfigurada() { return !!(SUPABASE_URL && SUPABASE_ANON_KEY); }
