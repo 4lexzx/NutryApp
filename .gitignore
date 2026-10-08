@@ -4,3 +4,5 @@ skills-lock.json
 
 # capturas de pantalla que generan las pruebas automatizadas
 /*.png
+
+.playwright-mcp/
