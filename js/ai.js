@@ -293,8 +293,9 @@ function friendlyError(status, bodyText, kind) {
   return new AIError(apiMsg ? `Error de Gemini (${status}): ${apiMsg}` : `Error de Gemini (${status}).`, 'otro');
 }
 
-async function callGemini({ parts, model, variant = 0, attempt = 0 }) {
-  // La clave vive en el servidor (Vercel → función /api/ai); el navegador solo llama a casa.
+async function callGemini({ parts, apiKey, model, variant = 0, attempt = 0 }) {
+  // La clave la pega CADA CLIENTE en Ajustes → IA (solo en su celular).
+  // El navegador llama a casa (/api/ai) y esa función es quien llama a Google.
   const url = '/api/ai';
   // variant 0 = completo · 1 = sin thinking · 2 = sin thinking ni responseMimeType
   const cfg = { temperature: 0.2 };
@@ -308,7 +309,7 @@ async function callGemini({ parts, model, variant = 0, attempt = 0 }) {
     res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, contents: [{ role: 'user', parts }], generationConfig: cfg }),
+      body: JSON.stringify({ apiKey, model, contents: [{ role: 'user', parts }], generationConfig: cfg }),
       signal: ctrl.signal
     });
   } catch (e) {
@@ -325,17 +326,20 @@ async function callGemini({ parts, model, variant = 0, attempt = 0 }) {
     if (res.status === 404) {
       throw new AIError('La función de IA del servidor no está disponible (/api/ai). Revisa el despliegue en Vercel o actualiza la app.', 'servidor');
     }
+    if (res.status === 401) {
+      throw new AIError('Falta tu API key de Gemini. Ve a Ajustes → IA y pégala (se guarda solo en tu celular).', 'sin-key');
+    }
     if (res.status === 400 && variant < 2 && /thinking/.test(low)) {
-      return callGemini({ parts, model, variant: 1 });
+      return callGemini({ parts, apiKey, model, variant: 1 });
     }
     if (res.status === 400 && variant < 2 && /mime/.test(low)) {
-      return callGemini({ parts, model, variant: 2 });
+      return callGemini({ parts, apiKey, model, variant: 2 });
     }
     // error transitorio del servidor de Google: esperamos y reintentamos una vez
     const transitorio = res.status === 500 || res.status === 503 || /overloaded|unavailable|internal/.test(low);
     if (transitorio && attempt < 1) {
       await new Promise(r => setTimeout(r, 2500));
-      return callGemini({ parts, model, variant, attempt: attempt + 1 });
+      return callGemini({ parts, apiKey, model, variant, attempt: attempt + 1 });
     }
     throw friendlyError(res.status, text, text);
   }
@@ -447,7 +451,8 @@ export function validarResultado(r) {
  *   false = hay más elementos en la frase y el total lo arma la IA.
  * @returns {Promise<{name,totalG,comment,supuestos,confianza,items}>}
  */
-export async function analyzeMeal({ imageDataUrl, description, prompt, model, maxTotalG, mult = 1, multLocal = true }) {
+export async function analyzeMeal({ imageDataUrl, description, prompt, apiKey, model, maxTotalG, mult = 1, multLocal = true }) {
+  if (!apiKey) throw new AIError('Falta tu API key de Gemini. Ve a Ajustes → IA y pégala (se guarda solo en tu celular).', 'sin-key');
   if (!navigator.onLine) throw new AIError('Sin conexión a internet. El análisis con IA necesita red; tus datos guardados sí se ven sin conexión.', 'sin-internet');
 
   const m = Number(mult) || 1;
@@ -467,7 +472,7 @@ export async function analyzeMeal({ imageDataUrl, description, prompt, model, ma
   }
   parts.push({ text: txt });
 
-  const first = await callGemini({ parts, model });
+  const first = await callGemini({ parts, apiKey, model });
   let raw;
   try { raw = extractJSON(first); }
   catch (e) {
@@ -475,7 +480,7 @@ export async function analyzeMeal({ imageDataUrl, description, prompt, model, ma
     const retry = await callGemini({
       parts: [...parts,
         { text: 'Tu respuesta anterior no era JSON válido. Devuelve SOLO el JSON corregido, sin comentarios ni markdown.' }],
-      model
+      apiKey, model
     });
     raw = extractJSON(retry);
   }
@@ -510,12 +515,13 @@ function limitarTotal(items, maxG) {
 /** Prueba rápida de la conexión con la IA (devuelve {ok, msg}). */
 export async function testApiKey(apiKey, model = 'gemini-3.1-flash-lite') {
   if (!navigator.onLine) return { ok: false, msg: 'Sin conexión a internet.' };
+  if (!apiKey) return { ok: false, msg: 'Aún no has pegado una API key.' };
   try {
     await callGemini({
       parts: [{ text: 'Responde solo con la palabra OK' }],
-      model
+      apiKey, model
     });
-    return { ok: true, msg: 'La IA del servidor responde correctamente.' };
+    return { ok: true, msg: 'La clave funciona correctamente.' };
   } catch (e) {
     return { ok: false, msg: e.message || 'Error desconocido.' };
   }

@@ -69,11 +69,16 @@ export async function render(root) {
 
     <div class="card">
       <div class="card-title"><h3>${icon('bot')} Inteligencia artificial</h3>
-        <span class="badge ok">clave en el servidor</span></div>
+        <span class="badge ${s.apiKey ? 'ok' : 'warn'}">${s.apiKey ? 'key configurada' : 'sin key'}</span></div>
       <label class="field"><span class="lbl">Modelo</span>
         <select id="s-model">${modelOptions().map(m => `<option value="${m.v}" ${s.model === m.v ? 'selected' : ''}>${m.l}</option>`).join('')}</select></label>
+      <label class="field"><span class="lbl">API key</span>
+            <input id="s-key" type="password" autocomplete="off" spellcheck="false" placeholder="pega aquí tu clave de Google AI" value="${esc(s.apiKey || '')}"></label>
       <div class="row wrap">
-        <button class="btn btn-sm btn-accent" id="s-key-test" type="button">Probar la IA</button>
+        <button class="btn btn-sm" id="s-key-show" type="button">Ver</button>
+        <button class="btn btn-sm btn-primary" id="s-key-save" type="button">Guardar</button>
+        <button class="btn btn-sm btn-accent" id="s-key-test" type="button">Probar clave</button>
+        <button class="btn btn-sm btn-ghost" id="s-key-del" type="button">Borrar</button>
       </div>
       <div id="s-key-res" class="hint"></div>
       <div class="divider"></div>
@@ -97,8 +102,9 @@ export async function render(root) {
           <button class="btn btn-sm btn-ghost" id="s-base-clear" type="button" ${nBase ? '' : 'disabled'}>Borrar</button>
         </div>
       </div>
-      <p class="tiny muted" style="margin-top:10px">La clave de Gemini vive en el <b>servidor de la app (Vercel)</b>:
-        nunca se guarda en tu teléfono ni viaja en el código público. Cada análisis pasa por /api/ai.</p>
+      <p class="tiny muted" style="margin-top:10px">Tu clave de Gemini se guarda <b>solo en este celular</b> (IndexedDB):
+        no se sube a la nube ni viaja en el código público. Cada análisis la usa a través de /api/ai y la función la
+        descarta al terminar.</p>
     </div>
 
     <div class="card">
@@ -211,9 +217,9 @@ export async function render(root) {
 
     <div class="card">
       <div class="card-title"><h3>${icon('info')} Acerca de</h3></div>
-      <p class="small muted">Nutri Gym v${VERSION} · PWA con nube opcional (Supabase) e IA por servidor (Vercel).<br>
+      <p class="small muted">Nutri Gym v${VERSION} · PWA con nube opcional (Supabase) e IA con tu propia clave de Gemini.<br>
       Tus datos viven <b>en este celular</b> (IndexedDB); si conectas la nube en Ajustes, se copian a tu cuenta de
-      Supabase para verlos en otros dispositivos. La IA usa la clave que vive en el servidor: tú no configuras nada.</p>
+      Supabase para verlos en otros dispositivos. Para la IA, cada quien pega su clave gratis en Ajustes → IA.</p>
       <div class="col" style="margin:10px 0 4px">
         <button class="btn btn-primary btn-block" id="s-update" type="button" disabled>${icon('check')} Estás al día</button>
         <div class="hint" id="s-update-hint">Última versión instalada: v${VERSION}. Si sale una nueva, este botón se activa.</div>
@@ -306,6 +312,24 @@ export async function render(root) {
   });
 
   /* IA */
+  const keyIn = root.querySelector('#s-key');
+  root.querySelector('#s-key-show').onclick = e => {
+    const show = keyIn.type === 'password';
+    keyIn.type = show ? 'text' : 'password';
+    e.target.textContent = show ? 'Ocultar' : 'Ver';
+  };
+  root.querySelector('#s-key-save').onclick = async () => {
+    await saveSettings({ apiKey: keyIn.value.trim() });
+    toast('API key guardada.', 'ok');
+    render(root);
+  };
+  root.querySelector('#s-key-del').onclick = async () => {
+    const ok = await confirmSheet({ title: '¿Borrar la API key?', msg: 'La IA dejará de funcionar hasta que pegues otra clave.', okText: 'Borrar', danger: true });
+    if (!ok) return;
+    await saveSettings({ apiKey: '' });
+    toast('Clave borrada.', 'ok');
+    render(root);
+  };
   root.querySelector('#s-model').onchange = async e => { await saveSettings({ model: e.target.value }); toast('Modelo: ' + e.target.value, 'ok'); };
   /* ver mis porciones estándar (y poder revertir una guardada sin querer) */
   const baseVer = root.querySelector('#s-base-ver');
@@ -369,9 +393,11 @@ export async function render(root) {
   };
   root.querySelector('#s-key-test').onclick = async e => {
     const btn = e.target, res = root.querySelector('#s-key-res');
+    const key = keyIn.value.trim();
+    await saveSettings({ apiKey: key });
     btn.disabled = true; btn.textContent = 'Probando…'; res.textContent = '';
-    const r = await testApiKey('', root.querySelector('#s-model').value);
-    btn.disabled = false; btn.textContent = 'Probar la IA';
+    const r = await testApiKey(key, root.querySelector('#s-model').value);
+    btn.disabled = false; btn.textContent = 'Probar clave';
     res.innerHTML = r.ok ? `<span style="color:var(--brand)">${icon('checkCircle')} ${esc(r.msg)}</span>` : `<span style="color:#ff9a9a">${icon('alert')} ${esc(r.msg)}</span>`;
   };
 

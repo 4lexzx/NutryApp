@@ -1,7 +1,9 @@
 /* Nutri Gym · función serverless de IA (Vercel).
-   Recibe { model, contents, generationConfig } desde la app y le añade
-   la clave de Gemini (variable de entorno GEMINI_API_KEY) para llamar a
-   Google. Devuelve la respuesta de Google tal cual (mismo JSON).
+   Recibe { apiKey, model, contents, generationConfig } desde la app: la clave
+   la pega CADA CLIENTE en Ajustes → IA y viaja solo en este request (no se
+   guarda aquí). Usamos la del body y, si no viene, la variable de entorno
+   GEMINI_API_KEY (opcional, para quien prefiera una clave compartida).
+   Devuelve la respuesta de Google tal cual (mismo JSON).
 
    Node 18+ (fetch global). No usa dependencias. */
 
@@ -11,8 +13,7 @@ module.exports = async (req, res) => {
     return;
   }
   if (req.method === 'GET') {
-    const key = process.env.GEMINI_API_KEY;
-    res.status(key ? 200 : 500).json({ ok: !!key });
+    res.status(200).json({ ok: true });
     return;
   }
   if (req.method !== 'POST') {
@@ -20,15 +21,14 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const key = process.env.GEMINI_API_KEY;
+  const { apiKey, model, contents, generationConfig } = req.body || {};
+  const key = String(apiKey || '').trim() || String(process.env.GEMINI_API_KEY || '').trim();
   if (!key) {
-    res.status(500).json({
-      error: { message: 'El servidor no tiene la clave de Gemini configurada (falta la variable GEMINI_API_KEY en Vercel).' }
+    res.status(401).json({
+      error: { message: 'Falta tu API key de Gemini: pégala en Ajustes → IA.' }
     });
     return;
   }
-
-  const { model, contents, generationConfig } = req.body || {};
   if (!model || !Array.isArray(contents)) {
     res.status(400).json({ error: { message: 'Faltan model o contents.' } });
     return;

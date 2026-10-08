@@ -23,7 +23,7 @@ export async function renderStart(root, args, query) {
   const date = (query && query.d) || todayISO();
   state.date = date;
   const settings = await getSettings();
-  const hasKey = true;   // la IA la gestiona el servidor (v2): no hace falta key local
+  const hasKey = !!(settings.apiKey && settings.apiKey.trim());
   const favorites = await DB.all('favorites');
   const nItems = state.draft ? state.draft.items.length : 0;
 
@@ -492,8 +492,9 @@ async function runAI({ date, hasKey, usePhoto }) {
   const settings = await getSettings();
   const descEl = body.querySelector('#f-desc') || body.querySelector('#t-desc');
   if (descEl) state.desc = descEl.value;
-  if (!hasKey) {
-    toast('La IA no está disponible. Usa la pestaña Manual para registrar a mano.', 'warn');
+  if (!hasKey || !settings.apiKey) {
+    toast('Configura tu API key en Ajustes → IA primero.', 'warn');
+    location.hash = '#/ajustes';
     return;
   }
   if (usePhoto && !state.photos.length) { toast('Toma o elige una foto primero (o usa la pestaña Texto).', 'warn'); return; }

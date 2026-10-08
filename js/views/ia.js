@@ -28,18 +28,22 @@ export async function render(root) {
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>${icon('key')} Modelo</h3>
-        <span class="badge ok">clave en el servidor</span></div>
+      <div class="card-title"><h3>${icon('key')} API key y modelo</h3>
+        <span class="badge ${settings.apiKey ? 'ok' : 'warn'}">${settings.apiKey ? 'key configurada' : 'sin key'}</span></div>
       <label class="field"><span class="lbl">Modelo</span>
         <select id="ia-model">
           ${modelOptions().map(m => `<option value="${m.v}" ${settings.model === m.v ? 'selected' : ''}>${m.l}</option>`).join('')}
         </select></label>
+      <label class="field"><span class="lbl">API key (se guarda solo en este celular)</span>
+        <input id="ia-key" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…" value="${esc(settings.apiKey || '')}"></label>
       <div class="row">
-        <button class="btn btn-sm btn-accent" id="ia-test" type="button">Probar la IA</button>
+        <button class="btn btn-sm" id="ia-show" type="button">Ver</button>
+        <button class="btn btn-sm btn-primary" id="ia-savekey" type="button">Guardar key</button>
+        <button class="btn btn-sm btn-accent" id="ia-test" type="button">Probar</button>
       </div>
       <div id="ia-testres" class="hint"></div>
-      <div class="hint">La clave de Gemini vive en el servidor de la app (Vercel). Tú no tienes que configurar nada:
-        cada análisis pasa por <b>/api/ai</b> y la clave nunca se guarda en tu teléfono.</div>
+      <div class="hint">La clave la usas tú: cada análisis pasa por <b>/api/ai</b> (que solo hace de puente hacia Google)
+        y la clave no se sube a la nube ni se guarda en el servidor.</div>
     </div>
 
     <div class="card">
@@ -48,11 +52,14 @@ export async function render(root) {
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>${icon('shield')} Sobre la clave de Gemini</h3></div>
+      <div class="card-title"><h3>${icon('key')} Conseguir una key gratis (paso a paso)</h3></div>
       <ol class="small muted" style="padding-left:20px;line-height:1.8">
-        <li>La app llama a su propio servidor (<b>/api/ai</b>) y quien responde la consulta a Gemini es el servidor.</li>
-        <li>La clave está como variable de entorno en <b>Vercel</b> (GEMINI_API_KEY): no viaja en la app ni se ve en el navegador.</li>
-        <li>Si el análisis falla con “función de IA no disponible”, el servidor aún no tiene la clave configurada.</li>
+        <li>Entra a <b>aistudio.google.com</b> con tu cuenta de Google (no necesita tarjeta).</li>
+        <li>Busca <b>“Get API key” / “Obtener clave de API”</b> (botón arriba a la izquierda).</li>
+        <li>Botón <b>Create API key</b> → <b>Create API key in new project</b> (o usa el proyecto que te sugiera).</li>
+        <li>Copia la clave que empieza con <b>AIza…</b> y pégala arriba.</li>
+        <li><b>No pongas restricciones</b> de dominio (HTTP referrers) en la clave: la app llama a Google a través
+            de su servidor, no desde tu navegador, y una restricción bloquearía los análisis.</li>
         <li>NUNCA actives la facturación: sin ella solo usas la cuota gratuita (costo $0).</li>
       </ol>
       <div class="note">${icon('alert')} Si más adelante activas facturas, fija un <b>presupuesto de alertas</b> en Google Cloud (Billing → Budgets).</div>
@@ -76,6 +83,17 @@ export async function render(root) {
     render(root);
   };
 
+  const keyInput = root.querySelector('#ia-key');
+  root.querySelector('#ia-show').onclick = e => {
+    const isPw = keyInput.type === 'password';
+    keyInput.type = isPw ? 'text' : 'password';
+    e.target.textContent = isPw ? 'Ocultar' : 'Ver';
+  };
+  root.querySelector('#ia-savekey').onclick = async () => {
+    await saveSettings({ apiKey: keyInput.value.trim() });
+    toast('API key guardada en tu celular.', 'ok');
+    render(root);
+  };
   root.querySelector('#ia-model').onchange = async e => {
     await saveSettings({ model: e.target.value });
     toast('Modelo actualizado: ' + e.target.value, 'ok');
@@ -83,10 +101,12 @@ export async function render(root) {
   root.querySelector('#ia-test').onclick = async e => {
     const btn = e.target;
     const out = root.querySelector('#ia-testres');
+    const key = keyInput.value.trim();
+    await saveSettings({ apiKey: key });
     btn.disabled = true; btn.textContent = 'Probando…';
     out.textContent = '';
-    const r = await testApiKey('', root.querySelector('#ia-model').value);
-    btn.disabled = false; btn.textContent = 'Probar la IA';
+    const r = await testApiKey(key, root.querySelector('#ia-model').value);
+    btn.disabled = false; btn.textContent = 'Probar';
     out.innerHTML = r.ok ? `<span style="color:var(--brand)">${icon('checkCircle')} ${esc(r.msg)}</span>` : `<span style="color:#ff9a9a">${icon('alert')} ${esc(r.msg)}</span>`;
     toast(r.msg, r.ok ? 'ok' : 'err');
   };

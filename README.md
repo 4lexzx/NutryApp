@@ -3,8 +3,9 @@
 App para tu celular Android (y cualquier navegador) que registra lo que comes, calcula tus metas
 de **kcal / proteína / carbohidratos / grasas**, y puede analizar tus platos con **Gemini AI**
 (foto o descripción). Tus datos se guardan **en tu celular** (IndexedDB) y, si activas la **nube
-(Supabase)**, se sincronizan entre tus dispositivos con tu propia cuenta. La IA se llama desde un
-**servidor propio (Vercel)**: la clave de Gemini **nunca se guarda en el celular**.
+(Supabase)**, se sincronizan entre tus dispositivos con tu propia cuenta. Para la IA, **cada
+usuario pega su propia clave gratuita de Gemini** en Ajustes → IA: esa clave se queda **solo en su
+celular** y viaja únicamente en cada consulta a `/api/ai`, que solo hace de puente hacia Google.
 
 > ⚠️ **Aviso**: los valores nutricionales son **estimaciones** generadas por IA y por una tabla de
 > referencia de alimentos. No sustituyen la opinión de un nutricionista.
@@ -37,7 +38,7 @@ de **kcal / proteína / carbohidratos / grasas**, y puede analizar tus platos co
 | Sincronizarlos con la nube (**opcional**) | **Supabase** (cuenta propia, con RLS) | **Sí, solo eso** |
 | Ver el día, el historial y los gráficos | Se lee de IndexedDB | No |
 | Guardar comidas, editar, favoritos | Se escribe en IndexedDB | No |
-| **Análisis de platos con IA** | Servidor propio en **Vercel** que llama a **Gemini** (la clave vive en el servidor) | **Sí, solo eso** |
+| **Análisis de platos con IA** | Tu clave de Gemini (pegada en Ajustes → IA) enviada a `/api/ai` en **Vercel**, que llama a **Gemini** | **Sí, solo eso** |
 | Guardar la app en el celular | Manifest + Service Worker (PWA) | No (una vez instalada) |
 
 **Archivos del proyecto**
@@ -50,7 +51,7 @@ APP_Nutri/
 ├── vercel.json                ← config de Vercel (función serverless, 60 s máx.)
 ├── .nojekyll                  ← le dice a GitHub Pages que sirva los archivos tal cual
 ├── api/
-│   └── ai.js                  ← servidor: recibe la foto/texto y llama a Gemini con la clave
+│   └── ai.js                  ← servidor: recibe la foto/texto + tu clave y llama a Gemini
 ├── supabase/
 │   └── schema.sql             ← SQL para crear la tabla de la nube (se pega una vez)
 ├── icons/                     ← íconos PNG (192, 512 y maskable)
@@ -61,7 +62,7 @@ APP_Nutri/
     ├── config.js              ← URL y clave pública de tu Supabase (opcional)
     ├── cloud.js               ← cuenta, sincronización y cola de cambios de la nube
     ├── nutrition.js           ← fórmulas Mifflin-St Jeor, metas y tabla de alimentos
-    ├── ai.js                  ← llama a /api/ai (IA sin clave en el celular)
+    ├── ai.js                  ← llama a /api/ai enviando tu clave (guardada en el celular)
     ├── editor.js              ← editor de plato (ingredientes 100% editables)
     ├── charts.js              ← gráficos en canvas (peso, barras semana/mes)
     ├── export.js              ← CSV para Excel + respaldo/restauración .json
@@ -87,9 +88,9 @@ APP_Nutri/
    de modelo en **Ajustes → IA** (o seguir a mano: no gasta cuota).
 2. **Costo: $0.** Mientras **no actives la facturación** en Google Cloud, solo existe la cuota
    gratuita. Nunca actives Billing para esta app.
-3. **Tu API key de Gemini vive en el servidor (Vercel)**, nunca en el celular: la app solo llama
-   a `/api/ai` de tu propia app. Aun así, como es una app web pública, usa una clave con cuota
-   gratuita y **no actives facturación**.
+3. **Tu API key de Gemini se guarda solo en el celular donde la pegas** (Ajustes → IA). No se sube
+   a la nube ni queda en el servidor: viaja únicamente en esa petición a `/api/ai`. Usa una clave
+   con cuota gratuita y **no actives facturación**.
 4. **Si borras los datos del navegador (o actualizas Android de forma agresiva), pierdes el
    historial** (a menos que tengas la nube conectada, que lo restaura solo). También puedes hacer
    respaldos `.json` seguido (paso 8).
@@ -113,13 +114,13 @@ servidor `/api/ai`).
    repositorio.
 3. **Framework Preset**: déjalo en *Other* (no hay build). **Root Directory**: `.`. Vercel
    detecta solo la carpeta `api/` y crea la función serverless.
-4. Antes de desplegar, en **Environment Variables** agrega:
-   - `GEMINI_API_KEY` = tu clave de Google AI Studio (paso 5).
+4. En **Environment Variables** no hace falta ninguna: la clave de Gemini la pega **cada usuario**
+   en su propia app (paso 5), no el servidor.
 5. **Deploy**. En 1 minuto te da una URL tipo `https://nutrigym.vercel.app` con HTTPS.
 6. Abre esa URL en el celular → funciona igual (ícono, offline, todo).
 
-> Cada vez que hagas `git push`, Vercel vuelve a desplegar solo. La clave solo vive en
-> **Settings → Environment Variables** de Vercel: los visitantes jamás la ven.
+> Cada vez que hagas `git push`, Vercel vuelve a desplegar solo. `/api/ai` solo hace de puente:
+> recibe la clave en cada consulta, la usa y la descarta (no se guarda ni se escribe en los logs).
 
 ### 3.1 GitHub Pages (solo sin IA): crea la cuenta (si no tienes)
 
@@ -205,8 +206,9 @@ Si Chrome no ofrece “Instalar”, usa **⋮ → Agregar a pantalla de inicio**
 
 ## 5. API key de Gemini gratis (Google AI Studio)
 
-La clave **no se pega en la app**: se guarda como variable de entorno en Vercel (paso 3.0) y solo
-la usa el servidor `/api/ai`.
+Cada usuario pega **su propia** clave en la app: **Ajustes → IA → API key → Guardar** (se guarda en
+ese celular, en IndexedDB, y no se sube a la nube). El servidor `/api/ai` solo la recibe en cada
+petición para llamar a Google y la descarta al terminar.
 
 ### 5.1 Crear la clave (5 minutos, gratis, sin tarjeta)
 
@@ -215,22 +217,23 @@ la usa el servidor `/api/ai`.
 3. **Create API key → Create API key in new project** (deja que cree el proyecto si te lo pide).
 4. Copia la clave (empieza con `AIza…`). Guárdala en un lugar seguro, por ejemplo un correo que te
    envíes a ti mismo.
-5. En **Vercel → tu proyecto → Settings → Environment Variables**: crea
-   `GEMINI_API_KEY` con esa clave y redeploya (botón **Redeploy** o un `git push`). Desde la app
-   puedes probarla en **Ajustes → IA → Probar la IA**.
+5. En la app: **Ajustes → IA**, pega la clave en el campo **API key** → **Guardar** → **Probar
+   clave**. En otro celular se repite el mismo paso con la clave de cada quien.
 
 ### 5.2 Restringir la clave (opcional)
 
-Como la clave vive en **tu servidor** y no viaja al navegador, ya **no hace falta restringirla por
-dominio**. Si aun así quieres una capa extra: en <https://console.cloud.google.com/apis/credentials>
-abre tu clave → **API restrictions → Restrict key → Gemini API** (solo esa API). No actives
-HTTP referrers (el servidor no tiene referrer de navegador).
+La clave viaja del celular a `/api/ai` y de ahí a Google, así que **no pongas restricciones de
+HTTP referrers** en Google Cloud: al llegar sin referrer de navegador, la restricción bloquearía
+todos los análisis. Si quieres una capa extra de control, en
+<https://console.cloud.google.com/apis/credentials> abre tu clave → **API restrictions → Restrict
+key → Gemini API** (solo esa API).
 
 ### 5.3 Notas de seguridad y costo
 
 - **No actives facturación** (Billing). Sin facturación no hay cobro posible: solo cuota gratuita.
 - Si algún día la activas, ve a **Billing → Budgets & alerts** y pon una alerta de **S/ 1 / $ 1**.
-- Si un día dejas de usar la IA, borra la variable `GEMINI_API_KEY` en Vercel.
+- La clave vive **solo en el celular donde la pegaste**: si borras los datos del navegador se
+  pierde (basta con pegarla de nuevo; no se sube a la nube).
 
 ---
 
@@ -548,7 +551,7 @@ Crea un contenedor nativo con `npm create @capacitor/app` y apunta la URL de Git
 
 | Problema | Solución |
 |---|---|
-| *“La IA no responde / servidor no encontrado”* | La app llama a `/api/ai` de **tu** Vercel: si publicaste en GitHub Pages o Netlify estático, la IA no existe ahí (publica en Vercel, paso 3.0) o revisa que `GEMINI_API_KEY` esté en Vercel y que hayas redeployado. |
+| *“La IA no responde / servidor no encontrado”* | La app llama a `/api/ai` de **tu** Vercel: si publicaste en GitHub Pages o Netlify estático, la IA no existe ahí (publica en Vercel, paso 3.0). Si la IA responde con error de clave, ve a **Ajustes → IA** y vuelve a pegar tu API key (**Probar clave**). |
 | *“Límite alcanzado / cuota”* | Es la **cuota gratuita** de Gemini. Espera 1 minuto (o al día siguiente) o cambia de modelo en Ajustes → IA. Mientras tanto puedes registrar **manual**. |
 | *“El modelo no existe”* | Cambia el modelo en Ajustes → IA (usa `gemini-3.1-flash-lite`). |
 | *“Se acabó la cuota diaria gratuita”* | Ese modelo solo regala 20 consultas/día; en **Ajustes → IA** cámbialo por un modelo **`-lite`** (~500/día) o espera a que se renueve al día siguiente. |
@@ -562,7 +565,7 @@ Crea un contenedor nativo con `npm create @capacitor/app` y apunta la URL de Git
 | La nube dice *“sin configurar”* | Falta pegar la URL y la clave de Supabase en `js/config.js` y redeployar (paso 12.2). |
 | No entra la nube (correo/rechazo) | En Supabase → Authentication → Settings, revisa que **Confirm email** esté desactivado (paso 12.1) y que usuario/contraseña sean los mismos. |
 | *“Nube: 1 cambio pendiente”* casi siempre | Vuelve a tocar **Sincronizar** en Ajustes → Nube; si sigue, pulsa **Bajar** (muestra los datos de la nube) o revisa que estés en línea. |
-| ¿Se envían mis fotos a algún lado? | Van a **tu servidor en Vercel** (`/api/ai`) y de ahí a **Gemini (Google)** cuando tocas “Analizar con la IA”. Solo eso. |
+| ¿Se envían mis fotos a algún lado? | Solo cuando tocas “Analizar con la IA”: van a **tu servidor en Vercel** (`/api/ai`) y de ahí a **Gemini (Google)**, junto con tu clave de este celular. Nunca a otra parte. |
 | El iPhone no muestra la app | Safari → botón **Compartir → Añadir a pantalla de inicio**. |
 
 ---
@@ -599,8 +602,8 @@ bundler ni servidor propio.
 - **URL de la nube y configuración**: `js/config.js` (URL y clave pública de Supabase; la clave
   pública no es secreta, pero si prefieres no subirla, déjala vacía y pégala en el navegador).
 - **Sincronización**: `js/cloud.js`; SQL de la tabla en `supabase/schema.sql`.
-- **Servidor de IA**: `api/ai.js` (recibe la petición en Vercel y llama a Gemini con
-  `GEMINI_API_KEY`). `vercel.json` solo ajusta el tiempo máximo (60 s).
+- **Servidor de IA**: `api/ai.js` (recibe la petición en Vercel —con la clave que envía el cliente
+  en ese mismo request— y llama a Gemini). `vercel.json` solo ajusta el tiempo máximo (60 s).
 
 **Verla en local en tu PC** (opcional): necesitas un servidor porque los módulos ES y el service
 worker no corren desde `file://`:
@@ -652,7 +655,7 @@ datos gracias a las políticas de seguridad (RLS) de la tabla.
   volver (el badge te avisa). Al abrir la app o volver a conectar, **baja** los últimos cambios.
 - **La primera vez que conectas**: si tu nube está vacía, sube todo lo local; si ya hay datos en
   la nube, baja esos y los mezcla con los tuyos (gana lo más reciente).
-- **No se sincronizan**: tu clave de Gemini (ni falta que hace, vive en Vercel), la **lista de
+- **No se sincronizan**: tu clave de Gemini (se queda en el celular donde la pegaste), la **lista de
   usuarios** del candado local ni el historial de cambios pendientes.
 - Dos dispositivos con la misma cuenta nube ven **los mismos datos**. El candado local de la app
   (usuario `alexsu`) sigue existiendo: protege la app en ese dispositivo, no sustituye a la cuenta
