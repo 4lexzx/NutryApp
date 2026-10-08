@@ -116,7 +116,8 @@ servidor `/api/ai`).
    detecta solo la carpeta `api/` y crea la función serverless.
 4. En **Environment Variables** no hace falta ninguna: la clave de Gemini la pega **cada usuario**
    en su propia app (paso 5), no el servidor.
-5. **Deploy**. En 1 minuto te da una URL tipo `https://nutrigym.vercel.app` con HTTPS.
+5. **Deploy**. En 1 minuto te da una URL con HTTPS (esta app vive en
+   `https://nutrygym.vercel.app`).
 6. Abre esa URL en el celular → funciona igual (ícono, offline, todo).
 
 > Cada vez que hagas `git push`, Vercel vuelve a desplegar solo. `/api/ai` solo hace de puente:
@@ -191,8 +192,8 @@ Cualquiera de estas sirve igual: la app es HTML estático.
 
 ## 4. Instalarla en tu celular (pantalla de inicio)
 
-1. Abre la URL en **Chrome de Android** (tu URL de Vercel, por ejemplo
-   `https://nutrigym.vercel.app`, o la de GitHub Pages si la usaste).
+1. Abre la URL en **Chrome de Android** (la URL de Vercel, por ejemplo
+   `https://nutrygym.vercel.app`, o la de GitHub Pages si la usaste).
 2. Toca **Instalar Nutri Gym** (dentro de Ajustes), o el menú **⋮ → Instalar aplicación /
    Añadir a pantalla de inicio**.
 3. Confirmas y el ícono 🟩 **Nutri Gym** aparece en tu pantalla: se abre a pantalla completa,
