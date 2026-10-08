@@ -40,8 +40,8 @@ export function enVentana(hhmm, horario, ventanaMin = VENTANA_MIN) {
 export async function notificar(titulo, cuerpo) {
   const opts = {
     body: cuerpo,
-    icon: './icons/icon-192.png',
-    badge: './icons/icon-192.png',
+    icon: './icons/icon-512.png',       // icono grande a color (el logo completo)
+    badge: './icons/notif-badge.png',   // silueta blanca: en la barra se ve el logo, no un cuadrado
     tag: 'nutri-rem',
     renotify: true
   };

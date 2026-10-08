@@ -418,17 +418,21 @@ decirte que lo dejaste manual.
   sentidos**: lo cambias en Gimnasio y se actualiza en Perfil, y al revés. La app lleva una
   **racha en días** que sigue **día tras día, semana tras semana y mes a mes**, pero **se verifica
   cada día**: no se pierde mientras sigas dentro del rango de tu plan (aguanta entre semanas y al
-  cambiar de mes) y **solo se pierde si una semana cierra por debajo del mínimo** (con “3-4 días”,
-  pierdes solo si cierras la semana con menos de 3). Cuando **guardas gym y la racha crece o se
-  enciende**, suena el **fuego 🔥 (sonido de fogata)** y en Hoy la **llama se enciende con una
-  animación de chispa** (gris/apagada cuando va en 0), junto a **7 lámparas por día de la semana**
-  (L M X J V S D): **encendida** cuando ese día hubo gym y **gris mientras siga apagada hoy**,
-  con el avance **“k de N días”** de la semana.
+   cambiar de mes) y **solo se pierde si una semana cierra por debajo del mínimo** (con “3-4 días”,
+   pierdes solo si cierras la semana con menos de 3). Cuando **guardas gym y la racha crece o se
+   enciende**, la app se llena de **fuego 🔥 a PANTALLA COMPLETA** (llama gigante, resplandor y
+   brasas con **sonido de fogata**; se cierra sola o con un toque) y en Hoy la **llama se enciende
+   con una animación de chispa** (gris/apagada cuando va en 0), junto a **7 lámparas por día de la
+   semana**
+   (L M X J V S D): **encendida** cuando ese día hubo gym y **gris mientras siga apagada hoy**,
+   con el avance **“k de N días”** de la semana.
 - **⏰ Recordatorios de comidas** (Ajustes → Recordatorios): activas el permiso una vez, marcas
   las comidas que te sirven y les pones **la hora que quieras** (por defecto **desayuno 08:00,
   almuerzo 13:00 y cena 20:00**, cada una con su reloj editable). El aviso **“¿Ya anotaste…?”**
   incluye **cuántas kcal y proteína llevas hoy** y **cuántas kcal te quedan** por registrar
-  (el botón **Probar aviso** muestra exactamente eso). Funciona en **Android e iPhone** (PWA
+  (el botón **Probar aviso** muestra exactamente eso) y sale con **el logo de la app** (icono
+  grande a color y la silueta del logo en la barra: nada de cuadrados). Funciona en **Android e
+  iPhone** (PWA
   instalada en la pantalla de inicio, iOS 16.4+) mientras la app esté abierta o en segundo plano;
   al tocar el aviso se abre **Hoy**. Todo se programa en tu celular, sin servidores ni costo.
 

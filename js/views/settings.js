@@ -9,7 +9,7 @@ import { clearSession, currentUser } from '../auth.js';
 import { setSonidos, clic } from '../sound.js';
 import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe } from '../notif.js';
 
-const VERSION = '1.2.9';
+const VERSION = '1.2.10';
 
 export async function render(root) {
   const s = await getSettings();

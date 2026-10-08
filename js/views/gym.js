@@ -147,6 +147,28 @@ export function consumeIgnicion() {
   return v;
 }
 
+/** Fuego a PANTALLA COMPLETA con sonido de fogata: llama gigante, resplandor
+    y brasas; se cierra sola a los pocos segundos o al tocar en cualquier parte. */
+export function mostrarFuego(dias) {
+  fuego();
+  const back = document.createElement('div');
+  back.className = 'fire-back';
+  back.id = 'fire-overlay';
+  back.setAttribute('role', 'dialog');
+  back.setAttribute('aria-modal', 'true');
+  back.innerHTML = `
+    <div class="fire-glow"></div>
+    <div class="fire-stage">
+      <span class="fire-big">${icon('flame')}</span>
+      <div class="fire-embers">${'<i></i>'.repeat(10)}</div>
+    </div>
+    <div class="fire-txt">${dias > 1 ? `¡Racha de ${dias} días!` : '¡Racha encendida!'}</div>`;
+  document.getElementById('modal-root').appendChild(back);
+  const cerrar = () => back.remove();
+  back.addEventListener('click', cerrar);
+  setTimeout(cerrar, 2600);
+}
+
 /* ================= vista ================= */
 
 export async function render(root, args, query) {
@@ -344,7 +366,7 @@ export async function render(root, args, query) {
       regs[date] = { ido: true, horas: form.horas, musculos: form.musculos, cardio: form.cardio };
       const r = calcRacha(regs, plan, todayISO());
       if (r.dias > antes.dias) {
-        fuego();                          // sonido de fogata al encender/crecer la racha
+        mostrarFuego(r.dias);               // fuego a pantalla completa (sonido incluido)
         marcarIgnicion();                 // Hoy anima el encendido de la llama
         toast(antes.dias === 0
           ? `Gimnasio guardado${b > 0 ? `: +${num(b)} kcal` : ''} · ¡racha encendida con ${r.dias} ${r.dias === 1 ? 'día' : 'días'}!`
