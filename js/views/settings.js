@@ -9,7 +9,8 @@ import { clearSession, currentUser } from '../auth.js';
 import { setSonidos, clic } from '../sound.js';
 import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe } from '../notif.js';
 
-const VERSION = '1.2.11';
+const VERSION = '1.2.12';
+let hAct = null;   // oyente del evento "hay actualización" (uno solo, sin duplicar)
 
 export async function render(root) {
   const s = await getSettings();
@@ -167,12 +168,48 @@ export async function render(root) {
       <p class="small muted">Nutri Gym v${VERSION} · PWA 100% local.<br>
       Tus datos (perfil, comidas, historial) viven <b>en este celular</b>. No hay cuentas ni servidores propios;
       la única conexión externa es la consulta opcional a Gemini (Google) cuando usas la IA.</p>
+      <div class="col" style="margin:10px 0 4px">
+        <button class="btn btn-primary btn-block" id="s-update" type="button" disabled>${icon('check')} Estás al día</button>
+        <div class="hint" id="s-update-hint">Última versión instalada: v${VERSION}. Si sale una nueva, este botón se activa.</div>
+      </div>
       <div class="note">${icon('alert')} Los valores nutricionales son <b>estimaciones</b> generadas por IA y tablas de referencia.
         No sustituyen la opinión de un nutricionista.</div>
       <div class="note danger">${icon('lock')} Consejo: haz un <b>respaldo .json</b> al menos una vez por semana y guárdalo en
         Google Drive, tu PC o por correo. Si borras los datos del navegador, se pierde el historial.</div>
     </div>
   `;
+
+  /* actualización de la app */
+  const actBtn = root.querySelector('#s-update');
+  const actHint = root.querySelector('#s-update-hint');
+  const refrescAct = () => {
+    const hay = !!window.__nutriAct;
+    actBtn.disabled = !hay;
+    actBtn.innerHTML = hay
+      ? icon('refresh') + ' Actualizar ahora'
+      : icon('check') + ' Estás al día';
+    actHint.innerHTML = hay
+      ? 'Hay una versión nueva. Al tocar, la app se recarga con lo último (también refresca el logo).'
+      : `Última versión instalada: v${VERSION}. Si sale una nueva, este botón se activa.`;
+  };
+  refrescAct();
+  if (hAct) document.removeEventListener('nutri-actualizacion', hAct);
+  hAct = () => { if (document.contains(actBtn)) refrescAct(); };
+  document.addEventListener('nutri-actualizacion', hAct);
+  actBtn.onclick = async () => {
+    if (actBtn.disabled) return;
+    actBtn.disabled = true;
+    actBtn.innerHTML = icon('refresh') + ' Actualizando…';
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg && reg.waiting) reg.waiting.postMessage('skipWaiting');   // controllerchange recarga
+      else location.reload();
+    } catch (e) { location.reload(); }
+    // Si por lo que sea no llega el cambio, volvemos a dejar el botón usable.
+    setTimeout(() => {
+      if (document.contains(actBtn) && window.__nutriAct) refrescAct();
+    }, 3500);
+  };
 
   /* instalación */
   const instBtn = root.querySelector('#s-install');

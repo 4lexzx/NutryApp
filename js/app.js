@@ -170,6 +170,20 @@ function setupSW() {
   const habiaControlador = !!navigator.serviceWorker.controller;
   let primeraVez = true;
   let recargando = false;
+  let avisoAct = false;
+
+  // ¿Hay una versión nueva esperando? Señal global para el botón de Ajustes.
+  window.__nutriAct = false;
+  const marcarActualizacion = () => {
+    if (window.__nutriAct) return;
+    window.__nutriAct = true;
+    document.dispatchEvent(new CustomEvent('nutri-actualizacion'));
+    if (!avisoAct) {
+      avisoAct = true;
+      toast('Hay una nueva versión de la app: toca "Actualizar" en Ajustes.', 'ok');
+    }
+  };
+  window.__nutriMarcarAct = marcarActualizacion;
 
   // Cuando una versión nueva toma el control, recargamos para verla.
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -183,9 +197,21 @@ function setupSW() {
     location.reload();
   });
 
+  const vigilar = reg => {
+    if (reg.waiting && navigator.serviceWorker.controller) marcarActualizacion();
+    reg.addEventListener('updatefound', () => {
+      const w = reg.installing;
+      if (!w) return;
+      w.addEventListener('statechange', () => {
+        if (w.state === 'installed' && navigator.serviceWorker.controller) marcarActualizacion();
+      });
+    });
+  };
+
   const registrar = async () => {
     try {
       const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+      vigilar(reg);
       const buscar = () => { if (navigator.onLine) reg.update().catch(() => {}); };
       setTimeout(buscar, 3000);                       // al abrir
       setInterval(buscar, 15 * 60 * 1000);            // cada 15 min

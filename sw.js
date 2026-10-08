@@ -1,7 +1,7 @@
 /* Service worker: la app abre y funciona SIN internet (los datos están en IndexedDB).
    Solo las consultas a la IA necesitan red. */
 
-const CACHE = 'nutri-gym-v26';
+const CACHE = 'nutri-gym-v27';
 
 const PRECACHE = [
   './',
@@ -45,7 +45,8 @@ self.addEventListener('install', event => {
     await Promise.all(PRECACHE.map(url =>
       cache.add(new Request(url, { cache: 'reload' })).catch(() => null)
     ));
-    self.skipWaiting();
+    // No skipWaiting: la versión nueva queda en espera y el usuario la aplica
+    // con el botón "Actualizar" de Ajustes (o sola al cerrar del todo la app).
   })());
 });
 

@@ -151,8 +151,11 @@ Cualquiera de estas sirve igual: la app es HTML estático.
 
 1. Cambia los archivos en tu PC.
 2. Vuelve a subirlos (o `git add . && git commit && git push`).
-3. En el celular, abre la app y recarga (menú ⋮ → **Actualizar**). El service worker descarga la
-   nueva versión automáticamente y te avisa *“Nueva versión lista”*.
+3. En el celular, abre la app: si hay versión nueva, en **Ajustes → Acerca de** se **activa el
+   botón “Actualizar ahora”** (normalmente muestra “✓ Estás al día” y queda deshabilitado) y
+   sale un aviso *“Hay una nueva versión…”*. Tócala y la app se recarga con lo nuevo (también
+   refresca el logo del ícono). Si no la tocas, se aplica sola la próxima vez que cierres
+   del todo la app.
 
 ---
 
@@ -514,6 +517,7 @@ Crea un contenedor nativo con `npm create @capacitor/app` y apunta la URL de Git
 | *“Sin conexión a internet”* | El análisis con IA necesita red. Ver historial/registrar manual funciona igual sin internet. |
 | La app no instala | Úsala en **Chrome** (no en Firefox/Samsung Internet si no ofrece instalar) y con **HTTPS** (GitHub Pages sí). O usa ⋮ → *Añadir a pantalla de inicio*. |
 | Se ve rara al abrir | Recarga: menú ⋮ → **Actualizar**. |
+| El ícono sigue con el logo viejo | Ajustes → Acerca de → **Actualizar ahora** (solo se activa si hay versión nueva) y espera unos minutos. Si aun así no cambia, quita el ícono de la pantalla de inicio y vuelve a tocar **Instalar**. |
 | *“Ups, algo salió mal”* | Recarga la página. Si persiste, revisa la consola de Chrome (⋮ → Herramientas → Consola de JS) y los mensajes de error. |
 | **Borré los datos del navegador** | Si tenías un respaldo `.json`, restáuralo desde Ajustes. Si no, no hay forma de recuperarlos (no existe servidor). |
 | Cambié de celular | Restaura el respaldo `.json` en el nuevo (paso 8). |
