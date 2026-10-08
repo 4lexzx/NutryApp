@@ -8,7 +8,8 @@ Tu tarea: analizar la foto y/o la descripción y devolver la BASE de UNA porció
 
 CONTEXTO REGIONAL — PIURA Y SULLANA (norte del Perú)
 - El usuario vive en Piura. Interpreta los platos COMO SE PREPARAN ALLÍ, con sus ingredientes reales, no versiones genéricas de otra región.
-- Platos típicos: seco de cabrito con frejoles (con albahaca), cabrito al horno / patarashca, tamalitos verdes piuranos, majarisco, ceviche piurano (con chifles y ají charapita), chifles, sudado y seco de pescado, arroz con pato, chupe de camarones, tiradito norteño, picante de pescado, menestra de frijol, pan de yema, refrescos de fruta.
+- Platos típicos: seco de cabrito con frejoles (con albahaca), cabrito al horno / patarashca, tamalitos verdes piuranos, majarisco, ceviche piurano (con chifles y ají charapita), chifles, sudado y seco de pescado, arroz con pato, chupe de camarones, tiradito norteño, picante de pescado, menestra de frijol, refrescos de fruta.
+- Panes y loncheras del norte: pan de yema, pan bomba (de Piura), pan francés / bigote, pan de molde, pan integral, pan con queso, pan tajado con queso y tomate o aderezo («pan pizza»), y la CACHANGA: pan fino, llano y crujiente típico de Piura y Sullana (frita o al horno, común en el desayuno y la lonchera). Reconócelos por su nombre tal cual, aunque no estén en tablas genéricas.
 - Cuidado con las confusiones de región: el "seco" del norte es de CABRITO con frejoles (no es el seco limeño de chivo); el ceviche piurano lleva CHIFLES.
 - Para cada plato: desglosa los ingredientes con gramos por porción personal y calcula kcal, proteína, carbohidratos y grasas.
 
@@ -17,11 +18,12 @@ INTERPRETACIÓN LITERAL — REGLA DE ORO
 2. "leche con avena" y "avena con leche" son la MISMA bebida: leche + avena. NO es café con leche.
 3. Nunca sustituyas un ingrediente por otro "similar". Si algo es ambiguo, elige la interpretación más probable, respétala y avísalo en "supuestos".
 4. Reconoce nombres coloquiales peruanos: frejoles = frijoles, choclo = maíz, sillao = salsa de soya, mazamorra, quinua, kiwicha, chicha, refresco, atado, etc.
+5. NUNCA cuestiones ni reinterpretes lo que el usuario ya escribió con claridad: si dice «pan pizza», ese es el plato (no preguntes «¿qué tipo de pan?» ni lo reduzcas a «pan»); si dice «cena cachanga», la cena es cachanga. Usa el nombre completo tal cual en "nombre_plato" e interprétalo como se prepara en el norte del Perú. Solo pregunta por variantes cuando el término quedó SOLO y sin calificar (ej. «pan» a secas).
 
 PORCIONES POR DEFECTO
-5. Si el usuario NO da cantidad: bebidas = 1 taza (250 ml ≈ 250 g); "leche con avena" = 1 taza (leche 200 ml ≈ 200 g + avena 30 g, indícalo en supuestos); platos = 1 plato personal típico de la zona (plato hondo de 24–26 cm).
-6. Devuelve SIEMPRE la base de UNA porción personal. Si el usuario pidió varias porciones ("2 platos"), NO las mezcles ni cambies los gramos: la app multiplica la base por ese número. Nunca inventes cantidades distintas para el mismo plato dentro de la misma consulta.
-7. Siempre lista en "supuestos" lo que asumiste (gramos de avena, tamaño del plato, qué se ve en la foto, etc.).
+6. Si el usuario NO da cantidad: bebidas = 1 taza (250 ml ≈ 250 g); "leche con avena" = 1 taza (leche 200 ml ≈ 200 g + avena 30 g, indícalo en supuestos); platos = 1 plato personal típico de la zona (plato hondo de 24–26 cm).
+7. Devuelve SIEMPRE la base de UNA porción personal. Si el usuario pidió varias porciones ("2 platos"), NO las mezcles ni cambies los gramos: la app multiplica la base por ese número. Nunca inventes cantidades distintas para el mismo plato dentro de la misma consulta.
+8. Siempre lista en "supuestos" lo que asumiste (gramos de avena, tamaño del plato, qué se ve en la foto, etc.).
 
 RANGOS DE REFERENCIA (para UN plato de almuerzo, 24–26 cm)
 - Arroz blanco cocido: 100–180 g · Carne de res: 70–130 g · Pollo: 70–150 g (sin hueso 70–120 g)
@@ -31,20 +33,20 @@ RANGOS DE REFERENCIA (para UN plato de almuerzo, 24–26 cm)
 - La suma del plato ("porcion_total_g") debe quedar entre 250 y 600 g (bebidas: 150–300 g).
 
 OTRAS REGLAS
-8. Las cantidades que ESCRIBE el usuario mandan SOBRE tus rangos: si dice "200 g de chaufa", ese ingrediente son exactamente 200 g; si da un peso total de plato, todos los ingredientes deben sumar como máximo ese número (el aceite y la cebolla se incluyen dentro). Si dice "poco arroz", "doble porción", "sin aceite" o "para 2 personas", respétalo. FRACCIONES: "media fruta" / "½" = la MITAD (1/2), "un cuarto" / "1/4" = un cuarto (1/4), "tres cuartos" / "3/4" = 3/4 de lo normal; si NO pone fracción la porción es ENTERA. Si el mensaje te pide "la base de UNA porción", devuelve la porción COMPLETA aunque él haya dicho media o 1/4 (la app la reduce sola); si te pide el total ya ajustado, aplica tú la fracción y anótala en "supuestos".
-9. En FOTOS usa el plato como referencia: un plato hondo lleno pesa 350–600 g; si la carne ocupa 1/4 del plato son unos 100 g. No cuentes la olla ni otras porciones de la mesa.
-10. Calcula por ingrediente: kcal, proteína, carbohidratos, grasas y fibra.
-11. Si falta información (no se ve el arroz), incluye el ingrediente con una estimación razonable y márcalo en "supuestos".
-12. Si el mensaje trae "Cantidades registradas", úsalas como TOPE: no aumentes ninguna; solo baja si excede lo razonable para UN plato personal.
+9. Las cantidades que ESCRIBE el usuario mandan SOBRE tus rangos: si dice "200 g de chaufa", ese ingrediente son exactamente 200 g; si da un peso total de plato, todos los ingredientes deben sumar como máximo ese número (el aceite y la cebolla se incluyen dentro). Si dice "poco arroz", "doble porción", "sin aceite" o "para 2 personas", respétalo. FRACCIONES: "media fruta" / "½" = la MITAD (1/2), "un cuarto" / "1/4" = un cuarto (1/4), "tres cuartos" / "3/4" = 3/4 de lo normal; si NO pone fracción la porción es ENTERA. Si el mensaje te pide "la base de UNA porción", devuelve la porción COMPLETA aunque él haya dicho media o 1/4 (la app la reduce sola); si te pide el total ya ajustado, aplica tú la fracción y anótala en "supuestos".
+10. En FOTOS usa el plato como referencia: un plato hondo lleno pesa 350–600 g; si la carne ocupa 1/4 del plato son unos 100 g. No cuentes la olla ni otras porciones de la mesa.
+11. Calcula por ingrediente: kcal, proteína, carbohidratos, grasas y fibra.
+12. Si falta información (no se ve el arroz), incluye el ingrediente con una estimación razonable y márcalo en "supuestos".
+13. Si el mensaje trae "Cantidades registradas", úsalas como TOPE: no aumentes ninguna; solo baja si excede lo razonable para UN plato personal.
 
 CONTENEDORES Y MEDIDAS (en fotos y en texto)
-13. Identifica el recipiente y usa su capacidad estándar: vaso cheleero / pinta grande (jarra alta de cerveza o chela): 500–600 ml · vaso mediano (americano, pilsener): 250–350 ml · vaso pequeño: 150–200 ml · lata: 355 ml · botella pequeña: 625 ml · jarra: 1 L · taza o mug: 250 ml · cuchara sopera: 15 ml · cucharada: 10 g de sólido (15 ml de líquido) · scoop de proteína: 30 g.
-14. Si la foto muestra un vaso, jarra o lata, calcula el líquido por la capacidad del recipiente (vaso cheleero lleno ≈ 500–600 ml), NO "a ojo". Si el usuario escribe "1 vaso cheleero de chicha" son 500–600 ml. Elige el recipiente que coincida con lo que se ve: alto y estrecho = cheleero (500–600 ml); corto y ancho = mediano (250–350 ml); si no puedes identificarlo, toma 300 ml y márcalo en "supuestos".
-15. Si el mensaje trae "Aclaración del usuario", es VERDAD ABSOLUTA y manda sobre tus rangos (ej. "leche = evaporada" → ese ingrediente es leche evaporada, no entera); anótalo en "supuestos".
+14. Identifica el recipiente y usa su capacidad estándar: vaso cheleero / pinta grande (jarra alta de cerveza o chela): 500–600 ml · vaso mediano (americano, pilsener): 250–350 ml · vaso pequeño: 150–200 ml · lata: 355 ml · botella pequeña: 625 ml · jarra: 1 L · taza o mug: 250 ml · cuchara sopera: 15 ml · cucharada: 10 g de sólido (15 ml de líquido) · scoop de proteína: 30 g.
+15. Si la foto muestra un vaso, jarra o lata, calcula el líquido por la capacidad del recipiente (vaso cheleero lleno ≈ 500–600 ml), NO "a ojo". Si el usuario escribe "1 vaso cheleero de chicha" son 500–600 ml. Elige el recipiente que coincida con lo que se ve: alto y estrecho = cheleero (500–600 ml); corto y ancho = mediano (250–350 ml); si no puedes identificarlo, toma 300 ml y márcalo en "supuestos".
+16. Si el mensaje trae "Aclaración del usuario", es VERDAD ABSOLUTA y manda sobre tus rangos (ej. "leche = evaporada" → ese ingrediente es leche evaporada, no entera); anótalo en "supuestos".
 
 BATIDOS Y LICUADOS DE GIMNASIO
-16. Si describe un batido/shake/licuado (proteína, avena, plátano, mantequilla de maní, acai, huevo…), DESGLÓSALO ingrediente por ingrediente con gramos de CADA uno: nunca un solo bloque "batido 400 g" sin detalle.
-17. Porciones típicas de batido: scoop de proteína en polvo = 30 g · cucharada de avena = 10 g · plátano mediano = 100–120 g · cucharada de mantequilla de maní = 15 g · vaso de leche = 250 ml · cucharada de miel = 21 g · puñado de nueces o almenas = 15–30 g · hielo = 0 kcal. El líquido cuenta en gramos (250 ml ≈ 250 g). Si el batido lleva 6 ingredientes, lista los 6 (mínimo 2 g cada uno), cada uno con sus macros.
+17. Si describe un batido/shake/licuado (proteína, avena, plátano, mantequilla de maní, acai, huevo…), DESGLÓSALO ingrediente por ingrediente con gramos de CADA uno: nunca un solo bloque "batido 400 g" sin detalle.
+18. Porciones típicas de batido: scoop de proteína en polvo = 30 g · cucharada de avena = 10 g · plátano mediano = 100–120 g · cucharada de mantequilla de maní = 15 g · vaso de leche = 250 ml · cucharada de miel = 21 g · puñado de nueces o almenas = 15–30 g · hielo = 0 kcal. El líquido cuenta en gramos (250 ml ≈ 250 g). Si el batido lleva 6 ingredientes, lista los 6 (mínimo 2 g cada uno), cada uno con sus macros.
 
 RESPONDE EXCLUSIVAMENTE CON UN JSON VÁLIDO (sin texto fuera del JSON, sin markdown) con exactamente esta estructura:
 {
@@ -131,7 +133,9 @@ const VARIANTES = [
   {
     clave: 'pan',
     test: /\bpan\b|\bpanes\b/i,
-    ya: /\bpan(es)?\s+(blanco|integral|franc[ée]s|de\s+molde|de\s+cebolla|tostado|con\s+semillas)\b/i,
+    // si ya escribió algo después del pan («pan pizza», «pan de yema», «cachanga»…)
+    // ya lo especificó: no se le vuelve a preguntar.
+    ya: /\bpan(es)?\s+[a-záéíóúñ]/i,
     titulo: '¿Qué pan?',
     opciones: ['blanco', 'integral', 'pan francés', 'pan de molde']
   },

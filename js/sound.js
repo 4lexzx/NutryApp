@@ -10,8 +10,10 @@ let bufCheck = null;
 let cargandoCheck = null;
 let bufLic = null;
 let cargandoLic = null;
+let bufFuego = null;
+let cargandoFuego = null;
 
-export function setSonidos(v) { activos = v !== false; if (activos) { cargarSonido(); cargarCheck(); cargarLicuar(); } }
+export function setSonidos(v) { activos = v !== false; if (activos) { cargarSonido(); cargarCheck(); cargarLicuar(); cargarFuego(); } }
 export function sonidosActivos() { return activos; }
 
 function audioCtx() {
@@ -75,6 +77,23 @@ function cargarLicuar() {
   return cargandoLic;
 }
 
+/** Descarga y decodifica el chisporroteo de fuego (~1 s) — al encender la racha. */
+function cargarFuego() {
+  if (bufFuego) return Promise.resolve(bufFuego);
+  if (!cargandoFuego) {
+    cargandoFuego = fetch('./sfx/fuego.wav')
+      .then(r => (r && r.ok ? r.arrayBuffer() : Promise.reject(new Error('sin archivo'))))
+      .then(ab => new Promise((res, rej) => {
+        const c = audioCtx();
+        if (!c) rej(new Error('sin audio'));
+        else c.decodeAudioData(ab, res, rej);
+      }))
+      .then(b => { bufFuego = b; return b; })
+      .catch(() => null);
+  }
+  return cargandoFuego;
+}
+
 function tocar(buffer, gain) {
   try {
     const c = audioCtx();
@@ -105,6 +124,16 @@ export function licuar() {
     const c = audioCtx();
     if (!c || !bufLic) { cargarLicuar(); return; }
     tocar(bufLic, 0.9);
+  } catch (e) { /* silencio */ }
+}
+
+/** Suena el fuego (~1 s) — cuando la racha de gimnasio se enciende o crece. */
+export function fuego() {
+  if (!activos) return;
+  try {
+    const c = audioCtx();
+    if (!c || !bufFuego) { cargarFuego(); return; }
+    tocar(bufFuego, 0.9);
   } catch (e) { /* silencio */ }
 }
 
@@ -142,6 +171,7 @@ export function initSonidos() {
   cargarSonido();
   cargarCheck();
   cargarLicuar();
+  cargarFuego();
   let presion = null; // { el, x, y, id } del último botón importante pulsado
   document.addEventListener('pointerdown', e => {
     presion = null;

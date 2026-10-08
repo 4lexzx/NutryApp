@@ -180,7 +180,8 @@ export const DEFAULT_SETTINGS = {
   theme: 'dark',
   waterGoal: 8,
   sounds: true,
-  disclaimerSeen: false
+  disclaimerSeen: false,
+  rem: { on: false, ids: ['desayuno', 'almuerzo', 'cena'] }
 };
 
 /* Modelos con muy pocas consultas gratuitas por día (~20): pasamos al -lite (~500/día). */

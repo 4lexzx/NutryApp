@@ -5,11 +5,13 @@ import { icon } from '../icons.js';
 import { calcTargets, bmr, tdee, ACTIVIDADES, OBJETIVOS, SEXOS } from '../nutrition.js';
 import { lineChart } from '../charts.js';
 import { todayISO, esc, num, toast, confirmSheet, openSheet, fmtShortDate, fromISODate, toISODate, uid, DIAS } from '../util.js';
+import { PLAN_RANGOS, PLAN_RANGO_DEF, rangoLabel } from './gym.js';
 
 export async function render(root) {
   const p = (await getProfile()) || {
     weight: '', height: '', age: '', sex: 'hombre', activity: 1.55, objective: 'mantenimiento'
   };
+  const gymRango = (p.gymDays && PLAN_RANGOS.indexOf(p.gymDays) >= 0) ? p.gymDays : PLAN_RANGO_DEF;
   const weights = (await DB.all('weights')).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const isNew = !(await getProfile());
   const t = (p.weight && p.height && p.age) ? calcTargets(p) : null;
@@ -33,6 +35,10 @@ export async function render(root) {
       </div>
       <label class="field"><span class="lbl">Nivel de actividad</span>
         <select id="p-act">${ACTIVIDADES.map(a => `<option value="${a.v}" ${String(p.activity) === String(a.v) ? 'selected' : ''}>${a.l} — ${a.d}</option>`).join('')}</select></label>
+      <label class="field"><span class="lbl">Días de gimnasio por semana (tu plan de racha)</span>
+        <select id="p-gym">${PLAN_RANGOS.map(r => `<option value="${r}" ${r === gymRango ? 'selected' : ''}>${rangoLabel(r)}${r === PLAN_RANGO_DEF ? ' (por defecto)' : ''}</option>`).join('')}</select></label>
+      <div class="hint" style="margin:-8px 0 14px">Vale también en la vista Gimnasio (cambiás allá y se actualiza aquí, y al revés).
+        Tu racha solo se pierde si una semana cierra por debajo del mínimo del rango: con “3-4 días” aguantas mientras hagas 3 o más.</div>
       <label class="field"><span class="lbl">Objetivo</span>
         <select id="p-obj">${OBJETIVOS.map(o => `<option value="${o.v}" ${p.objective === o.v ? 'selected' : ''}>${o.l}</option>`).join('')}</select></label>
       <button class="btn btn-primary btn-lg btn-block" id="p-save" type="button">${icon('calculator')} Calcular mis metas</button>
@@ -104,13 +110,23 @@ export async function render(root) {
       age: parseInt(root.querySelector('#p-a').value, 10) || 0,
       sex: root.querySelector('#p-s').value,
       activity: parseFloat(root.querySelector('#p-act').value),
-      objective: root.querySelector('#p-obj').value
+      objective: root.querySelector('#p-obj').value,
+      gymDays: root.querySelector('#p-gym').value
     };
     if (!next.weight || !next.height || !next.age) { toast('Completa peso, estatura y edad.', 'warn'); return; }
     next.targets = p.targets || null;
     await saveProfile(next);
     toast('Perfil guardado. Metas recalculadas.', 'ok');
     render(root);
+  };
+
+  // ---- plan de gym: se guarda apenas cambia (y Gimnasio lo lee igual) ----
+  root.querySelector('#p-gym').onchange = async e => {
+    const v = PLAN_RANGOS.indexOf(e.target.value) >= 0 ? e.target.value : PLAN_RANGO_DEF;
+    const pr = (await getProfile()) || {};
+    pr.gymDays = v;
+    await saveProfile(pr);
+    toast(`Plan de gym: ${rangoLabel(v)} por semana. Sincronizado con Gimnasio.`, 'ok');
   };
 
   // ---- metas manuales ----

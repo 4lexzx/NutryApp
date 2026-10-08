@@ -738,7 +738,13 @@ export async function renderEdit(root, args) {
   });
 }
 
-async function saveMeal(draft) {
+/**
+ * Guarda una comida. Por defecto limpia el borrador, avisa y salta al día
+ * (así se usa desde el editor). Con { navegar: false } solo guarda y devuelve
+ * la comida creada, sin tocar el borrador ni navegar (lo usa el batido).
+ */
+export async function saveMeal(draft, opts = {}) {
+  const navegar = opts.navegar !== false;
   const meal = {
     id: draft.id || uid(),
     date: draft.date || todayISO(),
@@ -756,9 +762,12 @@ async function saveMeal(draft) {
     updatedAt: Date.now()
   };
   await DB.put('meals', meal);
-  state.draft = null;
-  toast(`Guardado: ${num(meal.totals.kcal)} kcal.`, 'ok');
-  location.hash = `#/hoy/${meal.date}`;
+  if (navegar) {
+    state.draft = null;
+    toast(`Guardado: ${num(meal.totals.kcal)} kcal.`, 'ok');
+    location.hash = `#/hoy/${meal.date}`;
+  }
+  return meal;
 }
 
 async function saveFav(draft) {

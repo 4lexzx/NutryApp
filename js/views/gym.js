@@ -1,12 +1,13 @@
 /* Gimnasio del día: si fui, horas, músculos y cardio → suma kcal a la meta.
    Se guarda SIEMPRE el registro (también "No fui") para distinguirlo de
-   "Sin registrar". Incluye el PLAN de días por semana y la RACHA (días
-   seguidos cumpliendo el plan, verificada cada día) con lámparas por día. */
+   "Sin registrar". El PLAN de días por semana vive en el PERFIL (rangos como
+   "3-4 días", sincronizados con Perfil) y la RACHA (días seguidos cumpliendo
+   el plan, verificada cada día) se enciende con sonido y animación. */
 
-import { DB, getProfile } from '../db.js';
+import { DB, getProfile, saveProfile } from '../db.js';
 import { bonusGymKcal, detalleGym } from '../nutrition.js';
 import { icon } from '../icons.js';
-import { clic } from '../sound.js';
+import { clic, fuego } from '../sound.js';
 import { todayISO, esc, num, toast, fmtLongDate, dayLabel } from '../util.js';
 
 export const MUSCULOS = [
@@ -29,7 +30,26 @@ export function fmtHoras(v) {
 
 /* ================= plan, racha y lámparas ================= */
 
-export const PLAN_DEF = 3;                  // días por semana por defecto
+export const PLAN_DEF = 3;                  // mínimo del rango por defecto
+export const PLAN_RANGO_DEF = '3-4';        // rango por defecto (está en el perfil)
+
+/** Rangos de días por semana (el primero es el mínimo que exige la racha). */
+export const PLAN_RANGOS = ['1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7'];
+
+/** Mínimo del plan: '3-4' → 3, '7' → 7, número suelto 4 → 4, inválido → 3. */
+export function planMin(plan) {
+  const n = parseInt(String(plan == null ? '' : plan).trim(), 10);
+  return Math.max(1, Math.min(7, isFinite(n) && n > 0 ? n : PLAN_DEF));
+}
+
+/** De un plan viejo (número suelto) al rango equivalente. */
+export function rangoDe(n) {
+  const min = planMin(n);
+  return min >= 7 ? '7' : `${min}-${min + 1}`;
+}
+
+/** Etiqueta bonita de un rango: '3-4' → '3-4 días', '7' → '7 días'. */
+export function rangoLabel(r) { return r === '7' ? '7 días' : `${r} días`; }
 
 const DOS = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -40,16 +60,25 @@ export const lunesDe = iso => {
   return DOS(d);
 };
 
-/** Registros de gym {fecha: reg} + plan semanal (kv 'gymPlan'). */
+/**
+ * Registros de gym {fecha: reg} + plan semanal.
+ * El plan vive en el PERFIL (profile.gymDays, rango "3-4"); si venís del plan
+ * viejo (kv 'gymPlan' con un número) se migra una sola vez al perfil.
+ */
 export async function cargarGym() {
-  const rows = await DB.kvAll();
+  const [rows, profile] = await Promise.all([DB.kvAll(), getProfile()]);
   const regs = {};
-  let plan = PLAN_DEF;
+  let viejo = 0;
   rows.forEach(r => {
     if (!r || typeof r.k !== 'string') return;
-    if (r.k === 'gymPlan') plan = Math.max(1, Math.min(7, Number(r.n) || PLAN_DEF));
+    if (r.k === 'gymPlan') viejo = Number(r.n) || 0;
     else if (r.k.slice(0, 4) === 'gym:' && /^\d{4}-\d{2}-\d{2}$/.test(r.k.slice(4))) regs[r.k.slice(4)] = r;
   });
+  let plan = profile && profile.gymDays ? String(profile.gymDays) : '';
+  if (plan && PLAN_RANGOS.indexOf(plan) < 0) plan = rangoDe(plan);
+  if (!plan) plan = viejo ? rangoDe(viejo) : PLAN_RANGO_DEF;
+  if (profile && profile.gymDays !== plan) await saveProfile(Object.assign({}, profile, { gymDays: plan }));
+  if (viejo) await DB.kvDel('gymPlan');       // migrado al perfil
   return { regs, plan };
 }
 
@@ -57,11 +86,12 @@ export async function cargarGym() {
  * Racha en DÍAS cumpliendo el plan, verificada cada día:
  * suma los días de gym de las semanas cerradas que cumplan el plan + los de la
  * semana en curso. La semana actual nunca la rompe (aún está en curso); solo
- * se pierde cuando una semana cierra POR DEBAJO del número del plan.
- * Así sigue contando día tras día, semana tras semana y mes a mes.
+ * se pierde cuando una semana cierra POR DEBAJO del mínimo del rango del plan
+ * (plan '3-4' → pierde solo si cierra con menos de 3). Acepta el rango
+ * ('3-4') o el mínimo directo (3), como el plan viejo.
  */
 export function calcRacha(regs, planN, hoy) {
-  const plan = Math.max(1, Math.min(7, Number(planN) || PLAN_DEF));
+  const plan = planMin(planN);
   const cuenta = lunesISO => {
     const d = new Date(lunesISO + 'T12:00:00');
     let n = 0;
@@ -104,6 +134,19 @@ export function lampsHTML(regs, hoy) {
     `<span class="lamp${x.ido ? ' on' : ''}${x.hoy ? ' hoy' : ''}" title="${esc(x.fecha)}${x.ido ? ' · gym' : ''}"><i>${L[x.dia]}</i></span>`).join('')}</div>`;
 }
 
+/* ===== Encendido de la racha: el guardado avisa y Hoy anima la llama ===== */
+let proximaIgnicion = false;
+
+/** Marca que la próxima tarjeta de Hoy debe encender la llama con animación. */
+export function marcarIgnicion() { proximaIgnicion = true; }
+
+/** La consume (una sola vez) quien muestre la tarjeta de racha. */
+export function consumeIgnicion() {
+  const v = proximaIgnicion;
+  proximaIgnicion = false;
+  return v;
+}
+
 /* ================= vista ================= */
 
 export async function render(root, args, query) {
@@ -137,9 +180,11 @@ export async function render(root, args, query) {
       <div class="gym-sec">
         <div class="gym-sec-title"><span class="gym-num">★</span> Mi plan: cuántos días por semana</div>
         <div class="chips" id="gy-plan">
-          ${[1, 2, 3, 4, 5, 6, 7].map(n => `<button type="button" class="chip ${n === plan ? 'active' : ''}" data-plan="${n}">${n} ${n === 1 ? 'día' : 'días'}</button>`).join('')}
+          ${PLAN_RANGOS.map(r => `<button type="button" class="chip ${r === plan ? 'active' : ''}" data-plan="${r}">${rangoLabel(r)}</button>`).join('')}
         </div>
-        <div class="hint">La racha se revisa <b>cada día</b>: no se pierde mientras sigas dentro de los días de tu plan (aguanta entre semanas y al cambiar de mes); <b>solo se pierde si una semana cierra por debajo de ese número</b>.</div>
+        <div class="hint">Se guarda en tu <b>perfil</b> (junto a Nivel de actividad) y vale en toda la app.
+          La racha se revisa <b>cada día</b>: no se pierde mientras sigas dentro del rango de tu plan (aguanta entre semanas y al cambiar de mes);
+          <b>solo se pierde si una semana cierra por debajo del mínimo</b> (con “3-4 días”, pierdes solo si cierras la semana con menos de 3).</div>
       </div>
       <div class="gym-sec">
         <div class="gym-sec-title"><span class="gym-num">7</span> Esta semana: lámparas por día</div>
@@ -236,10 +281,12 @@ export async function render(root, args, query) {
     const box = q('#gy-plan');
     if (!box) return;
     box.querySelectorAll('[data-plan]').forEach(b => b.onclick = async () => {
-      plan = Math.max(1, Math.min(7, Number(b.dataset.plan) || PLAN_DEF));
-      await DB.kvSet({ k: 'gymPlan', n: plan });
+      plan = PLAN_RANGOS.indexOf(b.dataset.plan) >= 0 ? b.dataset.plan : PLAN_RANGO_DEF;
+      const pr = (await getProfile()) || {};
+      pr.gymDays = plan;
+      await saveProfile(pr);                 // sincronizado con la vista de Perfil
       clic();
-      toast(`Plan: ${plan} ${plan === 1 ? 'día' : 'días'} por semana.`, 'ok');
+      toast(`Plan: ${rangoLabel(plan)} por semana (guardado en tu perfil).`, 'ok');
       q('#gy-racha').innerHTML = rachaHTML();
       bindPlan();
     });
@@ -287,6 +334,7 @@ export async function render(root, args, query) {
 
   q('#gy-save').onclick = async () => {
     // Se guarda SIEMPRE (también "No fui") para poder distinguirlo de "Sin registrar".
+    const antes = calcRacha(regs, plan, todayISO());
     await DB.kvSet({
       k: 'gym:' + date, date, ido: form.ido,
       horas: form.horas, musculos: form.musculos, cardio: form.cardio
@@ -295,7 +343,15 @@ export async function render(root, args, query) {
       const b = bonusGymKcal({ ido: 1, horas: form.horas, musculos: form.musculos, cardio: form.cardio }, peso);
       regs[date] = { ido: true, horas: form.horas, musculos: form.musculos, cardio: form.cardio };
       const r = calcRacha(regs, plan, todayISO());
-      toast(b > 0 ? `Gimnasio guardado: +${num(b)} kcal · racha de ${r.dias} ${r.dias === 1 ? 'día' : 'días'}.` : 'Gimnasio guardado.', 'ok');
+      if (r.dias > antes.dias) {
+        fuego();                          // sonido de fogata al encender/crecer la racha
+        marcarIgnicion();                 // Hoy anima el encendido de la llama
+        toast(antes.dias === 0
+          ? `Gimnasio guardado${b > 0 ? `: +${num(b)} kcal` : ''} · ¡racha encendida con ${r.dias} ${r.dias === 1 ? 'día' : 'días'}!`
+          : `Gimnasio guardado${b > 0 ? `: +${num(b)} kcal` : ''} · racha de ${r.dias} ${r.dias === 1 ? 'día' : 'días'}.`, 'ok');
+      } else {
+        toast(b > 0 ? `Gimnasio guardado: +${num(b)} kcal · racha de ${r.dias} ${r.dias === 1 ? 'día' : 'días'}.` : 'Gimnasio guardado.', 'ok');
+      }
     } else {
       toast('Gimnasio guardado: hoy no fuiste. La meta sigue igual.', 'ok');
     }

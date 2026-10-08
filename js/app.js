@@ -3,6 +3,7 @@
 import { getSettings, DB } from './db.js';
 import { toast } from './util.js';
 import { initSonidos, setSonidos } from './sound.js';
+import { initRecordatorios } from './notif.js';
 import { seedUsers, isAuthed } from './auth.js';
 import { icon } from './icons.js';
 import * as today from './views/today.js';
@@ -152,7 +153,7 @@ function setupNetwork() {
 /* ---------- Service worker (modo sin conexión) ---------- */
 /* Evita recargar mientras el usuario está escribiendo o con una hoja abierta. */
 function enFormulario() {
-  if (document.querySelector('.sheet-back')) return true;
+  if (document.querySelector('.sheet-back, .ov-back')) return true;
   const h = location.hash || '';
   if (/^#\/(nuevo|editar|gym)/.test(h)) return true;
   if (/^#\/registrar/.test(h)) {
@@ -223,6 +224,7 @@ async function init() {
   await DB.open();
   await applyTheme();
   initSonidos();
+  initRecordatorios();
   getSettings().then(s => setSonidos(s.sounds)).catch(() => {});
   setupInstall();
   setupNetwork();

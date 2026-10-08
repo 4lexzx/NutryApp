@@ -7,7 +7,7 @@ import { icon } from '../icons.js';
 import { computeTotals } from '../nutrition.js';
 import { esc, num, toast, todayISO, fmtLongDate, confirmSheet, openSheet, qtyTexto, uid } from '../util.js';
 import { newDraft } from '../editor.js';
-import { sugerirTipo, getDraft, setDraft } from './log.js';
+import { sugerirTipo, saveMeal } from './log.js';
 import { clic, check, licuar } from '../sound.js';
 
 const CAP = 700;          // ml de la licuadora (≈ g)
@@ -107,6 +107,39 @@ function aplicarDescripcion(draw) {
   draw();
 }
 
+/* ================= resumen flotante tras licuar ================= */
+function mostrarResumen(meal) {
+  const t = meal.totals || {};
+  const tipo = meal.type ? meal.type.charAt(0).toUpperCase() + meal.type.slice(1) : 'Almuerzo';
+  const n = (meal.items || []).length;
+  const back = document.createElement('div');
+  back.className = 'ov-back';
+  back.id = 'bt-overlay';
+  back.innerHTML = `
+    <div class="ov-card" role="dialog" aria-modal="true">
+      <div class="ov-ico">${icon('checkCircle')}</div>
+      <h3>Batido añadido a tu día</h3>
+      <p class="small muted" style="margin:4px 0 0">Guardado como <b>${esc(tipo)}</b> · ${esc(fmtLongDate(meal.date))}</p>
+      <div class="statgrid ov-stats">
+        <div class="stat kcal"><div class="v">${num(t.kcal)}</div><div class="k">kcal</div></div>
+        <div class="stat prot"><div class="v">${num(t.protein)}</div><div class="k">prot (g)</div></div>
+        <div class="stat carb"><div class="v">${num(t.carbs)}</div><div class="k">carb (g)</div></div>
+        <div class="stat gras"><div class="v">${num(t.fat)}</div><div class="k">gras (g)</div></div>
+      </div>
+      <p class="tiny muted">${n} ingrediente${n === 1 ? '' : 's'} · ${num(t.grams)} g${meal.note ? ' · con tu descripción' : ''}</p>
+      <div class="col" style="margin-top:14px">
+        <button class="btn btn-primary btn-block" id="bt-edit" type="button">${icon('pencil')} Editar plato</button>
+        <button class="btn btn-ghost btn-block" id="bt-ok" type="button">Listo</button>
+      </div>
+      <div class="hint" style="text-align:center">Si algo está mal, edítalo: se abre el plato tal cual lo guardaste.</div>
+    </div>`;
+  document.getElementById('modal-root').appendChild(back);
+  const cerrar = () => back.remove();
+  back.addEventListener('click', e => { if (e.target === back) cerrar(); });
+  back.querySelector('#bt-ok').onclick = cerrar;
+  back.querySelector('#bt-edit').onclick = () => { cerrar(); location.hash = `#/editar/${meal.id}`; };
+}
+
 /* ================= vista ================= */
 export async function render(root, args, query) {
   let date = (query && query.d) || (args && args[0]) || todayISO();
@@ -176,7 +209,7 @@ export async function render(root, args, query) {
         <button class="btn btn-primary btn-lg btn-block btn-licuar" id="bt-use" type="button" disabled>${icon('cup')} ¡Licuar!</button>
         <button class="btn btn-block" id="bt-clear" type="button" disabled>${icon('trash')} Vaciar licuadora</button>
       </div>
-      <div class="hint">Al licuar suena la licuadora y el batido se abre listo en el editor para guardarlo en tu día.</div>
+      <div class="hint">Al licuar se guarda el batido en tu día y ves un resumen con sus macros; después puedes editarlo desde ahí si quieres cambiar algo.</div>
     </div>
   `;
 
@@ -384,12 +417,9 @@ export async function render(root, args, query) {
   q('#bt-use').onclick = async () => {
     const items = itemsParaPlato();
     if (!items.length) return;
-    const prev = getDraft();
-    if (prev && prev.items && prev.items.length && !prev.id) {
-      const ok = await confirmSheet({ title: '¿Reemplazar el plato actual?', msg: `Ya tienes ${prev.items.length} ingrediente${prev.items.length === 1 ? '' : 's'} en el borrador. Se reemplazará por tu batido.`, okText: 'Reemplazar' });
-      if (!ok) return;
-    }
-    // ¡Licuar! → 1 s de sonido de licuadora + la licuadora licuando en pantalla
+    // ¡Licuar! → 1.3 s de sonido de licuadora + la licuadora licuando en pantalla.
+    // Al terminar el batido se GUARDA en el día (sin saltar al editor) y queda
+    // un resumen flotante con sus macros para verlo bien o editarlo después.
     const btn = q('#bt-use');
     const svg = q('#bt-svg');
     const txt0 = btn.innerHTML;
@@ -400,14 +430,18 @@ export async function render(root, args, query) {
     try { svg.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { /* si no se puede, sigue */ }
     await new Promise(r => setTimeout(r, 1300));
     svg.classList.remove('blending');
-    btn.innerHTML = txt0;
-    btn.disabled = false;
     const s = await sugerirTipo(date, items);
-    setDraft(newDraft({ date, type: s.type, name: 'Batido', source: 'batido', items, mult: 1, note: desc.trim().slice(0, 140), _hint: s.hint }));
+    const meal = await saveMeal(newDraft({
+      date, type: s.type, name: 'Batido', source: 'batido',
+      items, mult: 1, note: desc.trim().slice(0, 140)
+    }), { navegar: false });
     sel.clear();
     desc = '';
-    check();                              // "check" al añadirse a los platos
-    location.hash = '#/nuevo';
+    q('#bt-desc').value = '';
+    btn.innerHTML = txt0;
+    draw();                                  // licuadora vacía, botón queda deshabilitado
+    check();                                 // "check" al añadirse a tu día
+    mostrarResumen(meal);
   };
 
   draw();

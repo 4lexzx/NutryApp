@@ -3,7 +3,7 @@
 import { DB, getProfile, getSettings } from '../db.js';
 import { icon } from '../icons.js';
 import { calcTargets, computeTotals, bonusGymKcal } from '../nutrition.js';
-import { fmtHoras, MUSCULOS, CARDIO, cargarGym, calcRacha, lampsHTML } from './gym.js';
+import { fmtHoras, MUSCULOS, CARDIO, cargarGym, calcRacha, lampsHTML, consumeIgnicion } from './gym.js';
 import {
   todayISO, addDays, dayLabel, relDayTitle, fmtLongDate, TIPOS_COMIDA, ICONO_TIPO,
   esc, num, toast, confirmSheet, openSheet, fromISODate, DIAS
@@ -167,6 +167,7 @@ function gymCard(gym, date, bonus, gy) {
   const hoy = todayISO();
   const racha = calcRacha(gy.regs, gy.plan, hoy);
   const cumple = racha.estaSemana >= racha.plan;
+  const ignite = consumeIgnicion();        // la racha se acaba de encender: anima la llama
   const estado = gym && gym.ido ? 'si' : gym ? 'no' : null;
   const pills = etiquetasGym(gym || {}).map(l => `<span class="chip pill">${esc(l)}</span>`).join('');
   return `
@@ -179,7 +180,7 @@ function gymCard(gym, date, bonus, gy) {
       : `<span class="badge">Sin registrar</span>`}
     </div>
     <div class="gym-racha">
-      <span class="flame${racha.dias ? '' : ' off'}">${icon('flame')}</span>
+      <span class="flame${racha.dias ? '' : ' off'}${ignite ? ' ignite' : ''}">${icon('flame')}</span>
       <div class="gr-main">
         <b class="racha-line">Racha: ${racha.dias} ${racha.dias === 1 ? 'día' : 'días'}</b>
         <div class="tiny muted">${cumple ? 'Plan de esta semana cumplido ✓' : `Esta semana ${racha.estaSemana}/${racha.plan} · aún no pierdes la racha`}</div>

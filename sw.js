@@ -1,7 +1,7 @@
 /* Service worker: la app abre y funciona SIN internet (los datos están en IndexedDB).
    Solo las consultas a la IA necesitan red. */
 
-const CACHE = 'nutri-gym-v22';
+const CACHE = 'nutri-gym-v23';
 
 const PRECACHE = [
   './',
@@ -12,9 +12,11 @@ const PRECACHE = [
   './js/db.js',
   './js/util.js',
   './js/sound.js',
+  './js/notif.js',
   './sfx/click.wav',
   './sfx/check.wav',
   './sfx/licuar.wav',
+  './sfx/fuego.wav',
   './js/icons.js',
   './js/auth.js',
   './js/nutrition.js',
@@ -56,6 +58,18 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('message', e => {
   if (e.data === 'skipWaiting') self.skipWaiting();
+});
+
+/* Al tocar un recordatorio: cierra el aviso y abre/centra la app en Hoy. */
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const win = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of win) {
+      if ('focus' in c) { await c.focus(); if ('navigate' in c) await c.navigate('./#/hoy'); return; }
+    }
+    await clients.openWindow('./#/hoy');
+  })());
 });
 
 self.addEventListener('fetch', event => {

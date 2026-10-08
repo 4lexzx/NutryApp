@@ -293,10 +293,12 @@ se actualizan solos. Eliges el tipo de comida (desayuno/almuerzo/cena/snack) y *
   **ajusta (y agrega) los ingredientes que reconoce, en tu celular y sin IA**; el texto se guarda
   como nota del plato.
 - **➕ Ingrediente que no está**: si te falta algo lo agregas tú (nombre, gramos y kcal).
-- **🥤 ¡Licuar!**: el botón final dice **¡Licuar!** — al pulsarlo **suena la licuadora (1 s)** y la
+- **🥤 ¡Licuar!**: el botón final dice **¡Licuar!** — al pulsarlo **suena la licuadora (~1 s)** y la
   animación muestra la licuadora **licuando de verdad** (aspas girando, vaso vibrando, burbujas
-  subiendo) y al terminar el batido **se añade a los platos con el “check”** y se abre el editor
-  listo para guardar, **sin gastar IA**.
+  subiendo). Al terminar el batido **se guarda solo en tu día** (sin saltar al editor) y aparece un
+  **resumen flotante grande con kcal, proteína, carbos y grasas**; desde ahí puedes tocar
+  **“Editar plato”** (se abre tal cual lo guardaste) o **“Listo”** (sigues en la licuadora, lista
+  para otro batido). **Sin gastar IA.**
 - Si la IA se equivoca (por ejemplo la porción), corrígela: es lo esperado, es una **estimación**.
 - **✨ Re-analizar con la IA**: el botón aparece al editar una comida guardada **y también recién
   analizada** (por si te equivocaste al escribir un ingrediente: corrige el nombre y dale a
@@ -324,8 +326,10 @@ precisa. Pregunta por:
 
 Reglas:
 
-- **No pregunta** si el texto ya lo trae escrito (“leche de almendras”, “arroz integral”): eso no
-  se pregunta, solo lo que quedó ambiguo.
+- **No pregunta** si el texto ya lo trae escrito (“leche de almendras”, “arroz integral”,
+  **“pan pizza”**, “cachanga”…): eso no se pregunta, solo lo que quedó ambiguo (un “pan” a secas).
+  Si escribes un plato o pan con nombre propio, la IA lo toma **tal cual**, con receta del norte
+  (cachanga, pan de yema, pan bomba…), sin “¿qué tipo de pan?” de por medio.
 - Respondes con un toque, o **“Omitir (que la IA suponga)”**; también puedes cerrar la pregunta
   con la tecla Escape.
 - **Siempre pregunta de nuevo** si lo vuelves a omitir: ayer pudiste usar leche entera y hoy
@@ -404,14 +408,23 @@ decirte que lo dejaste manual.
   (peso × horas × intensidad MET) antes de guardar. Ese día tu **meta de kcal sube sola** ≈ *peso ×
   horas × intensidad* (sin peso en el perfil se estima a 250 kcal/h) y en la cabecera te avisa
   **“+X por gym”**. Se guarda por día, entra al respaldo y puedes editarlo para días pasados desde ‹ ›.
-- **🔥 Racha del gimnasio (con plan)**: defines tu **plan de días por semana** (1–7, por defecto 3)
-  y la app lleva una **racha en días** que sigue **día tras día, semana tras semana y mes a mes**,
-  pero **se verifica cada día**: no se pierde mientras sigas dentro de los días de tu plan (aguanta
-  entre semanas y al cambiar de mes) y **solo se pierde si una semana cierra por debajo de ese
-  número**. En la tarjeta de Hoy y en la vista de Gimnasio verás la **llama de la racha**
-  **encendida y animada** (gris/apagada cuando va en 0) y **7 lámparas por día de la semana**
+- **🔥 Racha del gimnasio (con plan)**: tu **plan de días por semana** vive en el **perfil**
+  (junto a Nivel de actividad, en rangos como **“3-4 días”**) y está **sincronizado en ambos
+  sentidos**: lo cambias en Gimnasio y se actualiza en Perfil, y al revés. La app lleva una
+  **racha en días** que sigue **día tras día, semana tras semana y mes a mes**, pero **se verifica
+  cada día**: no se pierde mientras sigas dentro del rango de tu plan (aguanta entre semanas y al
+  cambiar de mes) y **solo se pierde si una semana cierra por debajo del mínimo** (con “3-4 días”,
+  pierdes solo si cierras la semana con menos de 3). Cuando **guardas gym y la racha crece o se
+  enciende**, suena el **fuego 🔥 (sonido de fogata)** y en Hoy la **llama se enciende con una
+  animación de chispa** (gris/apagada cuando va en 0), junto a **7 lámparas por día de la semana**
   (L M X J V S D): **encendida** cuando ese día hubo gym y **gris mientras siga apagada hoy**,
   con el avance **“k de N días”** de la semana.
+- **⏰ Recordatorios de comidas** (Ajustes → Recordatorios): activas el permiso una vez y marcas
+  las horas que te sirven (**desayuno 08:00, almuerzo 13:00, cena 20:00**, combinables) y la app
+  te avisa **“¿Ya anotaste…?”** a esa hora (con botón de **Probar aviso**). Funciona en **Android
+  e iPhone** (PWA instalada en la pantalla de inicio, iOS 16.4+) mientras la app esté abierta o
+  en segundo plano; al tocar el aviso se abre **Hoy**. Todo se programa en tu celular, sin
+  servidores ni costo.
 
 ### Historial (📊)
 

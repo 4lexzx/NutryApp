@@ -7,8 +7,9 @@ import { testApiKey, modelOptions } from '../ai.js';
 import { esc, toast, confirmSheet, pickFile, downloadFile, todayISO, openSheet } from '../util.js';
 import { clearSession, currentUser } from '../auth.js';
 import { setSonidos, clic } from '../sound.js';
+import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, encenderRecordatorios } from '../notif.js';
 
-const VERSION = '1.2.7';
+const VERSION = '1.2.8';
 
 export async function render(root) {
   const s = await getSettings();
@@ -16,6 +17,17 @@ export async function render(root) {
   const summary = await backupSummary();
   const promptSaved = !!(await getPrompt());
   const nBase = await DB.count('platos').catch(() => 0);
+  const rem = (s.rem && typeof s.rem === 'object') ? s.rem : { on: false, ids: RECORDS_DEF.map(r => r.id) };
+  const remIds = Array.isArray(rem.ids) ? rem.ids : [];
+  const perm = ('Notification' in window) ? Notification.permission : 'unsupported';
+  const remActivo = perm === 'granted' && rem.on === true;
+  const remBadge = remActivo ? 'ok' : 'warn';
+  const remBadgeTxt = remActivo ? 'encendidos' : (perm === 'denied' ? 'bloqueados' : 'apagados');
+  const remEstado = remActivo
+    ? 'Te avisaremos en las horas marcadas mientras la app esté abierta o en segundo plano. Android: con la app instalada el aviso sigue saliendo en segundo plano. iPhone: instálala en la pantalla de inicio (iOS 16.4+) y ábrela al menos una vez.'
+    : perm === 'denied' ? 'El navegador bloqueó los avisos. Actívalos desde el candado/🔒 de la barra de direcciones (permisos del sitio) y vuelve aquí.'
+    : perm === 'unsupported' ? 'Este navegador no permite notificaciones.'
+    : 'Al activar, el navegador te pedirá permiso para mostrarte avisos.';
 
   root.innerHTML = `
     <h1>Ajustes</h1>
@@ -90,6 +102,21 @@ export async function render(root) {
       <label class="field"><span class="lbl">Vasos por día (1 vaso = 250 ml)</span>
         <input id="s-water" type="number" inputmode="numeric" min="0" max="30" value="${s.waterGoal}"></label>
       <button class="btn btn-sm btn-primary" id="s-water-save" type="button">Guardar meta de agua</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><h3>${icon('clock')} Recordatorios de comidas</h3>
+        <span class="badge ${remBadge}" id="s-rem-badge">${remBadgeTxt}</span></div>
+      <p class="small muted">Avisos para que no se te olvide anotar lo que comiste. Marca las horas que te sirven.</p>
+      <div class="chips" id="s-rem-chips">
+        ${RECORDS_DEF.map(r => `<button type="button" class="chip ${remIds.indexOf(r.id) >= 0 ? 'active' : ''}" data-rem="${r.id}">${r.l} · ${r.h}</button>`).join('')}
+      </div>
+      <div class="col" style="margin-top:12px">
+        <button class="btn ${remActivo ? '' : 'btn-primary'} ${remActivo ? 'btn-outline' : ''} btn-block" id="s-rem-on" type="button">
+          ${remActivo ? 'Desactivar recordatorios' : 'Activar recordatorios'}</button>
+        <button class="btn btn-block" id="s-rem-test" type="button">Probar aviso</button>
+      </div>
+      <div class="hint" id="s-rem-estado">${remEstado}</div>
     </div>
 
     <div class="card">
@@ -285,6 +312,44 @@ export async function render(root) {
     const v = Math.max(0, Math.min(30, parseInt(root.querySelector('#s-water').value, 10) || 0));
     await saveSettings({ waterGoal: v });
     toast(`Meta de agua: ${v} vasos.`, 'ok');
+  };
+
+  /* recordatorios */
+  root.querySelectorAll('[data-rem]').forEach(b => b.onclick = async () => {
+    const activo = !b.classList.contains('active');
+    b.classList.toggle('active', activo);
+    await guardarRecordatorio(b.dataset.rem, activo);
+    const r = RECORDS_DEF.find(x => x.id === b.dataset.rem);
+    toast(activo ? `${r.l} a las ${r.h}: recordatorio marcado.` : `${r.l}: recordatorio desmarcado.`, 'ok');
+  });
+  root.querySelector('#s-rem-on').onclick = async () => {
+    if (remActivo) {
+      await encenderRecordatorios(false);
+      toast('Recordatorios apagados.', 'ok');
+      render(root);
+      return;
+    }
+    const r = await pedirPermiso();
+    if (r === 'granted') {
+      await encenderRecordatorios(true);
+      toast('¡Recordatorios encendidos!', 'ok');
+    } else if (r === 'denied') {
+      toast('El navegador bloqueó los avisos: actívalos en los permisos del sitio.', 'warn');
+    } else {
+      toast('Este navegador no permite notificaciones.', 'warn');
+    }
+    render(root);
+  };
+  root.querySelector('#s-rem-test').onclick = async () => {
+    let r = ('Notification' in window) ? Notification.permission : null;
+    if (r !== 'granted') r = await pedirPermiso();
+    if (r === 'granted') {
+      const ok = await notificar('Aviso de prueba', 'Nutri Gym te recordará tus comidas a las horas que elijas.');
+      if (ok) toast('Aviso enviado: míralo en la barra de notificaciones.', 'ok');
+      render(root);
+    } else {
+      toast('Sin permiso de avisos todavía.', 'warn');
+    }
   };
 
   /* datos */
