@@ -40,7 +40,7 @@ export async function render(root, params) {
     return acc;
   }, { kcal: 0, p: 0, c: 0, f: 0, fi: 0 });
 
-  const waterG = (water && water.glasses) || 0;
+  let waterG = (water && water.glasses) || 0;
   const waterGoal = Number(settings.waterGoal) || 8;
 
   root.innerHTML = `
@@ -88,13 +88,13 @@ export async function render(root, params) {
     ${gymCard(gym, date, gymBonus, gy)}
 
     <div class="card">
-      <div class="card-title"><h3>${icon('droplet')} Agua</h3><span class="badge">${waterG}/${waterGoal} vasos</span></div>
+      <div class="card-title"><h3>${icon('droplet')} Agua</h3><span class="badge" id="w-badge">${waterG}/${waterGoal} vasos</span></div>
       <div class="water">
         <div class="water-glasses" id="glasses"></div>
       </div>
       <div class="water-ctrl">
         <button class="wbtn" id="w-less" type="button" aria-label="Quitar un vaso" ${waterG > 0 ? '' : 'disabled'}>−</button>
-        <span class="wcount">${waterG} <small>/ ${waterGoal} vasos</small></span>
+        <span class="wcount" id="wcount">${waterG} <small>/ ${waterGoal} vasos</small></span>
         <button class="wbtn wbtn-more" id="w-more" type="button" aria-label="Añadir un vaso">＋</button>
       </div>
       <div class="tiny muted" style="margin-top:8px">${waterGoal} vasos = ${num(250 * waterGoal / 1000, 2)} L al día (1 vaso = 250 ml · ajustable en Ajustes).</div>
@@ -147,7 +147,16 @@ export async function render(root, params) {
     if (subio) { aguaAnimIdx = v - 1; agua(); }   // sonido + animación solo al sumar
     if (v === 0) await DB.kvDel('water:' + date);
     else await DB.kvSet({ k: 'water:' + date, date, glasses: v });
-    render(root, [date]);
+    waterG = v;
+    /* actualizar SOLO la tarjeta de agua: redibujar toda la vista hace parpadear
+       las demás tarjetas (gym, macros, comidas). */
+    const badge = root.querySelector('#w-badge');
+    if (badge) badge.textContent = `${waterG}/${waterGoal} vasos`;
+    const wc = root.querySelector('#wcount');
+    if (wc) wc.innerHTML = `${waterG} <small>/ ${waterGoal} vasos</small>`;
+    const less = root.querySelector('#w-less');
+    if (less) less.disabled = waterG === 0;
+    drawGlasses();
   };
   root.querySelector('#w-more').onclick = () => setWater(waterG + 1);
   root.querySelector('#w-less').onclick = () => setWater(waterG - 1);

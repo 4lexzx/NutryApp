@@ -9,7 +9,7 @@ import { clearSession, currentUser } from '../auth.js';
 import { setSonidos, clic } from '../sound.js';
 import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe, guardarMotivacion, mensajeDelDia } from '../notif.js';
 
-const VERSION = '1.2.13';
+const VERSION = '1.2.14';
 let hAct = null;   // oyente del evento "hay actualización" (uno solo, sin duplicar)
 
 export async function render(root) {
