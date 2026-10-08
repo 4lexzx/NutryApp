@@ -143,9 +143,8 @@ h1 .ic, h2 .ic, h3 .ic, h4 .ic { width: 1.05em; height: 1.05em; color: var(--bra
 .brand { display: flex; align-items: center; gap: 10px; color: var(--txt); font-weight: 700; }
 .brand-mark {
   width: 30px; height: 30px; border-radius: 8px;
-  background: var(--brand); color: var(--brand-ink);
-  font-size: .76rem; font-weight: 800; letter-spacing: -.3px;
-  display: grid; place-items: center;
+  display: block; object-fit: cover;
+  box-shadow: 0 1px 4px rgba(0,0,0,.35);
 }
 .brand-name { font-size: 1.05rem; letter-spacing: -.02em; }
 .topbar-actions { display: flex; gap: 6px; }
@@ -750,6 +749,21 @@ code.codeblock {
 .bt-row { cursor: default; }
 .bt-row.on { background: color-mix(in srgb, var(--brand) 8%, transparent); }
 .bt-dot { width: 14px; height: 14px; border-radius: 4px; flex: none; display: inline-block; }
+.bt-tipos { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 0 12px 10px 42px; }
+.bt-tipos .chip {
+  min-height: 34px; padding: 6px 12px; font-size: .78rem; font-weight: 600;
+  background: var(--card-2); color: var(--txt-2); border: 1px solid var(--line);
+}
+.bt-tipos .chip.active { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 16%, var(--card-2)); color: var(--brand); }
+.rem-rows { display: flex; flex-direction: column; gap: 8px; }
+.rem-row { display: flex; align-items: center; gap: 10px; }
+.rem-row .chip { flex: 1; justify-content: center; min-height: 44px; }
+.rem-row input[type="time"] {
+  flex: none; width: 120px; min-height: 44px; padding: 0 8px;
+  background: var(--card-2); border: 1px solid var(--line); border-radius: 12px;
+  color: var(--txt); font-size: .95rem; font-weight: 700; text-align: center;
+}
+.rem-row input[type="time"]:focus { border-color: var(--brand); outline: none; }
 .qtybox { display: flex; align-items: center; gap: 6px; }
 .qtybox b { min-width: 26px; text-align: center; font-variant-numeric: tabular-nums; font-size: .9rem; }
 .qtybox .btn { min-width: 36px; padding: 0 8px; }

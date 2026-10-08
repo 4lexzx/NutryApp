@@ -181,7 +181,7 @@ export const DEFAULT_SETTINGS = {
   waterGoal: 8,
   sounds: true,
   disclaimerSeen: false,
-  rem: { on: false, ids: ['desayuno', 'almuerzo', 'cena'] }
+  rem: { on: false, ids: ['desayuno', 'almuerzo', 'cena'], hours: {} }
 };
 
 /* Modelos con muy pocas consultas gratuitas por día (~20): pasamos al -lite (~500/día). */

@@ -293,6 +293,11 @@ se actualizan solos. Eliges el tipo de comida (desayuno/almuerzo/cena/snack) y *
   **ajusta (y agrega) los ingredientes que reconoce, en tu celular y sin IA**; el texto se guarda
   como nota del plato.
 - **➕ Ingrediente que no está**: si te falta algo lo agregas tú (nombre, gramos y kcal).
+- **🥛 ¿Qué leche usas?**: debajo de “Leche” eliges el **tipo con un toque** — **Entera, Vaporada,
+  En polvo, Descremada o De almendras**. Cada una trae sus **macros propias** (por ejemplo, la en
+  polvo se cuenta **por cucharada de 10 g**, muy diferente a un medio vaso de entera); al cambiarla
+  **se conservan las porciones** que ya llevabas y el nombre del plato se guarda con el tipo
+  (“Leche en polvo”).
 - **🥤 ¡Licuar!**: el botón final dice **¡Licuar!** — al pulsarlo **suena la licuadora (~1 s)** y la
   animación muestra la licuadora **licuando de verdad** (aspas girando, vaso vibrando, burbujas
   subiendo). Al terminar el batido **se guarda solo en tu día** (sin saltar al editor) y aparece un
@@ -419,12 +424,13 @@ decirte que lo dejaste manual.
   animación de chispa** (gris/apagada cuando va en 0), junto a **7 lámparas por día de la semana**
   (L M X J V S D): **encendida** cuando ese día hubo gym y **gris mientras siga apagada hoy**,
   con el avance **“k de N días”** de la semana.
-- **⏰ Recordatorios de comidas** (Ajustes → Recordatorios): activas el permiso una vez y marcas
-  las horas que te sirven (**desayuno 08:00, almuerzo 13:00, cena 20:00**, combinables) y la app
-  te avisa **“¿Ya anotaste…?”** a esa hora (con botón de **Probar aviso**). Funciona en **Android
-  e iPhone** (PWA instalada en la pantalla de inicio, iOS 16.4+) mientras la app esté abierta o
-  en segundo plano; al tocar el aviso se abre **Hoy**. Todo se programa en tu celular, sin
-  servidores ni costo.
+- **⏰ Recordatorios de comidas** (Ajustes → Recordatorios): activas el permiso una vez, marcas
+  las comidas que te sirven y les pones **la hora que quieras** (por defecto **desayuno 08:00,
+  almuerzo 13:00 y cena 20:00**, cada una con su reloj editable). El aviso **“¿Ya anotaste…?”**
+  incluye **cuántas kcal y proteína llevas hoy** y **cuántas kcal te quedan** por registrar
+  (el botón **Probar aviso** muestra exactamente eso). Funciona en **Android e iPhone** (PWA
+  instalada en la pantalla de inicio, iOS 16.4+) mientras la app esté abierta o en segundo plano;
+  al tocar el aviso se abre **Hoy**. Todo se programa en tu celular, sin servidores ni costo.
 
 ### Historial (📊)
 

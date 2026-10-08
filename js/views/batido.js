@@ -18,7 +18,14 @@ const MARCAS = [200, 400, 600];   // marcas de ml del vaso
 
 /** Ingredientes del batido: unidad de medida, color de capa y macros por 100 g. */
 export const INGREDIENTES = [
-  { g: 'Base líquida', id: 'leche', n: 'Leche entera', p: 'Medio vaso (125 ml)', gr: 125, c: '#f4efe4', m: { k: 61, p: 3.2, c: 4.8, f: 3.3, fi: 0 }, al: ['leche'] },
+  { g: 'Base líquida', id: 'leche', n: 'Leche entera', p: 'Medio vaso (125 ml)', gr: 125, c: '#f4efe4', m: { k: 61, p: 3.2, c: 4.8, f: 3.3, fi: 0 }, al: ['leche'],
+    tipos: [
+      { id: 'entera', c: 'Entera', n: 'Leche entera', p: 'Medio vaso (125 ml)', gr: 125, m: { k: 61, p: 3.2, c: 4.8, f: 3.3, fi: 0 } },
+      { id: 'vaporada', c: 'Vaporada', n: 'Leche vaporada', p: 'Medio vaso (125 ml)', gr: 125, m: { k: 134, p: 6.8, c: 10, f: 7.6, fi: 0 } },
+      { id: 'polvo', c: 'En polvo', n: 'Leche en polvo', p: 'Cucharada (10 g)', gr: 10, m: { k: 496, p: 26.2, c: 38.4, f: 26.2, fi: 0 } },
+      { id: 'descremada', c: 'Descremada', n: 'Leche descremada', p: 'Medio vaso (125 ml)', gr: 125, m: { k: 34, p: 3.4, c: 5, f: 0.1, fi: 0 } },
+      { id: 'almendras', c: 'De almendras', n: 'Leche de almendras', p: 'Medio vaso (125 ml)', gr: 125, m: { k: 15, p: 0.6, c: 0.3, f: 1.2, fi: 0 } }
+    ] },
   { g: 'Base líquida', id: 'agua', n: 'Agua', p: 'Medio vaso (125 ml)', gr: 125, c: '#cfe9ff', m: { k: 0, p: 0, c: 0, f: 0, fi: 0 }, al: ['agua'] },
   { g: 'Base líquida', id: 'yogur', n: 'Yogur natural', p: 'Cucharada (20 g)', gr: 20, c: '#eef4ff', m: { k: 60, p: 3.5, c: 4.7, f: 3.3, fi: 0 }, spoon: 20, al: ['yogur', 'yogurt'] },
   { g: 'Base líquida', id: 'algarrobina', n: 'Algarrobina líquida', p: 'Cucharada (15 g)', gr: 15, c: '#8a5a2b', m: { k: 310, p: 1.5, c: 75, f: 0.5, fi: 0 }, spoon: 15, al: ['algarrobina'] },
@@ -33,12 +40,20 @@ export const INGREDIENTES = [
 ];
 
 let sel = new Map();     // id → gramos totales de ese ingrediente
+let tipoSel = new Map(); // id → tipo elegido (ej.: leche = 'polvo')
 let customs = [];        // ingredientes agregados a mano: { id, n, gr, m, c, al }
 let desc = '';           // descripción opcional (texto mientras se escribe)
 
-const byId = id => INGREDIENTES.find(i => i.id === id) || customs.find(i => i.id === id);
+const rawById = id => INGREDIENTES.find(i => i.id === id) || customs.find(i => i.id === id);
+/** Devuelve el ingrediente CON su tipo elegido (nombre, porción y macros del tipo). */
+const actIng = i => {
+  if (!i || !i.tipos || !i.tipos.length) return i;
+  const t = i.tipos.find(x => x.id === tipoSel.get(i.id)) || i.tipos[0];
+  return Object.assign({}, i, { n: t.n, p: t.p || i.p, gr: t.gr || i.gr, m: t.m });
+};
+const byId = id => actIng(rawById(id));
 const sinAcentos = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-const todoIng = () => INGREDIENTES.concat(customs);
+const todoIng = () => INGREDIENTES.concat(customs).map(actIng);
 const maxU = i => i.max || 10;
 const cantU = i => {
   const u = sel.get(i.id) || 0;
@@ -269,6 +284,15 @@ export async function render(root, args, query) {
     </div>`;
   };
 
+  const tiposHTML = i => {
+    if (!i.tipos || !i.tipos.length) return '';
+    const activo = tipoSel.get(i.id) || i.tipos[0].id;
+    return `<div class="bt-tipos" data-tipos="${i.id}">
+      <span class="tiny muted">Tipo:</span>
+      ${i.tipos.map(t => `<button type="button" class="chip ${activo === t.id ? 'active' : ''}" data-tipo="${i.id}:${t.id}">${esc(t.c)}</button>`).join('')}
+    </div>`;
+  };
+
   const drawPicker = () => {
     const orden = ['Base líquida', 'Sólidos', 'Opcionales'];
     const gruposVistos = {};
@@ -276,7 +300,7 @@ export async function render(root, args, query) {
     const claves = orden.filter(g => gruposVistos[g]).concat(Object.keys(gruposVistos).filter(g => orden.indexOf(g) < 0));
     q('#bt-groups').innerHTML = claves.map(g => `
       <div class="group-title">${esc(g)}</div>
-      ${gruposVistos[g].map(rowHTML).join('')}
+      ${gruposVistos[g].map(i => rowHTML(i) + tiposHTML(i)).join('')}
     `).join('');
     const items = itemsSeleccionados();
     const t = computeTotals(itemsParaPlato());
@@ -305,6 +329,18 @@ export async function render(root, args, query) {
       if (!i) return;
       const g = (sel.get(i.id) || 0) - i.gr;
       if (g <= 0.01) sel.delete(i.id); else sel.set(i.id, Math.round(g * 10) / 10);
+      clic();
+      draw();
+    });
+    q('#bt-picker').querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => {
+      const [id, tid] = b.dataset.tipo.split(':');
+      const raw = rawById(id);
+      if (!raw || !raw.tipos) return;
+      const antes = actIng(raw);
+      const cu = cantU(antes);               // porciones que ya tienes: se conservan
+      tipoSel.set(id, tid);
+      const desp = actIng(raw);
+      if (sel.has(id) && cu > 0) sel.set(id, Math.min(Math.round(desp.gr * cu * 10) / 10, maxU(desp) * desp.gr));
       clic();
       draw();
     });

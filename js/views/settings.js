@@ -7,9 +7,9 @@ import { testApiKey, modelOptions } from '../ai.js';
 import { esc, toast, confirmSheet, pickFile, downloadFile, todayISO, openSheet } from '../util.js';
 import { clearSession, currentUser } from '../auth.js';
 import { setSonidos, clic } from '../sound.js';
-import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, encenderRecordatorios } from '../notif.js';
+import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe } from '../notif.js';
 
-const VERSION = '1.2.8';
+const VERSION = '1.2.9';
 
 export async function render(root) {
   const s = await getSettings();
@@ -107,9 +107,14 @@ export async function render(root) {
     <div class="card">
       <div class="card-title"><h3>${icon('clock')} Recordatorios de comidas</h3>
         <span class="badge ${remBadge}" id="s-rem-badge">${remBadgeTxt}</span></div>
-      <p class="small muted">Avisos para que no se te olvide anotar lo que comiste. Marca las horas que te sirven.</p>
-      <div class="chips" id="s-rem-chips">
-        ${RECORDS_DEF.map(r => `<button type="button" class="chip ${remIds.indexOf(r.id) >= 0 ? 'active' : ''}" data-rem="${r.id}">${r.l} · ${r.h}</button>`).join('')}
+      <p class="small muted">Avisos para que no se te olvide anotar lo que comiste. Marca las comidas y
+        ponles la hora que quieras; el aviso te muestra cuántas kcal y proteína llevas hoy.</p>
+      <div class="rem-rows" id="s-rem-chips">
+        ${RECORDS_DEF.map(r => `
+        <div class="rem-row">
+          <button type="button" class="chip ${remIds.indexOf(r.id) >= 0 ? 'active' : ''}" data-rem="${r.id}">${r.l}</button>
+          <input type="time" data-remh="${r.id}" value="${horaDe({ rem }, r.id)}" aria-label="Hora del recordatorio de ${r.l}">
+        </div>`).join('')}
       </div>
       <div class="col" style="margin-top:12px">
         <button class="btn ${remActivo ? '' : 'btn-primary'} ${remActivo ? 'btn-outline' : ''} btn-block" id="s-rem-on" type="button">
@@ -320,7 +325,13 @@ export async function render(root) {
     b.classList.toggle('active', activo);
     await guardarRecordatorio(b.dataset.rem, activo);
     const r = RECORDS_DEF.find(x => x.id === b.dataset.rem);
-    toast(activo ? `${r.l} a las ${r.h}: recordatorio marcado.` : `${r.l}: recordatorio desmarcado.`, 'ok');
+    toast(activo ? `${r.l}: recordatorio marcado.` : `${r.l}: recordatorio desmarcado.`, 'ok');
+  });
+  root.querySelectorAll('[data-remh]').forEach(inp => inp.onchange = async () => {
+    const ok = await guardarHoraRecordatorio(inp.dataset.remh, inp.value);
+    if (!ok) { toast('Esa hora no es válida.', 'warn'); return; }
+    const r = RECORDS_DEF.find(x => x.id === inp.dataset.remh);
+    toast(`${r.l}: te avisaré a las ${inp.value}.`, 'ok');
   });
   root.querySelector('#s-rem-on').onclick = async () => {
     if (remActivo) {
@@ -344,7 +355,8 @@ export async function render(root) {
     let r = ('Notification' in window) ? Notification.permission : null;
     if (r !== 'granted') r = await pedirPermiso();
     if (r === 'granted') {
-      const ok = await notificar('Aviso de prueba', 'Nutri Gym te recordará tus comidas a las horas que elijas.');
+      const cuerpo = await cuerpoMacros();
+      const ok = await notificar('Aviso de prueba', cuerpo);
       if (ok) toast('Aviso enviado: míralo en la barra de notificaciones.', 'ok');
       render(root);
     } else {

@@ -3,8 +3,9 @@
    (PWA instalada en la pantalla de inicio, iOS 16.4+). Sin servidores: todo
    se programa y dispara desde el propio celular. */
 
-import { getSettings, saveSettings } from './db.js';
-import { todayISO, toast } from './util.js';
+import { getSettings, saveSettings, getProfile, DB } from './db.js';
+import { todayISO, toast, num } from './util.js';
+import { calcTargets } from './nutrition.js';
 
 /** Horarios de comida disponibles (se pueden combinar a gusto). */
 export const RECORDS_DEF = [
@@ -14,6 +15,13 @@ export const RECORDS_DEF = [
 ];
 
 const VENTANA_MIN = 15;   // margen: si la app se abrió a los pocos minutos, igual avisa
+
+/** Hora elegida para un recordatorio (la del ajuste, o la del horario por defecto). */
+export function horaDe(s, id) {
+  const def = RECORDS_DEF.find(r => r.id === id);
+  const h = s && s.rem && s.rem.hours && s.rem.hours[id];
+  return /^\d{2}:\d{2}$/.test(h || '') ? h : (def ? def.h : '08:00');
+}
 
 /** ¿Está la hora actual dentro de la ventana [horario, horario + margen]? */
 export function enVentana(hhmm, horario, ventanaMin = VENTANA_MIN) {
@@ -62,6 +70,28 @@ export async function pedirPermiso() {
 
 const yaAviso = new Set();   // 'id:fecha' ya avisado en esta sesión
 
+/** Texto del aviso con lo que llevas hoy de kcal y proteína (vs tus metas). */
+export async function cuerpoMacros() {
+  try {
+    const p = await getProfile();
+    const t = calcTargets(p);
+    const meta = (p && p.targets && p.targets.kcal) ? Number(p.targets.kcal) : t.kcal;
+    const meals = await DB.all('meals');
+    let k = 0, pr = 0;
+    for (const m of meals) {
+      if (m.date !== todayISO()) continue;
+      const tt = m.totals || {};
+      k += Number(tt.kcal) || 0;
+      pr += Number(tt.protein) || 0;
+    }
+    const falta = Math.max(0, Math.round(meta - k));
+    const base = `Hoy llevas ${num(k)} de ${num(meta)} kcal y ${num(pr)} de ${num(t.protein)} g de proteína.`;
+    return falta > 0 ? `${base} Te quedan ${num(falta)} kcal.` : `${base} ¡Metas cumplidas!`;
+  } catch (e) {
+    return 'Registra lo que comiste para llevar el conteo del día.';
+  }
+}
+
 async function tick() {
   try {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
@@ -74,11 +104,12 @@ async function tick() {
     const fecha = todayISO();
     for (const r of RECORDS_DEF) {
       if (ids.indexOf(r.id) < 0) continue;
-      if (!enVentana(hhmm, r.h)) continue;
+      if (!enVentana(hhmm, horaDe(s, r.id))) continue;
       const key = r.id + ':' + fecha;
       if (yaAviso.has(key)) continue;
       yaAviso.add(key);
-      notificar(`¿Ya anotaste ${r.l.toLowerCase()}?`, 'Abre Nutri Gym y regístralo en segundos.');
+      const cuerpo = await cuerpoMacros();
+      notificar(`¿Ya anotaste ${r.l.toLowerCase()}?`, cuerpo);
     }
   } catch (e) { /* un recordatorio jamás debe romper la app */ }
 }
@@ -103,6 +134,19 @@ export async function guardarRecordatorio(id, activo) {
   if (!activo && i >= 0) ids.splice(i, 1);
   rem.ids = ids;
   rem.on = rem.on === true;      // los chips no encienden solos: eso es del botón
+  await saveSettings({ rem });
+  return rem;
+}
+
+/** Guarda la hora elegida para un recordatorio (formato "HH:MM"). */
+export async function guardarHoraRecordatorio(id, hhmm) {
+  if (!/^\d{2}:\d{2}$/.test(hhmm || '')) return null;
+  const s = await getSettings();
+  const rem = s.rem && typeof s.rem === 'object' ? Object.assign({}, s.rem) : {};
+  const hours = rem.hours && typeof rem.hours === 'object' ? Object.assign({}, rem.hours) : {};
+  hours[id] = hhmm;
+  rem.hours = hours;
+  rem.on = rem.on === true;
   await saveSettings({ rem });
   return rem;
 }
