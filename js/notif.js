@@ -40,7 +40,7 @@ export function enVentana(hhmm, horario, ventanaMin = VENTANA_MIN) {
 export async function notificar(titulo, cuerpo) {
   const opts = {
     body: cuerpo,
-    icon: './icons/icon-512.png',       // icono grande a color (el logo completo)
+    icon: './icons/icon-512-v2.png',    // icono grande a color (el logo completo)
     badge: './icons/notif-badge.png',   // silueta blanca: en la barra se ve el logo, no un cuadrado
     tag: 'nutri-rem',
     renotify: true
@@ -109,7 +109,7 @@ async function tick() {
       if (yaAviso.has(key)) continue;
       yaAviso.add(key);
       const cuerpo = await cuerpoMacros();
-      notificar(`¿Ya anotaste ${r.l.toLowerCase()}?`, cuerpo);
+      notificar('NutriGym', `¿Ya anotaste ${r.l.toLowerCase()}? ${cuerpo}`);
     }
   } catch (e) { /* un recordatorio jamás debe romper la app */ }
 }

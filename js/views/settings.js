@@ -9,7 +9,7 @@ import { clearSession, currentUser } from '../auth.js';
 import { setSonidos, clic } from '../sound.js';
 import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe } from '../notif.js';
 
-const VERSION = '1.2.10';
+const VERSION = '1.2.11';
 
 export async function render(root) {
   const s = await getSettings();
@@ -356,7 +356,7 @@ export async function render(root) {
     if (r !== 'granted') r = await pedirPermiso();
     if (r === 'granted') {
       const cuerpo = await cuerpoMacros();
-      const ok = await notificar('Aviso de prueba', cuerpo);
+      const ok = await notificar('NutriGym', cuerpo);
       if (ok) toast('Aviso enviado: míralo en la barra de notificaciones.', 'ok');
       render(root);
     } else {

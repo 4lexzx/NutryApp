@@ -428,9 +428,10 @@ decirte que lo dejaste manual.
    con el avance **“k de N días”** de la semana.
 - **⏰ Recordatorios de comidas** (Ajustes → Recordatorios): activas el permiso una vez, marcas
   las comidas que te sirven y les pones **la hora que quieras** (por defecto **desayuno 08:00,
-  almuerzo 13:00 y cena 20:00**, cada una con su reloj editable). El aviso **“¿Ya anotaste…?”**
-  incluye **cuántas kcal y proteína llevas hoy** y **cuántas kcal te quedan** por registrar
-  (el botón **Probar aviso** muestra exactamente eso) y sale con **el logo de la app** (icono
+  almuerzo 13:00 y cena 20:00**, cada una con su reloj editable). El aviso se titula **NutriGym**
+  (solo el nombre de la app) y el cuerpo pregunta **“¿Ya anotaste…?”** con **cuántas kcal y
+  proteína llevas hoy** y **cuántas kcal te quedan** por registrar (el botón **Probar aviso**
+  muestra exactamente eso) y sale con **el logo de la app** (icono
   grande a color y la silueta del logo en la barra: nada de cuadrados). Funciona en **Android e
   iPhone** (PWA
   instalada en la pantalla de inicio, iOS 16.4+) mientras la app esté abierta o en segundo plano;
