@@ -2,12 +2,16 @@
 
 import { DB, getProfile, getSettings } from '../db.js';
 import { icon } from '../icons.js';
+import { agua } from '../sound.js';
 import { calcTargets, computeTotals, bonusGymKcal } from '../nutrition.js';
 import { fmtHoras, MUSCULOS, CARDIO, cargarGym, calcRacha, lampsHTML, consumeIgnicion } from './gym.js';
 import {
   todayISO, addDays, dayLabel, relDayTitle, fmtLongDate, TIPOS_COMIDA, ICONO_TIPO,
   esc, num, toast, confirmSheet, openSheet, fromISODate, DIAS
 } from '../util.js';
+
+/* Vaso que acaba de llenarse: se anima aunque la vista se redibuje. */
+let aguaAnimIdx = -1;
 
 export async function render(root, params) {
   let date = params && params[0] ? params[0] : todayISO();
@@ -81,20 +85,17 @@ export async function render(root, params) {
 
     <div class="disclaimer"><span>${icon('alert')}</span><span>Los valores son <b>estimaciones</b> (IA + tabla de referencia), no mediciones exactas.</span></div>
 
-    <div class="hero-actions">
-      <a class="btn btn-primary btn-lg btn-block" href="#/registrar?d=${date}">${icon('camera')} Registrar comida</a>
-    </div>
-
     ${gymCard(gym, date, gymBonus, gy)}
 
     <div class="card">
       <div class="card-title"><h3>${icon('droplet')} Agua</h3><span class="badge">${waterG}/${waterGoal} vasos</span></div>
       <div class="water">
         <div class="water-glasses" id="glasses"></div>
-        <div class="stack" style="flex:none">
-          <button class="btn btn-sm" id="w-more" type="button">＋</button>
-          <button class="btn btn-sm btn-ghost" id="w-less" type="button">−</button>
-        </div>
+      </div>
+      <div class="water-ctrl">
+        <button class="wbtn" id="w-less" type="button" aria-label="Quitar un vaso" ${waterG > 0 ? '' : 'disabled'}>−</button>
+        <span class="wcount">${waterG} <small>/ ${waterGoal} vasos</small></span>
+        <button class="wbtn wbtn-more" id="w-more" type="button" aria-label="Añadir un vaso">＋</button>
       </div>
       <div class="tiny muted" style="margin-top:8px">${waterGoal} vasos = ${num(250 * waterGoal / 1000, 2)} L al día (1 vaso = 250 ml · ajustable en Ajustes).</div>
     </div>
@@ -125,11 +126,25 @@ export async function render(root, params) {
   // agua
   const gl = root.querySelector('#glasses');
   const drawGlasses = () => {
-    gl.innerHTML = Array.from({ length: waterGoal }, (_, i) => `<div class="glass ${i < waterG ? 'full' : ''}"></div>`).join('');
+    const CILINDRO = 'M7.1 4.4h9.8l-1.2 15.3a1.8 1.8 0 0 1-1.8 1.7H10.1a1.8 1.8 0 0 1-1.8-1.7z';
+    gl.innerHTML = Array.from({ length: waterGoal }, (_, i) => {
+      const full = i < waterG;
+      const just = i === aguaAnimIdx && full;
+      return `<svg class="glass${full ? ' full' : ''}${just ? ' anim' : ''}" data-g="${i}" viewBox="0 0 24 24" role="img" aria-label="Vaso ${i + 1}${full ? ' (lleno)' : ''}">
+        <defs><clipPath id="gc${i}"><path d="${CILINDRO}"/></clipPath></defs>
+        ${full ? `<rect class="liq" x="6.5" y="5.6" width="11" height="14.8" clip-path="url(#gc${i})"/>` : ''}
+        <path class="rim" d="${CILINDRO}"/>
+        <path class="lip" d="M6.5 4.4h11"/>
+      </svg>`;
+    }).join('');
+    aguaAnimIdx = -1;
   };
   drawGlasses();
   const setWater = async v => {
     v = Math.max(0, Math.min(30, v));
+    if (v === waterG) return;
+    const subio = v > waterG;
+    if (subio) { aguaAnimIdx = v - 1; agua(); }   // sonido + animación solo al sumar
     if (v === 0) await DB.kvDel('water:' + date);
     else await DB.kvSet({ k: 'water:' + date, date, glasses: v });
     render(root, [date]);
@@ -137,9 +152,11 @@ export async function render(root, params) {
   root.querySelector('#w-more').onclick = () => setWater(waterG + 1);
   root.querySelector('#w-less').onclick = () => setWater(waterG - 1);
   gl.onclick = e => {
-    const all = Array.from(gl.children);
-    const idx = all.indexOf(e.target);
-    if (idx >= 0) setWater(idx + 1 === waterG ? idx : idx + 1);
+    const g = e.target && e.target.closest ? e.target.closest('[data-g]') : null;
+    if (!g) return;
+    const idx = Number(g.dataset.g);
+    if (!Number.isFinite(idx)) return;
+    setWater(idx + 1 === waterG ? idx : idx + 1);
   };
 
   // acciones de comidas

@@ -10,7 +10,8 @@ import {
   TIPOS_COMIDA, ICONO_TIPO, fmtLongDate, uid, debounce, elegirTipo, faltanPorHora, qtyTexto
 } from '../util.js';
 
-const state = { draft: null, tab: 'foto', photo: null, desc: '', date: todayISO() };
+const state = { draft: null, tab: 'foto', photos: [], desc: '', date: todayISO() };
+const MAX_FOTOS = 4;   // fotos por análisis (se analizan una por una y se juntan)
 const viewRoot = () => document.getElementById('view');
 
 /** Acceso al borrador actual desde otras vistas (ej. Arma tu batido). */
@@ -63,21 +64,39 @@ export async function renderStart(root, args, query) {
   else await renderFavoritos(body, date, favorites);
 }
 
+/** Añade una foto a la cola del análisis (con tope y sin repetir la misma). */
+function addFoto(dataUrl) {
+  if (state.photos.length >= MAX_FOTOS) {
+    toast(`Máximo ${MAX_FOTOS} fotos por análisis. Quita una si quieres agregar otra.`, 'warn');
+    return false;
+  }
+  if (state.photos.indexOf(dataUrl) >= 0) {
+    toast('Esa foto ya está en la lista.', 'warn');
+    return false;
+  }
+  state.photos.push(dataUrl);
+  return true;
+}
+
 function renderFoto(body, date, hasKey) {
+  const n = state.photos.length;
   body.innerHTML = `
     <div class="card">
-      <div class="card-title"><h3>${icon('camera')} Foto del plato</h3>${state.photo ? '<span class="badge ok">Foto lista</span>' : ''}</div>
+      <div class="card-title"><h3>${icon('camera')} Fotos del plato</h3>${n ? `<span class="badge ok">${n} foto${n === 1 ? '' : 's'} lista${n === 1 ? '' : 's'}</span>` : ''}</div>
       <div class="grid2" style="margin-bottom:10px">
         <button class="btn btn-lg btn-primary" id="f-shot" type="button">${icon('camera')} Tomar foto</button>
-        <button class="btn btn-lg" id="f-gal" type="button">${icon('image')} Galería</button>
+        <button class="btn btn-lg" id="f-gal" type="button">${icon('image')} ${n ? 'Añadir foto' : 'Galería'}</button>
       </div>
-      ${state.photo ? `<img class="photo-preview" src="${state.photo}" alt="Plato">` :
-      `<div class="empty" style="padding:22px 12px"><span class="ico">${icon('utensils')}</span><span class="small">Sube una foto o escribe el plato abajo</span></div>`}
+      ${n ? `<div class="photo-grid">${state.photos.map((p, i) => `
+        <div class="ph"><img src="${p}" alt="Foto ${i + 1}">
+          <button class="ph-x" data-ph-del="${i}" type="button" aria-label="Quitar foto ${i + 1}">✕</button></div>`).join('')}</div>`
+      : `<div class="empty" style="padding:22px 12px"><span class="ico">${icon('utensils')}</span><span class="small">Sube una o más fotos, o escribe el plato abajo</span></div>`}
       <label class="field" style="margin-top:12px"><span class="lbl">Descripción opcional (mejora la precisión)</span>
         <textarea id="f-desc" rows="2" placeholder="Ej. almuerzo de gimnasio, con poco arroz y doble presa de pollo">${esc(state.desc)}</textarea></label>
-      <button class="btn btn-accent btn-lg btn-block" id="f-go" type="button">${icon('sparkles')} Analizar con la IA</button>
+      <button class="btn btn-accent btn-lg btn-block" id="f-go" type="button">${icon('sparkles')} Analizar con la IA${n > 1 ? ` (${n} fotos)` : ''}</button>
       ${!hasKey ? `<div class="hint">Necesitas tu API key: <a href="#/ajustes">Ajustes → IA</a>.</div>` : ''}
-      <div class="hint">La foto se envía <b>solo</b> a Google Gemini para el análisis; no se sube a ningún otro servidor.</div>
+      ${n > 1 ? `<div class="hint">Se analizará foto por foto y todo se junta en un solo plato (nombres, ingredientes y totales).</div>` : ''}
+      <div class="hint">Las fotos se envían <b>solo</b> a Google Gemini para el análisis; no se suben a ningún otro servidor.</div>
     </div>
     <div class="hero-actions">
       <button class="btn btn-block" id="f-manual" type="button">${icon('pencil')} Escribir / ingresar a mano</button>
@@ -88,6 +107,10 @@ function renderFoto(body, date, hasKey) {
   body.querySelector('#f-gal').onclick = () => pickPhoto(false, body, date, hasKey);
   body.querySelector('#f-go').onclick = () => runAI({ date, hasKey, usePhoto: true });
   body.querySelector('#f-manual').onclick = () => { state.tab = 'manual'; renderStart(viewRoot(), [], { d: date }); };
+  body.querySelectorAll('[data-ph-del]').forEach(b => b.onclick = () => {
+    const i = Number(b.dataset.phDel);
+    if (Number.isFinite(i)) { state.photos.splice(i, 1); renderStart(viewRoot(), [], { d: date }); }
+  });
 }
 
 function renderTexto(body, date, hasKey) {
@@ -274,9 +297,9 @@ function abrirCamara(date) {
       canvas.height = Math.round(h * r);
       canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
       const raw = canvas.toDataURL('image/jpeg', 0.86);
-      state.photo = await resizeImage(raw, 1024, 0.78);
+      const ok = addFoto(await resizeImage(raw, 1024, 0.78));
       cerrar();
-      toast('Foto lista.', 'ok');
+      if (ok) toast('Foto lista.', 'ok');
       renderStart(viewRoot(), [], { d: date });
     } catch (e) {
       snap.disabled = false;
@@ -302,6 +325,7 @@ function pickPhoto(capture, body, date, hasKey) {
   if (pickerPendiente) pickerPendiente.cerrar();
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*';
+  if (!capture) input.multiple = true;          // la galería puede elegir varias a la vez
   if (capture) input.capture = 'environment';
   input.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0';
 
@@ -313,18 +337,21 @@ function pickPhoto(capture, body, date, hasKey) {
   };
   const procesar = async () => {
     if (procesado) return;
-    const f = input.files && input.files[0];
-    if (!f) return;
+    const files = input.files ? Array.from(input.files) : [];
+    if (!files.length) return;
     procesado = true;
     cerrar();
+    let ok = 0;
     try {
-      const raw = await fileToDataURL(f);
-      state.photo = await resizeImage(raw, 1024, 0.78);
-      toast('Foto lista.', 'ok');
+      for (const f of files) {
+        const raw = await fileToDataURL(f);
+        if (addFoto(await resizeImage(raw, 1024, 0.78))) ok++;
+      }
     } catch (e) {
-      toast('No se pudo leer la imagen.', 'err');
+      toast('No se pudo leer alguna imagen.', 'err');
       return;
     }
+    if (ok) toast('Foto lista.', 'ok');
     renderStart(viewRoot(), [], { d: date });
   };
   input.addEventListener('change', procesar);
@@ -413,6 +440,52 @@ function anexarAclaraciones(desc, aclar) {
   return `${desc}. Aclaración del usuario: ${partes.join('; ')}.`;
 }
 
+/**
+ * Junta los resultados de varias fotos en UN solo plato:
+ * nombres ("pan + café con leche"), ingredientes (los iguales se suman),
+ * supuestos combinados y confianza (la más baja).
+ */
+function fusionarFotos(rs) {
+  if (!rs || !rs.length) throw new Error('No se analizó ninguna foto.');
+  if (rs.length === 1) return rs[0];
+
+  const nombres = [];
+  for (const r of rs) {
+    const nm = String(r.name || '').trim();
+    if (!nm) continue;
+    const k = claveConsulta(nm);
+    if (!nombres.some(x => x.k === k)) nombres.push({ k, nm });
+  }
+  const name = nombres.map(x => x.nm).join(' + ').slice(0, 80) || 'Varios alimentos';
+
+  const items = [];
+  for (const r of rs) {
+    for (const it of (r.items || [])) {
+      const k = claveConsulta(it.nombre);
+      const dup = k && items.find(x => x.__k === k);
+      if (dup) {
+        dup.gramos = (Number(dup.gramos) || 0) + (Number(it.gramos) || 0);   // macros: per100 × gramos
+        if (it.nota && !dup.nota) dup.nota = it.nota;
+      } else {
+        items.push({ ...it, __k: k || items.length });
+      }
+    }
+  }
+  items.forEach(it => { delete it.__k; });
+
+  const comments = rs.map(r => String(r.comment || '').trim()).filter(Boolean);
+  const supuestos = [];
+  for (const r of rs) for (const s of (r.supuestos || [])) if (supuestos.indexOf(s) < 0) supuestos.push(s);
+  const conf = rs.reduce((m, r) => Math.min(m, Number(r.confianza) || 1), 1);
+
+  return {
+    name, items,
+    comment: comments.join(' · ').slice(0, 200),
+    supuestos,
+    confianza: conf
+  };
+}
+
 async function runAI({ date, hasKey, usePhoto }) {
   const root = viewRoot();
   const body = root.querySelector('#lg-body');
@@ -424,7 +497,7 @@ async function runAI({ date, hasKey, usePhoto }) {
     location.hash = '#/ajustes';
     return;
   }
-  if (usePhoto && !state.photo) { toast('Toma o elige una foto primero (o usa la pestaña Texto).', 'warn'); return; }
+  if (usePhoto && !state.photos.length) { toast('Toma o elige una foto primero (o usa la pestaña Texto).', 'warn'); return; }
   if (!usePhoto && !state.desc.trim()) { toast('Escribe qué comiste primero.', 'warn'); return; }
 
   const desc = (state.desc || '').trim();
@@ -452,12 +525,14 @@ async function runAI({ date, hasKey, usePhoto }) {
     }
   }
 
+  const nFotos = state.photos.length;
   body.innerHTML = `
     <div class="card loading-block">
       <div class="spinner"></div>
       <b>Analizando con Gemini…</b>
-      <p class="small muted">Esto puede tardar entre 5 y 25 segundos.<br>
-      ${state.photo && usePhoto ? 'Enviando foto' : 'Enviando descripción'} + tus instrucciones de IA.</p>
+      <p class="small muted">${nFotos > 1 ? `<b id="ai-prog">Foto 1 de ${nFotos}: analizando…</b><br>` : ''}
+      Estos pasos pueden tardar entre 5 y 25 segundos.<br>
+      ${usePhoto ? `Enviando ${nFotos} foto${nFotos === 1 ? '' : 's'} + tus instrucciones de IA` : 'Enviando descripción + tus instrucciones de IA'}.</p>
       <button class="btn btn-ghost btn-sm" id="ai-cancel" type="button">Cancelar</button>
     </div>`;
 
@@ -466,15 +541,39 @@ async function runAI({ date, hasKey, usePhoto }) {
 
   try {
     const prompt = (await getPrompt()) || DEFAULT_PROMPT;
-    const res = await analyzeMeal({
-      imageDataUrl: usePhoto ? state.photo : null,
-      description: descFinal,
-      prompt,
-      apiKey: settings.apiKey,
-      model: settings.model,
-      mult: plan.mult,
-      multLocal: plan.local
-    });
+    const photos = state.photos.slice();
+    let res;
+    if (usePhoto) {
+      // varias fotos → cada una se analiza SOLO (una llamada por foto) y al final se juntan
+      const rs = [];
+      for (let i = 0; i < photos.length; i++) {
+        if (cancelled) return;
+        if (photos.length > 1) {
+          const prog = body.querySelector('#ai-prog');
+          if (prog) prog.textContent = `Foto ${i + 1} de ${photos.length}: analizando…`;
+        }
+        rs.push(await analyzeMeal({
+          imageDataUrl: photos[i],
+          description: i === 0 ? descFinal : '',
+          prompt,
+          apiKey: settings.apiKey,
+          model: settings.model,
+          mult: plan.mult,
+          multLocal: plan.local
+        }));
+      }
+      res = fusionarFotos(rs);
+    } else {
+      res = await analyzeMeal({
+        imageDataUrl: null,
+        description: descFinal,
+        prompt,
+        apiKey: settings.apiKey,
+        model: settings.model,
+        mult: plan.mult,
+        multLocal: plan.local
+      });
+    }
     if (cancelled) return;
 
     // 2) lo aprendido queda guardado en la base local para no repetir la consulta
@@ -494,13 +593,15 @@ async function runAI({ date, hasKey, usePhoto }) {
 
     await montarDraftIA({
       date, name: res.name, source: 'ia', items: res.items,
-      photo: usePhoto ? state.photo : '',
+      photo: usePhoto ? (photos[0] || '') : '',
       note: notaPlato(res.comment, res),
       mult: plan.mult, baseClave: clave || claveConsulta(res.name)
     });
 
     const sumG = res.items.reduce((a, i) => a + (Number(i.gramos) || 0), 0);
-    if (plan.mult > 1) {
+    if (usePhoto && photos.length > 1) {
+      toast(`${photos.length} fotos analizadas y juntadas en "${res.name}" (${Math.round(sumG)} g). Revisa antes de guardar.`, 'ok');
+    } else if (plan.mult > 1) {
       toast(`Plato × ${plan.mult}: ${Math.round(sumG)} g en total (misma porción por plato). Revisa antes de guardar.`, 'ok');
     } else if (plan.mult < 1) {
       const como = plan.mult === 0.5
@@ -529,7 +630,7 @@ async function runAI({ date, hasKey, usePhoto }) {
     body.querySelector('#ai-retry').onclick = () => runAI({ date, hasKey, usePhoto });
     body.querySelector('#ai-manual').onclick = async () => {
       const s = await sugerirTipo(date, null);
-      state.draft = newDraft({ date, type: s.type, source: 'manual', photo: usePhoto ? state.photo : '', note: state.desc });
+      state.draft = newDraft({ date, type: s.type, source: 'manual', photo: usePhoto ? (state.photos[0] || '') : '', note: state.desc });
       state.draft._hint = s.hint;
       state.tab = 'manual';
       renderStart(root, [], { d: date });
@@ -561,7 +662,9 @@ async function montarDraftIA(o) {
   });
   state.draft._hint = s.hint;
   if (targets) state.draft._kcalTarget = (profile.targets && profile.targets.kcal) || targets.kcal;
+  // análisis listo: las fotos consumidas NO quedan colgadas en Registrar
   state.desc = '';
+  state.photos = [];
   location.hash = '#/nuevo';
 }
 

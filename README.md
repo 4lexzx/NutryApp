@@ -70,7 +70,8 @@ APP_Nutri/
    ~500 consultas por día** (`gemini-3.1-flash-lite`, `gemini-3.5-flash-lite`) mientras que los
    flash “normales” (`3.8/3.7/3.6/3.5-flash`) solo regalan **20 consultas por día**. La app viene
    con **`gemini-3.1-flash-lite`**, que es la que aguanta varios análisis por día para dos
-   personas. Una **foto consume bastante más tokens** que un texto. Los valores exactos de tu
+    personas. Una **foto consume bastante más tokens** que un texto, y **cada foto de un análisis
+   con varias fotos cuenta como una consulta aparte**. Los valores exactos de tu
    cuenta los ves en Google AI Studio y en <https://ai.google.dev/gemini-api/docs/rate-limits>;
    la cuota diaria se renueva sola cada día. Si llegas al límite, la app te avisa y puedes cambiar
    de modelo en **Ajustes → IA** (o seguir a mano: no gasta cuota).
@@ -267,11 +268,14 @@ caracteres, y ya queda creada **solo en ese dispositivo**. No hace falta exporta
 
 ## 7. Uso diario
 
+La barra de abajo tiene 5 botones en este orden: **🏠 Hoy · 📊 Historial · ➕ Registrar (en el
+medio) · 💪 Perfil · ⚙️ Ajustes**.
+
 ### Registrar una comida (botón ＋)
 
 | Pestaña | Qué hace | ¿Gasta cuota de IA? |
 |---|---|---|
-| 📷 **Foto** | **La cámara se abre dentro de la app** (no sales de la app) o eliges de galería; + descripción opcional → **Analizar con la IA** | Sí |
+| 📷 **Foto** | **La cámara se abre dentro de la app** (no sales de la app) o eliges de galería — puedes elegir **varias fotos seguidas (hasta 4)** y quitarlas una por una; + descripción opcional → **Analizar con la IA** (cada foto se analiza por separado y todo se junta en **un solo plato**, con los nombres combinados tipo *“Pan + Café con leche”*) | Sí |
 | 📝 **Texto** | Escribes “1 lomo saltado con arroz, poco arroz” → **Analizar con la IA** | Sí |
 | ✋ **Manual** | Buscas en la tabla de alimentos, pones gramos → sin IA | **No** |
 | ⭐ **Favoritos** | Cargas un plato guardado con 2 toques → sin IA | **No** |
@@ -406,7 +410,10 @@ decirte que lo dejaste manual.
 - Ves **kcal consumidas vs meta** y **4 barras de progreso** con lo que falta de cada macro.
 - Lista de comidas del día con sus macros; puedes **Ver ingredientes / Editar / Eliminar**.
 - Contador de **agua** (vasos de 250 ml): la tarjeta te dice la cuenta clara, por ejemplo
-  **“8 vasos = 2.00 L al día (1 vaso = 250 ml)”**, y la meta se cambia en Ajustes.
+  **“8 vasos = 2.00 L al día (1 vaso = 250 ml)”**, y la meta se cambia en Ajustes. Los vasos se
+  ven **dibujados uno por uno** y se llenan con una **animación de líquido** más un **sonidito de
+  agua** cada vez que sumas; los grandes botones **− / +** restan o suman (y también puedes tocar
+  cualquier vaso para marcarlo hasta ese punto).
 - **🏋️ Gimnasio del día**: la tarjeta **Gimnasio** (con icono y estado claro: **Sí fui**, **No fui**
   o **Sin registrar** — marcar “No hoy” **también se guarda**, ya no se pierde el registro) muestra
   las horas, los trabajos del día y las etiquetas de **músculos** (pecho, espalda, hombros, brazos,
@@ -437,8 +444,12 @@ decirte que lo dejaste manual.
   muestra exactamente eso) y sale con **el logo de la app** (icono
   grande a color y la silueta del logo en la barra: nada de cuadrados). Funciona en **Android e
   iPhone** (PWA
-  instalada en la pantalla de inicio, iOS 16.4+) mientras la app esté abierta o en segundo plano;
-  al tocar el aviso se abre **Hoy**. Todo se programa en tu celular, sin servidores ni costo.
+   instalada en la pantalla de inicio, iOS 16.4+) mientras la app esté abierta o en segundo plano;
+   al tocar el aviso se abre **Hoy**. Todo se programa en tu celular, sin servidores ni costo.
+- **💛 Avisos de ánimo** (mismo lugar: **Ajustes → Recordatorios**): un chip aparte, apagado por
+   defecto, que te manda **una frase motivadora al día** a la hora que elijas (por defecto **17:30**),
+   determinista: el mismo día siempre es la misma frase y al día siguiente cambia. Trae **hora
+   editable** y botón **“Probar aviso de ánimo”** para verla al instante; se apaga con el mismo chip.
 
 ### Historial (📊)
 

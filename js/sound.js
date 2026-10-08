@@ -12,8 +12,10 @@ let bufLic = null;
 let cargandoLic = null;
 let bufFuego = null;
 let cargandoFuego = null;
+let bufAgua = null;
+let cargandoAgua = null;
 
-export function setSonidos(v) { activos = v !== false; if (activos) { cargarSonido(); cargarCheck(); cargarLicuar(); cargarFuego(); } }
+export function setSonidos(v) { activos = v !== false; if (activos) { cargarSonido(); cargarCheck(); cargarLicuar(); cargarFuego(); cargarAgua(); } }
 export function sonidosActivos() { return activos; }
 
 function audioCtx() {
@@ -94,6 +96,23 @@ function cargarFuego() {
   return cargandoFuego;
 }
 
+/** Descarga y decodifica el "glug" de agua llenando un vaso (~0.7 s). */
+function cargarAgua() {
+  if (bufAgua) return Promise.resolve(bufAgua);
+  if (!cargandoAgua) {
+    cargandoAgua = fetch('./sfx/agua.wav')
+      .then(r => (r && r.ok ? r.arrayBuffer() : Promise.reject(new Error('sin archivo'))))
+      .then(ab => new Promise((res, rej) => {
+        const c = audioCtx();
+        if (!c) rej(new Error('sin audio'));
+        else c.decodeAudioData(ab, res, rej);
+      }))
+      .then(b => { bufAgua = b; return b; })
+      .catch(() => null);
+  }
+  return cargandoAgua;
+}
+
 function tocar(buffer, gain) {
   try {
     const c = audioCtx();
@@ -137,6 +156,16 @@ export function fuego() {
   } catch (e) { /* silencio */ }
 }
 
+/** Suena un vaso llenándose de agua (~0.7 s) — al sumar un vaso de agua. */
+export function agua() {
+  if (!activos) return;
+  try {
+    const c = audioCtx();
+    if (!c || !bufAgua) { cargarAgua(); return; }
+    tocar(bufAgua, 0.85);
+  } catch (e) { /* silencio */ }
+}
+
 /** Suena el clic (si está encendido y el archivo ya cargó). */
 export function clic() {
   if (!activos) return;
@@ -172,6 +201,7 @@ export function initSonidos() {
   cargarCheck();
   cargarLicuar();
   cargarFuego();
+  cargarAgua();
   let presion = null; // { el, x, y, id } del último botón importante pulsado
   document.addEventListener('pointerdown', e => {
     presion = null;

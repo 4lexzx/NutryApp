@@ -16,6 +16,30 @@ export const RECORDS_DEF = [
 
 const VENTANA_MIN = 15;   // margen: si la app se abrió a los pocos minutos, igual avisa
 
+/** Frases de ánimo: una al día, elegida por fecha (la misma cada día). */
+export const MENSAJES_ANIMO = [
+  '¡Tú puedes! Cada comida que anotas te acerca más a tu meta que dejarla en blanco.',
+  'Constancia > perfección. Si te saliste del plan, mañana vuelves: una comida no define el día.',
+  'Tu cuerpo agradece cada vaso de agua: llénate y sigue, vas mejor que ayer.',
+  'No necesitas motivación perfecta, solo el hábito de abrir la app y ser honesto contigo.',
+  'Un plato a la vez. Los cambios grandes son muchos días pequeños bien hechos.',
+  'Hoy también cuenta: registra todo y mira los números con calma, sin drama.',
+  'El progreso no grita, se nota. Sigue midiendo, siguiendo y cuidándote.',
+  'Recuerda tu porqué: por eso empiezas cada día con un registro más.',
+  'Pequeñas decisiones, grandes resultados: la próxima buena elección puede ser la que sigue.',
+  'Nadie nace sabiendo: pregunta, corrige las porciones y aprende de cada plato.',
+  'Tu racha de constancia se construye hoy. Anota lo que comiste y cierra el día bien.',
+  'Descansa, entrena y come con cabeza: el equilibrio también es resultados.',
+  'Si hoy apenas llevas un registro, ya ganaste: nada se compara con no rendirse.',
+  'Mereces sentirte bien: cada paso, por pequeño que sea, cuenta para tu meta.'
+];
+
+/** Mensaje de ánimo del día (determinístico por fecha). */
+export function mensajeDelDia(fecha) {
+  const n = Number(String(fecha || '').replace(/-/g, '')) || 0;
+  return MENSAJES_ANIMO[n % MENSAJES_ANIMO.length];
+}
+
 /** Hora elegida para un recordatorio (la del ajuste, o la del horario por defecto). */
 export function horaDe(s, id) {
   const def = RECORDS_DEF.find(r => r.id === id);
@@ -37,12 +61,12 @@ export function enVentana(hhmm, horario, ventanaMin = VENTANA_MIN) {
 }
 
 /** Muestra la notificación (Service Worker si es posible; si no, en página). */
-export async function notificar(titulo, cuerpo) {
+export async function notificar(titulo, cuerpo, tag = 'nutri-rem') {
   const opts = {
     body: cuerpo,
     icon: './icons/icon-512-v2.png',    // icono grande a color (el logo completo)
     badge: './icons/notif-badge.png',   // silueta blanca: en la barra se ve el logo, no un cuadrado
-    tag: 'nutri-rem',
+    tag,
     renotify: true
   };
   try {
@@ -97,19 +121,35 @@ async function tick() {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     const s = await getSettings();
     const rem = s.rem || {};
-    if (!rem.on) return;
-    const ids = Array.isArray(rem.ids) ? rem.ids : [];
     const now = new Date();
     const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     const fecha = todayISO();
-    for (const r of RECORDS_DEF) {
-      if (ids.indexOf(r.id) < 0) continue;
-      if (!enVentana(hhmm, horaDe(s, r.id))) continue;
-      const key = r.id + ':' + fecha;
-      if (yaAviso.has(key)) continue;
-      yaAviso.add(key);
-      const cuerpo = await cuerpoMacros();
-      notificar('NutriGym', `¿Ya anotaste ${r.l.toLowerCase()}? ${cuerpo}`);
+
+    // recordatorios de comidas
+    if (rem.on) {
+      const ids = Array.isArray(rem.ids) ? rem.ids : [];
+      for (const r of RECORDS_DEF) {
+        if (ids.indexOf(r.id) < 0) continue;
+        if (!enVentana(hhmm, horaDe(s, r.id))) continue;
+        const key = r.id + ':' + fecha;
+        if (yaAviso.has(key)) continue;
+        yaAviso.add(key);
+        const cuerpo = await cuerpoMacros();
+        notificar('NutriGym', `¿Ya anotaste ${r.l.toLowerCase()}? ${cuerpo}`);
+      }
+    }
+
+    // avisos de motivación (una vez al día a la hora elegida)
+    const mo = s.motiv || {};
+    if (mo.on) {
+      const h = /^\d{2}:\d{2}$/.test(mo.h || '') ? mo.h : '17:30';
+      if (enVentana(hhmm, h)) {
+        const key = 'motiv:' + fecha;
+        if (!yaAviso.has(key)) {
+          yaAviso.add(key);
+          notificar('NutriGym', mensajeDelDia(fecha), 'nutri-anim');
+        }
+      }
     }
   } catch (e) { /* un recordatorio jamás debe romper la app */ }
 }
@@ -159,4 +199,16 @@ export async function encenderRecordatorios(on) {
   rem.on = !!on;
   await saveSettings({ rem });
   return rem;
+}
+
+/** Guarda la configuración de los avisos de motivación ({ on?, h? }). */
+export async function guardarMotivacion(cambios) {
+  const s = await getSettings();
+  const mo = s.motiv && typeof s.motiv === 'object'
+    ? Object.assign({ on: false, h: '17:30' }, s.motiv)
+    : { on: false, h: '17:30' };
+  if (cambios && cambios.on !== undefined) mo.on = !!cambios.on;
+  if (cambios && cambios.h !== undefined) mo.h = cambios.h;
+  await saveSettings({ motiv: mo });
+  return mo;
 }

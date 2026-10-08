@@ -425,6 +425,21 @@ input.num, .num { font-variant-numeric: tabular-nums; }
   display: block; margin-bottom: 12px;
 }
 
+/* Rejilla de fotos del análisis (una por casilla, con su botón de quitar) */
+.photo-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px; margin-top: 10px;
+}
+.ph { position: relative; border-radius: 13px; overflow: hidden; aspect-ratio: 1; background: var(--card-2); }
+.ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ph-x {
+  position: absolute; top: 5px; right: 5px; width: 27px; height: 27px;
+  border: none; border-radius: 50%; background: rgba(0, 0, 0, .62); color: #fff;
+  font-size: .8rem; font-weight: 700; display: grid; place-items: center;
+  backdrop-filter: blur(4px);
+}
+.ph-x:active { transform: scale(.88); }
+
 /* ---------- Listas / pickers ---------- */
 .list-item {
   display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
@@ -569,13 +584,42 @@ input.num, .num { font-variant-numeric: tabular-nums; }
 .hrow.empty-day { opacity: .5; }
 
 /* ---------- Agua ---------- */
-.water { display: flex; align-items: center; gap: 12px; }
-.water-glasses { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
-.glass {
-  width: 25px; height: 31px; border: 2px solid var(--line); border-radius: 4px 4px 7px 7px;
-  background: transparent; position: relative; overflow: hidden;
+.water { display: block; }
+.water-glasses { display: flex; flex-wrap: wrap; gap: 9px; }
+.glass { width: 28px; height: 34px; display: block; cursor: pointer; }
+.glass .rim, .glass .lip {
+  fill: none; stroke: var(--line); stroke-width: 1.7;
+  stroke-linejoin: round; stroke-linecap: round;
 }
-.glass.full { border-color: var(--agua); background: color-mix(in srgb, var(--agua) 45%, transparent); }
+.glass.full .rim, .glass.full .lip { stroke: var(--agua); }
+.glass .liq {
+  fill: color-mix(in srgb, var(--agua) 72%, transparent);
+  transform-box: fill-box; transform-origin: center bottom;
+}
+.glass.anim .liq { animation: liqRise .55s cubic-bezier(.25, .75, .3, 1) both; }
+.glass:active { transform: scale(.9); }
+@keyframes liqRise {
+  from { transform: translateY(calc(100% + 3px)); }
+  to { transform: translateY(0); }
+}
+.water-ctrl {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-top: 14px;
+}
+.wbtn {
+  width: 48px; height: 48px; border-radius: 50%;
+  border: 1.5px solid var(--line); background: var(--card-2);
+  color: var(--txt); font-size: 1.35rem; font-weight: 700; line-height: 1;
+  display: grid; place-items: center; flex: none;
+}
+.wbtn:active { transform: scale(.9); }
+.wbtn:disabled { opacity: .35; }
+.wbtn-more {
+  background: var(--agua); border-color: var(--agua);
+  color: #06304a; box-shadow: 0 4px 12px color-mix(in srgb, var(--agua) 45%, transparent);
+}
+.wcount { font-weight: 700; font-size: 1.05rem; }
+.wcount small { color: var(--txt-3); font-weight: 500; font-size: .82rem; }
 
 /* ---------- Varios ---------- */
 .kbd { background: var(--card-2); border-radius: 6px; padding: 1px 6px; font-size: .82em; }

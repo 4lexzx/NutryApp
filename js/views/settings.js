@@ -7,9 +7,9 @@ import { testApiKey, modelOptions } from '../ai.js';
 import { esc, toast, confirmSheet, pickFile, downloadFile, todayISO, openSheet } from '../util.js';
 import { clearSession, currentUser } from '../auth.js';
 import { setSonidos, clic } from '../sound.js';
-import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe } from '../notif.js';
+import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe, guardarMotivacion, mensajeDelDia } from '../notif.js';
 
-const VERSION = '1.2.12';
+const VERSION = '1.2.13';
 let hAct = null;   // oyente del evento "hay actualización" (uno solo, sin duplicar)
 
 export async function render(root) {
@@ -29,6 +29,9 @@ export async function render(root) {
     : perm === 'denied' ? 'El navegador bloqueó los avisos. Actívalos desde el candado/🔒 de la barra de direcciones (permisos del sitio) y vuelve aquí.'
     : perm === 'unsupported' ? 'Este navegador no permite notificaciones.'
     : 'Al activar, el navegador te pedirá permiso para mostrarte avisos.';
+  const motiv = (s.motiv && typeof s.motiv === 'object') ? s.motiv : { on: false, h: '17:30' };
+  const motivActivo = perm === 'granted' && motiv.on === true;
+  const motivH = /^\d{2}:\d{2}$/.test(motiv.h || '') ? motiv.h : '17:30';
 
   root.innerHTML = `
     <h1>Ajustes</h1>
@@ -123,6 +126,16 @@ export async function render(root) {
         <button class="btn btn-block" id="s-rem-test" type="button">Probar aviso</button>
       </div>
       <div class="hint" id="s-rem-estado">${remEstado}</div>
+      <div class="divider"></div>
+      <b class="small">${icon('heart')} Notificaciones de motivación</b>
+      <div class="tiny muted" style="margin:2px 0 8px">Un empujón de ánimo al día, con una frase distinta cada vez.</div>
+      <div class="rem-rows">
+        <div class="rem-row">
+          <button type="button" class="chip ${motivActivo ? 'active' : ''}" id="s-motiv-on">Avisos de ánimo</button>
+          <input type="time" id="s-motiv-h" value="${motivH}" aria-label="Hora del aviso de ánimo">
+        </div>
+      </div>
+      <button class="btn btn-block" id="s-motiv-test" type="button">Probar aviso de ánimo</button>
     </div>
 
     <div class="card">
@@ -395,6 +408,41 @@ export async function render(root) {
       const cuerpo = await cuerpoMacros();
       const ok = await notificar('NutriGym', cuerpo);
       if (ok) toast('Aviso enviado: míralo en la barra de notificaciones.', 'ok');
+      render(root);
+    } else {
+      toast('Sin permiso de avisos todavía.', 'warn');
+    }
+  };
+
+  /* motivación */
+  root.querySelector('#s-motiv-on').onclick = async () => {
+    const activar = !motivActivo;
+    if (activar) {
+      let r = ('Notification' in window) ? Notification.permission : null;
+      if (r !== 'granted') r = await pedirPermiso();
+      if (r !== 'granted') {
+        toast(r === 'denied'
+          ? 'El navegador bloqueó los avisos: actívalos en los permisos del sitio.'
+          : 'Este navegador no permite notificaciones.', 'warn');
+        return;
+      }
+    }
+    await guardarMotivacion({ on: activar });
+    toast(activar ? `¡Avisos de ánimo encendidos! Te escribiré a las ${motivH}.` : 'Avisos de ánimo apagados.', 'ok');
+    render(root);
+  };
+  root.querySelector('#s-motiv-h').onchange = async e => {
+    const v = e.target.value;
+    if (!/^\d{2}:\d{2}$/.test(v || '')) { toast('Esa hora no es válida.', 'warn'); return; }
+    await guardarMotivacion({ h: v });
+    toast(`Aviso de ánimo: te escribiré a las ${v}.`, 'ok');
+  };
+  root.querySelector('#s-motiv-test').onclick = async () => {
+    let r = ('Notification' in window) ? Notification.permission : null;
+    if (r !== 'granted') r = await pedirPermiso();
+    if (r === 'granted') {
+      const ok = await notificar('NutriGym', mensajeDelDia(todayISO()), 'nutri-anim');
+      toast(ok ? 'Aviso de ánimo enviado: míralo en la barra.' : 'No se pudo enviar el aviso.', ok ? 'ok' : 'warn');
       render(root);
     } else {
       toast('Sin permiso de avisos todavía.', 'warn');
