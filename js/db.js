@@ -5,6 +5,31 @@ const DB_VER = 2;
 
 let _db = null;
 
+/* ---------- sincronización con la nube (opcional) ----------
+   Si hay sesión en la nube, cada cambio local se copia a la cola
+   de pendientes (js/cloud.js). Los cambios que VIENEN de la nube
+   se aplican con conAplicacionNube() para no re-encolarlos. */
+let aplicandoNube = false;
+let _cloud = null;
+
+export async function conAplicacionNube(fn) {
+  aplicandoNube = true;
+  try { return await fn(); } finally { aplicandoNube = false; }
+}
+async function avisarNube(tienda, id, op, data) {
+  if (aplicandoNube) return;
+  try {
+    if (!_cloud) _cloud = await import('./cloud.js');
+    if (_cloud.haySesion()) await _cloud.encolar(tienda, id, op, data);
+  } catch (e) { console.warn('sync nube:', e); }
+}
+function claveDe(store, obj, respaldo) {
+  if (store === 'kv') return obj.k;
+  if (store === 'water') return obj.date;
+  if (store === 'platos') return obj.clave;
+  return obj.id ?? respaldo;
+}
+
 function open() {
   if (_db) return Promise.resolve(_db);
   return new Promise((resolve, reject) => {
@@ -51,9 +76,12 @@ export const DB = {
     return r ? r : fallback;
   },
   async kvSet(obj) {
+    const o = Object.assign({ k: 'x' }, obj);
     const t = await tx(['kv'], 'readwrite');
-    t.objectStore('kv').put(Object.assign({ k: 'x' }, obj));
-    return done(t);
+    t.objectStore('kv').put(o);
+    await done(t);
+    await avisarNube('kv', o.k, 'put', o);
+    return undefined;
   },
   async kvAll() {
     const t = await tx(['kv'], 'readonly');
@@ -62,7 +90,8 @@ export const DB = {
   async kvDel(key) {
     const t = await tx(['kv'], 'readwrite');
     t.objectStore('kv').delete(key);
-    return done(t);
+    await done(t);
+    await avisarNube('kv', key, 'del');
   },
 
   /* ---- genérico por almacén ---- */
@@ -79,19 +108,24 @@ export const DB = {
     const req = t.objectStore(store).put(obj);
     const id = await wrap(req);
     await done(t);
-    return obj.id ?? id;
+    const real = obj.id ?? id;
+    await avisarNube(store, claveDe(store, obj, real), 'put', obj);
+    return real;
   },
   async add(store, obj) {
     const t = await tx([store], 'readwrite');
     const req = t.objectStore(store).add(obj);
     const id = await wrap(req);
     await done(t);
-    return id;
+    const real = obj.id ?? id;
+    await avisarNube(store, claveDe(store, obj, real), 'put', obj);
+    return real;
   },
   async del(store, id) {
     const t = await tx([store], 'readwrite');
     t.objectStore(store).delete(id);
-    return done(t);
+    await done(t);
+    await avisarNube(store, id, 'del');
   },
   async byDate(store, date) {
     const t = await tx([store], 'readonly');
@@ -102,15 +136,21 @@ export const DB = {
     return wrap(t.objectStore(store).count());
   },
   async clear(store) {
+    const ro = await tx([store], 'readonly');
+    const ids = await wrap(ro.objectStore(store).getAllKeys());
     const t = await tx([store], 'readwrite');
     t.objectStore(store).clear();
-    return done(t);
+    await done(t);
+    for (const id of ids) await avisarNube(store, id, 'del');
   },
   async clearAll() {
     const stores = ['kv', 'meals', 'weights', 'favorites', 'water', 'platos'];
+    const ro = await tx(stores, 'readonly');
+    const porTienda = await Promise.all(stores.map(s => wrap(ro.objectStore(s).getAllKeys())));
     const t = await tx(stores, 'readwrite');
     stores.forEach(s => t.objectStore(s).clear());
-    return done(t);
+    await done(t);
+    await Promise.all(porTienda.flatMap((ids, i) => ids.map(id => avisarNube(stores[i], id, 'del'))));
   },
 
   /* ---- respaldo / restauración ---- */

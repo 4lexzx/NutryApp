@@ -6,10 +6,12 @@ import { exportMealsCSV, exportWeightsCSV, exportBackup, importBackup, backupSum
 import { testApiKey, modelOptions } from '../ai.js';
 import { esc, toast, confirmSheet, pickFile, downloadFile, todayISO, openSheet } from '../util.js';
 import { clearSession, currentUser } from '../auth.js';
+import { nubeConfigurada } from '../config.js';
+import { haySesion, emailSesion, crearCuenta, conectar, desconectar, pendientes, sincronizar, subirTodo, bajarTodo, subidasEnNube } from '../cloud.js';
 import { setSonidos, clic } from '../sound.js';
 import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe, guardarMotivacion, mensajeDelDia } from '../notif.js';
 
-const VERSION = '1.2.15';
+const VERSION = '2.0.0';
 let hAct = null;   // oyente del evento "hay actualización" (uno solo, sin duplicar)
 
 export async function render(root) {
@@ -32,6 +34,9 @@ export async function render(root) {
   const motiv = (s.motiv && typeof s.motiv === 'object') ? s.motiv : { on: false, h: '17:30' };
   const motivActivo = perm === 'granted' && motiv.on === true;
   const motivH = /^\d{2}:\d{2}$/.test(motiv.h || '') ? motiv.h : '17:30';
+  const nubeOk = nubeConfigurada();
+  const conNube = haySesion();
+  const nubePend = conNube ? await pendientes().catch(() => 0) : 0;
 
   root.innerHTML = `
     <h1>Ajustes</h1>
@@ -64,16 +69,11 @@ export async function render(root) {
 
     <div class="card">
       <div class="card-title"><h3>${icon('bot')} Inteligencia artificial</h3>
-        <span class="badge ${s.apiKey ? 'ok' : 'warn'}">${s.apiKey ? 'key configurada' : 'sin key'}</span></div>
+        <span class="badge ok">clave en el servidor</span></div>
       <label class="field"><span class="lbl">Modelo</span>
         <select id="s-model">${modelOptions().map(m => `<option value="${m.v}" ${s.model === m.v ? 'selected' : ''}>${m.l}</option>`).join('')}</select></label>
-      <label class="field"><span class="lbl">API key</span>
-            <input id="s-key" type="password" autocomplete="off" spellcheck="false" placeholder="pega aquí tu clave de Google AI" value="${esc(s.apiKey || '')}"></label>
       <div class="row wrap">
-        <button class="btn btn-sm" id="s-key-show" type="button">Ver</button>
-        <button class="btn btn-sm btn-primary" id="s-key-save" type="button">Guardar</button>
-        <button class="btn btn-sm btn-accent" id="s-key-test" type="button">Probar clave</button>
-        <button class="btn btn-sm btn-ghost" id="s-key-del" type="button">Borrar</button>
+        <button class="btn btn-sm btn-accent" id="s-key-test" type="button">Probar la IA</button>
       </div>
       <div id="s-key-res" class="hint"></div>
       <div class="divider"></div>
@@ -97,8 +97,8 @@ export async function render(root) {
           <button class="btn btn-sm btn-ghost" id="s-base-clear" type="button" ${nBase ? '' : 'disabled'}>Borrar</button>
         </div>
       </div>
-      <p class="tiny muted" style="margin-top:10px">La clave se guarda <b>solo en tu celular</b> (IndexedDB). Solo se envía
-        a los servidores de Google cuando pides un análisis.</p>
+      <p class="tiny muted" style="margin-top:10px">La clave de Gemini vive en el <b>servidor de la app (Vercel)</b>:
+        nunca se guarda en tu teléfono ni viaja en el código público. Cada análisis pasa por /api/ai.</p>
     </div>
 
     <div class="card">
@@ -160,6 +160,39 @@ export async function render(root) {
       </div>
     </div>
 
+    <div class="card" id="s-nube">
+      <div class="card-title"><h3>${icon('upload')} Nube (respaldo en internet)</h3>
+        <span class="badge ${!nubeOk ? 'warn' : conNube ? 'ok' : 'warn'}" id="nb-badge">${!nubeOk ? 'sin configurar' : conNube ? 'conectada' : 'desconectada'}</span></div>
+      <p class="small muted">Con una cuenta en la nube, tus datos se guardan también en Supabase: puedes verlos en
+        otro dispositivo y tienes un respaldo en internet. <b>Sin nube la app funciona igual</b> (todo local en el celular).</p>
+      ${!nubeOk ? `
+        <div class="note">${icon('alert')} La nube de esta instalación todavía no está configurada
+          (falta la URL y la clave pública de Supabase en <b>js/config.js</b>).</div>` : (!conNube ? `
+        <label class="field"><span class="lbl">Correo</span>
+          <input id="nb-user" type="email" autocomplete="username" placeholder="tucorreo@ejemplo.com"></label>
+        <label class="field"><span class="lbl">Contraseña</span>
+          <input id="nb-pass" type="password" autocomplete="current-password" placeholder="mínimo 6 caracteres"></label>
+        <div class="row">
+          <button class="btn btn-primary" id="nb-go" type="button">Conectar</button>
+          <button class="btn" id="nb-new" type="button">Crear cuenta</button>
+        </div>` : `
+        <div class="spread" style="margin-bottom:12px">
+          <div>
+            <b class="small">${esc(emailSesion())}</b>
+            <div class="tiny muted" id="nb-estado">${nubePend ? `${nubePend} cambio${nubePend === 1 ? '' : 's'} pendiente${nubePend === 1 ? '' : 's'} por subir` : 'Todo sincronizado'}</div>
+          </div>
+          <button class="btn btn-sm btn-ghost" id="nb-out" type="button">Desconectar</button>
+        </div>
+        <div class="col">
+          <button class="btn btn-primary btn-block" id="nb-up" type="button">${icon('upload')} Subir mis datos ahora</button>
+          <button class="btn btn-block" id="nb-down" type="button">${icon('download')} Bajar los datos de la nube</button>
+          <button class="btn btn-block" id="nb-sync" type="button">${icon('refresh')} Sincronizar (subir + bajar)</button>
+        </div>`)}
+      <div class="hint" id="nb-res"></div>
+      <div class="note" style="margin-top:10px">${icon('shield')} Si un día dejas de pagar Supabase (plan gratis se pausa
+        tras 7 días sin uso), la app sigue funcionando en local; solo se apaga la sincronización.</div>
+    </div>
+
     <div class="card">
       <div class="card-title"><h3>${icon('user')} Cuenta</h3></div>
       <div class="spread" style="margin-bottom:14px">
@@ -178,9 +211,9 @@ export async function render(root) {
 
     <div class="card">
       <div class="card-title"><h3>${icon('info')} Acerca de</h3></div>
-      <p class="small muted">Nutri Gym v${VERSION} · PWA 100% local.<br>
-      Tus datos (perfil, comidas, historial) viven <b>en este celular</b>. No hay cuentas ni servidores propios;
-      la única conexión externa es la consulta opcional a Gemini (Google) cuando usas la IA.</p>
+      <p class="small muted">Nutri Gym v${VERSION} · PWA con nube opcional (Supabase) e IA por servidor (Vercel).<br>
+      Tus datos viven <b>en este celular</b> (IndexedDB); si conectas la nube en Ajustes, se copian a tu cuenta de
+      Supabase para verlos en otros dispositivos. La IA usa la clave que vive en el servidor: tú no configuras nada.</p>
       <div class="col" style="margin:10px 0 4px">
         <button class="btn btn-primary btn-block" id="s-update" type="button" disabled>${icon('check')} Estás al día</button>
         <div class="hint" id="s-update-hint">Última versión instalada: v${VERSION}. Si sale una nueva, este botón se activa.</div>
@@ -273,24 +306,6 @@ export async function render(root) {
   });
 
   /* IA */
-  const keyIn = root.querySelector('#s-key');
-  root.querySelector('#s-key-show').onclick = e => {
-    const show = keyIn.type === 'password';
-    keyIn.type = show ? 'text' : 'password';
-    e.target.textContent = show ? 'Ocultar' : 'Ver';
-  };
-  root.querySelector('#s-key-save').onclick = async () => {
-    await saveSettings({ apiKey: keyIn.value.trim() });
-    toast('API key guardada.', 'ok');
-    render(root);
-  };
-  root.querySelector('#s-key-del').onclick = async () => {
-    const ok = await confirmSheet({ title: '¿Borrar la API key?', msg: 'La IA dejará de funcionar hasta que pegues otra clave.', okText: 'Borrar', danger: true });
-    if (!ok) return;
-    await saveSettings({ apiKey: '' });
-    toast('Clave borrada.', 'ok');
-    render(root);
-  };
   root.querySelector('#s-model').onchange = async e => { await saveSettings({ model: e.target.value }); toast('Modelo: ' + e.target.value, 'ok'); };
   /* ver mis porciones estándar (y poder revertir una guardada sin querer) */
   const baseVer = root.querySelector('#s-base-ver');
@@ -354,12 +369,92 @@ export async function render(root) {
   };
   root.querySelector('#s-key-test').onclick = async e => {
     const btn = e.target, res = root.querySelector('#s-key-res');
-    const key = keyIn.value.trim();
-    await saveSettings({ apiKey: key });
     btn.disabled = true; btn.textContent = 'Probando…'; res.textContent = '';
-    const r = await testApiKey(key, root.querySelector('#s-model').value);
-    btn.disabled = false; btn.textContent = 'Probar clave';
+    const r = await testApiKey('', root.querySelector('#s-model').value);
+    btn.disabled = false; btn.textContent = 'Probar la IA';
     res.innerHTML = r.ok ? `<span style="color:var(--brand)">${icon('checkCircle')} ${esc(r.msg)}</span>` : `<span style="color:#ff9a9a">${icon('alert')} ${esc(r.msg)}</span>`;
+  };
+
+  /* nube (Supabase) */
+  window.__nutriNubeAct = () => {
+    const el = root.querySelector('#nb-estado');
+    if (!el || !document.contains(el)) return;
+    pendientes().then(p => {
+      el.textContent = p ? `${p} cambio${p === 1 ? '' : 's'} pendiente${p === 1 ? '' : 's'} por subir` : 'Todo sincronizado';
+    }).catch(() => {});
+  };
+  const nbRes = root.querySelector('#nb-res');
+  const nbPaso = async (btn, txt, fn) => {
+    if (btn) { btn.disabled = true; }
+    if (nbRes) nbRes.textContent = txt;
+    try {
+      const r = await fn();
+      if (nbRes) nbRes.textContent = '';
+      return r;
+    } catch (e) {
+      if (nbRes) nbRes.innerHTML = `<span style="color:#ff9a9a">${icon('alert')} ${esc(e && e.message ? e.message : e)}</span>`;
+      return null;
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  };
+  const nbGo = root.querySelector('#nb-go');
+  if (nbGo) nbGo.onclick = async () => {
+    const u = (root.querySelector('#nb-user').value || '').trim();
+    const p = root.querySelector('#nb-pass').value;
+    if (!u || !p) { toast('Escribe tu correo y tu contraseña.', 'warn'); return; }
+    await nbPaso(nbGo, 'Conectando…', async () => {
+      await conectar(u, p);
+      render(root);
+    });
+  };
+  const nbNew = root.querySelector('#nb-new');
+  if (nbNew) nbNew.onclick = async () => {
+    const u = (root.querySelector('#nb-user').value || '').trim();
+    const p = root.querySelector('#nb-pass').value;
+    if (!u || p.length < 6) { toast('Correo válido y contraseña de 6 caracteres o más.', 'warn'); return; }
+    await nbPaso(nbNew, 'Creando cuenta…', async () => {
+      const r = await crearCuenta(u, p);
+      if (r.confirmada) { render(root); }
+      else toast('Cuenta creada. Revisa tu correo para confirmarla y luego pulsa Conectar.', 'ok');
+    });
+  };
+  const nbOut = root.querySelector('#nb-out');
+  if (nbOut) nbOut.onclick = async () => {
+    const ok = await confirmSheet({
+      title: '¿Desconectar la nube?',
+      msg: 'Los datos de este dispositivo quedan como estaban. Puedes volver a conectar cuando quieras.',
+      okText: 'Desconectar'
+    });
+    if (!ok) return;
+    await desconectar();
+    toast('Nube desconectada. La app sigue en modo local.', 'ok');
+    render(root);
+  };
+  const nbUp = root.querySelector('#nb-up');
+  if (nbUp) nbUp.onclick = async () => {
+    const r = await nbPaso(nbUp, 'Subiendo todos tus datos a la nube…', () => subirTodo());
+    if (!r) return;
+    const linea = t => `${t}: ${r.antes[t] || 0} → ${r.despues ? (r.despues[t] || 0) : '?'} en la nube`;
+    toast(`Listo: subí ${r.subidas} registro${r.subidas === 1 ? '' : 's'}. Verificación: ${linea('meals')}, ${linea('weights')}, ${linea('favorites')}.`, 'ok');
+    if (nbRes) nbRes.textContent = ['meals', 'weights', 'favorites', 'platos', 'kv'].map(linea).join(' · ');
+    window.__nutriNubeAct();
+  };
+  const nbDown = root.querySelector('#nb-down');
+  if (nbDown) nbDown.onclick = async () => {
+    const r = await nbPaso(nbDown, 'Bajando los datos de la nube…', () => bajarTodo());
+    if (r === null) return;
+    toast(r ? `Bajé ${r} cambio${r === 1 ? '' : 's'} a este dispositivo.` : 'La nube no tiene cambios nuevos.', 'ok');
+    window.__nutriNubeAct();
+  };
+  const nbSync = root.querySelector('#nb-sync');
+  if (nbSync) nbSync.onclick = async () => {
+    await nbPaso(nbSync, 'Sincronizando…', async () => {
+      const r = await sincronizar();
+      if (r.ok) render(root);
+      else if (r.error) throw r.error;
+      return r;
+    });
   };
 
   /* agua */
@@ -503,7 +598,7 @@ export async function render(root) {
   root.querySelector('#s-clear').onclick = async () => {
     const ok = await confirmSheet({
       title: '¿Borrar TODOS los datos?',
-      msg: 'Se eliminarán perfil, comidas, pesos, favoritos, ajustes y API key de ESTE dispositivo. Esta acción no se puede deshacer.',
+      msg: 'Se eliminarán perfil, comidas, pesos, favoritos, ajustes y la base de platos de ESTE dispositivo. Esta acción no se puede deshacer.',
       okText: 'Sí, borrar todo', danger: true
     });
     if (!ok) return;

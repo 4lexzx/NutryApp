@@ -6,3 +6,9 @@ skills-lock.json
 /*.png
 
 .playwright-mcp/
+
+# secretos y artefactos de Vercel (nunca subir)
+.env
+.env.*
+.vercel/
+node_modules/

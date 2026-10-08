@@ -1,7 +1,7 @@
 /* Service worker: la app abre y funciona SIN internet (los datos están en IndexedDB).
    Solo las consultas a la IA necesitan red. */
 
-const CACHE = 'nutri-gym-v30';
+const CACHE = 'nutri-gym-v2.0.0';
 
 const PRECACHE = [
   './',
@@ -20,6 +20,8 @@ const PRECACHE = [
   './sfx/fuego.wav',
   './js/icons.js',
   './js/auth.js',
+  './js/config.js',
+  './js/cloud.js',
   './js/nutrition.js',
   './js/ai.js',
   './js/charts.js',

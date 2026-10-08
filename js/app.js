@@ -245,6 +245,18 @@ function setupResume() {
   window.addEventListener('pageshow', e => { if (e.persisted) refrescar(); });
 }
 
+/* ---------- Nube (Supabase, opcional) ---------- */
+function setupNube() {
+  import('./cloud.js').then(c => {
+    if (c.haySesion()) {
+      setTimeout(() => c.sincronizar({ silencioso: true }).catch(() => {}), 2500);
+      setInterval(() => {
+        if (c.haySesion() && navigator.onLine) c.sincronizar({ silencioso: true }).catch(() => {});
+      }, 10 * 60 * 1000);
+    }
+  }).catch(() => {});
+}
+
 /* ---------- Init ---------- */
 async function init() {
   await DB.open();
@@ -256,6 +268,7 @@ async function init() {
   setupNetwork();
   setupSW();
   setupResume();
+  setupNube();
 
   document.getElementById('btn-theme').onclick = async () => {
     const cur = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
