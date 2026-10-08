@@ -292,8 +292,11 @@ se actualizan solos. Eliges el tipo de comida (desayuno/almuerzo/cena/snack) y *
   cucharadas de avena, 3 almendras, 200 g de plátano”* y al tocar **Aplicar y recalcular** la app
   **ajusta (y agrega) los ingredientes que reconoce, en tu celular y sin IA**; el texto se guarda
   como nota del plato.
-- **➕ Ingrediente que no está**: si te falta algo lo agregas tú (nombre, gramos y kcal). Al tocar
-  **Usar en el plato** se abre el editor con el batido listo para guardar, **sin gastar IA**.
+- **➕ Ingrediente que no está**: si te falta algo lo agregas tú (nombre, gramos y kcal).
+- **🥤 ¡Licuar!**: el botón final dice **¡Licuar!** — al pulsarlo **suena la licuadora (1 s)** y la
+  animación muestra la licuadora **licuando de verdad** (aspas girando, vaso vibrando, burbujas
+  subiendo) y al terminar el batido **se añade a los platos con el “check”** y se abre el editor
+  listo para guardar, **sin gastar IA**.
 - Si la IA se equivoca (por ejemplo la porción), corrígela: es lo esperado, es una **estimación**.
 - **✨ Re-analizar con la IA**: el botón aparece al editar una comida guardada **y también recién
   analizada** (por si te equivocaste al escribir un ingrediente: corrige el nombre y dale a
@@ -401,6 +404,14 @@ decirte que lo dejaste manual.
   (peso × horas × intensidad MET) antes de guardar. Ese día tu **meta de kcal sube sola** ≈ *peso ×
   horas × intensidad* (sin peso en el perfil se estima a 250 kcal/h) y en la cabecera te avisa
   **“+X por gym”**. Se guarda por día, entra al respaldo y puedes editarlo para días pasados desde ‹ ›.
+- **🔥 Racha del gimnasio (con plan)**: defines tu **plan de días por semana** (1–7, por defecto 3)
+  y la app lleva una **racha en días** que sigue **día tras día, semana tras semana y mes a mes**,
+  pero **se verifica cada día**: no se pierde mientras sigas dentro de los días de tu plan (aguanta
+  entre semanas y al cambiar de mes) y **solo se pierde si una semana cierra por debajo de ese
+  número**. En la tarjeta de Hoy y en la vista de Gimnasio verás la **llama de la racha**
+  **encendida y animada** (gris/apagada cuando va en 0) y **7 lámparas por día de la semana**
+  (L M X J V S D): **encendida** cuando ese día hubo gym y **gris mientras siga apagada hoy**,
+  con el avance **“k de N días”** de la semana.
 
 ### Historial (📊)
 

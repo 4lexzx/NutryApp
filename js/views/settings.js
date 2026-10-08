@@ -8,7 +8,7 @@ import { esc, toast, confirmSheet, pickFile, downloadFile, todayISO, openSheet }
 import { clearSession, currentUser } from '../auth.js';
 import { setSonidos, clic } from '../sound.js';
 
-const VERSION = '1.2.6';
+const VERSION = '1.2.7';
 
 export async function render(root) {
   const s = await getSettings();

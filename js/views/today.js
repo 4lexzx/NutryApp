@@ -3,7 +3,7 @@
 import { DB, getProfile, getSettings } from '../db.js';
 import { icon } from '../icons.js';
 import { calcTargets, computeTotals, bonusGymKcal } from '../nutrition.js';
-import { fmtHoras, MUSCULOS, CARDIO } from './gym.js';
+import { fmtHoras, MUSCULOS, CARDIO, cargarGym, calcRacha, lampsHTML } from './gym.js';
 import {
   todayISO, addDays, dayLabel, relDayTitle, fmtLongDate, TIPOS_COMIDA, ICONO_TIPO,
   esc, num, toast, confirmSheet, openSheet, fromISODate, DIAS
@@ -13,9 +13,9 @@ export async function render(root, params) {
   let date = params && params[0] ? params[0] : todayISO();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
 
-  const [profile, settings, meals, water, gym] = await Promise.all([
+  const [profile, settings, meals, water, gym, gy] = await Promise.all([
     getProfile(), getSettings(), DB.byDate('meals', date), DB.kvGet('water:' + date, null),
-    DB.kvGet('gym:' + date, null)
+    DB.kvGet('gym:' + date, null), cargarGym()
   ]);
 
   const targets = profile ? calcTargets(profile) : null;
@@ -85,7 +85,7 @@ export async function render(root, params) {
       <a class="btn btn-primary btn-lg btn-block" href="#/registrar?d=${date}">${icon('camera')} Registrar comida</a>
     </div>
 
-    ${gymCard(gym, date, gymBonus)}
+    ${gymCard(gym, date, gymBonus, gy)}
 
     <div class="card">
       <div class="card-title"><h3>${icon('droplet')} Agua</h3><span class="badge">${waterG}/${waterGoal} vasos</span></div>
@@ -163,7 +163,10 @@ function etiquetasGym(reg) {
   return mus.concat(car);
 }
 
-function gymCard(gym, date, bonus) {
+function gymCard(gym, date, bonus, gy) {
+  const hoy = todayISO();
+  const racha = calcRacha(gy.regs, gy.plan, hoy);
+  const cumple = racha.estaSemana >= racha.plan;
   const estado = gym && gym.ido ? 'si' : gym ? 'no' : null;
   const pills = etiquetasGym(gym || {}).map(l => `<span class="chip pill">${esc(l)}</span>`).join('');
   return `
@@ -175,6 +178,15 @@ function gymCard(gym, date, bonus) {
       : estado === 'no' ? `<span class="badge warn">No fui</span>`
       : `<span class="badge">Sin registrar</span>`}
     </div>
+    <div class="gym-racha">
+      <span class="flame${racha.dias ? '' : ' off'}">${icon('flame')}</span>
+      <div class="gr-main">
+        <b class="racha-line">Racha: ${racha.dias} ${racha.dias === 1 ? 'día' : 'días'}</b>
+        <div class="tiny muted">${cumple ? 'Plan de esta semana cumplido ✓' : `Esta semana ${racha.estaSemana}/${racha.plan} · aún no pierdes la racha`}</div>
+      </div>
+      <a class="btn btn-sm btn-ghost" href="#/gym?d=${date}" aria-label="Ver racha y plan">›</a>
+    </div>
+    ${lampsHTML(gy.regs, hoy)}
     ${estado === 'si' ? `
       <div class="gym-stats">
         <div class="gs"><div class="gs-v">${fmtHoras(gym.horas)}<small> h</small></div><div class="gs-k">entreno</div></div>

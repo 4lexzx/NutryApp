@@ -754,3 +754,69 @@ code.codeblock {
 .qtybox b { min-width: 26px; text-align: center; font-variant-numeric: tabular-nums; font-size: .9rem; }
 .qtybox .btn { min-width: 36px; padding: 0 8px; }
 .blabel { fill: var(--txt-3); font-size: 9px; font-weight: 700; }
+
+/* ===== Animaciones: racha, gimnasio y licuadora ===== */
+.flame { display: inline-grid; place-items: center; }
+.flame .ic { width: 26px; height: 26px; color: #ff9f0a; animation: flameFlick .85s ease-in-out infinite alternate; }
+.flame.off .ic { color: var(--txt-3); animation: none; opacity: .55; }
+@keyframes flameFlick {
+  from { transform: scale(1) rotate(-5deg); filter: drop-shadow(0 0 3px rgba(255,159,10,.55)); }
+  to   { transform: scale(1.2) rotate(5deg); filter: drop-shadow(0 0 11px rgba(255,69,0,.95)); }
+}
+.gym-racha-big { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.gym-racha-big .flame .ic { width: 46px; height: 46px; }
+.racha-n { font-size: 1.9rem; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.racha-n small { font-size: .95rem; font-weight: 700; color: var(--txt-3); }
+.gym-racha { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.gym-racha .gr-main { flex: 1; min-width: 0; }
+.racha-line { font-size: .98rem; }
+.gym-racha .btn { flex: none; }
+.racha-card { animation: slideUp .45s ease backwards; }
+.lamps { display: flex; gap: 8px; flex-wrap: wrap; }
+.lamp {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--card-2); border: 1.5px solid var(--line);
+  color: var(--txt-3); transition: background .25s, box-shadow .25s, border-color .25s;
+}
+.lamp i { font-size: .7rem; font-weight: 800; font-style: normal; }
+.lamp.on {
+  background: radial-gradient(circle at 35% 30%, #b9f6c8, var(--brand));
+  border-color: var(--brand); color: #0b3d1c;
+  box-shadow: 0 0 10px rgba(52,199,89,.65);
+  animation: lampOn .5s cubic-bezier(.2,.9,.3,1.4);
+}
+.lamp.hoy { border-width: 2.5px; border-color: var(--brand); }
+.lamp.hoy:not(.on) { animation: lampPulse 1.7s ease-in-out infinite; }
+@keyframes lampOn { 0% { transform: scale(.4); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+@keyframes lampPulse { 0%, 100% { box-shadow: 0 0 0 rgba(52,199,89,0); } 50% { box-shadow: 0 0 9px rgba(52,199,89,.5); } }
+.plan-prog { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gym-pick .gym-opt { animation: popIn .4s cubic-bezier(.2,.9,.3,1.35) backwards; }
+.gym-pick .gym-opt:nth-child(2) { animation-delay: .08s; }
+#gy-form .gym-sec { animation: slideUp .42s ease backwards; }
+#gy-form .gym-sec:nth-child(1) { animation-delay: .05s; }
+#gy-form .gym-sec:nth-child(2) { animation-delay: .13s; }
+#gy-form .gym-sec:nth-child(3) { animation-delay: .21s; }
+.gym-card { animation: slideUp .45s ease backwards; }
+.gym-bonus.gb-pop { animation: gbPop .5s cubic-bezier(.2,.9,.3,1.4); }
+@keyframes gbPop { 0% { transform: scale(.92); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
+@keyframes popIn { from { transform: scale(.86); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* Licuadora licuando (1 s al pulsar "Licuar!") */
+#bt-svg .bblade-g { transform-box: view-box; transform-origin: 100px 200px; }
+#bt-svg.blending { animation: blenderHum .12s ease-in-out infinite alternate; }
+#bt-svg.blending .bblade-g { animation: bladeSpin 1s linear; }
+#bt-svg.blending .bjar { transform-box: fill-box; animation: jarShake .1s linear 13; }
+#bt-svg.blending .bfill { transform-box: fill-box; transform-origin: center; animation: swirl .26s ease-in-out infinite alternate; }
+#bt-svg.blending .bbase, #bt-svg.blending .bbtn { transform-box: fill-box; animation: vib .08s linear infinite alternate; }
+.bub { opacity: 0; transform-box: fill-box; fill: rgba(255,255,255,.8); }
+#bt-svg.blending .bub { animation: bubRise .95s linear infinite; }
+@keyframes bladeSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes jarShake { 0% { transform: translateX(0); } 25% { transform: translateX(-1.6px); } 75% { transform: translateX(1.6px); } 100% { transform: translateX(0); } }
+@keyframes swirl { from { transform: scaleY(1) skewX(-3deg); } to { transform: scaleY(1.07) skewX(3deg); } }
+@keyframes vib { from { transform: translateY(-1px); } to { transform: translateY(1px); } }
+@keyframes blenderHum { from { transform: translateY(0); } to { transform: translateY(1.5px); } }
+@keyframes bubRise { from { transform: translateY(0); opacity: .9; } to { transform: translateY(-150px); opacity: 0; } }
+.btn-licuar { transition: transform .12s ease; }
+.btn-licuar:active { transform: scale(.97); }

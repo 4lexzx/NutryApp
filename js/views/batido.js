@@ -8,7 +8,7 @@ import { computeTotals } from '../nutrition.js';
 import { esc, num, toast, todayISO, fmtLongDate, confirmSheet, openSheet, qtyTexto, uid } from '../util.js';
 import { newDraft } from '../editor.js';
 import { sugerirTipo, getDraft, setDraft } from './log.js';
-import { clic, check } from '../sound.js';
+import { clic, check, licuar } from '../sound.js';
 
 const CAP = 700;          // ml de la licuadora (≈ g)
 const INNER_TOP = 42;
@@ -133,7 +133,13 @@ export async function render(root, args, query) {
     return `<path d="M120 ${y.toFixed(1)}h22" class="bmark"/><text x="150" y="${(y + 3).toFixed(1)}" class="blabel">${ml}</text>`;
   }).join('')}
         <path d="M120 ${INNER_TOP}h22" class="bmark"/><text x="150" y="${INNER_TOP + 3}" class="blabel">${CAP}</text>
-        <path d="M92 200l16-9M108 200l-16-9" class="bblade"/>
+        <g class="bblade-g"><path d="M92 200l16-9M108 200l-16-9" class="bblade"/></g>
+        <g id="bt-bub" clip-path="url(#bt-clip)">
+          <circle class="bub" cx="78" cy="198" r="4" style="animation-delay:0s"/>
+          <circle class="bub" cx="106" cy="204" r="3" style="animation-delay:.28s"/>
+          <circle class="bub" cx="92" cy="210" r="5" style="animation-delay:.55s"/>
+          <circle class="bub" cx="118" cy="200" r="3.5" style="animation-delay:.8s"/>
+        </g>
         <rect x="44" y="216" width="112" height="52" rx="14" class="bbase"/>
         <circle cx="100" cy="242" r="9" class="bbtn"/>
         <rect x="56" y="268" width="16" height="8" rx="3" class="bpart"/>
@@ -167,10 +173,10 @@ export async function render(root, args, query) {
       <div id="bt-list"></div>
       <div class="statgrid" style="margin-top:12px" id="bt-totals"></div>
       <div class="col" style="margin-top:14px">
-        <button class="btn btn-primary btn-lg btn-block" id="bt-use" type="button" disabled>Usar en el plato →</button>
+        <button class="btn btn-primary btn-lg btn-block btn-licuar" id="bt-use" type="button" disabled>${icon('cup')} ¡Licuar!</button>
         <button class="btn btn-block" id="bt-clear" type="button" disabled>${icon('trash')} Vaciar licuadora</button>
       </div>
-      <div class="hint">Al usarlo se abre el editor con el batido listo para guardar en tu día.</div>
+      <div class="hint">Al licuar suena la licuadora y el batido se abre listo en el editor para guardarlo en tu día.</div>
     </div>
   `;
 
@@ -383,10 +389,24 @@ export async function render(root, args, query) {
       const ok = await confirmSheet({ title: '¿Reemplazar el plato actual?', msg: `Ya tienes ${prev.items.length} ingrediente${prev.items.length === 1 ? '' : 's'} en el borrador. Se reemplazará por tu batido.`, okText: 'Reemplazar' });
       if (!ok) return;
     }
+    // ¡Licuar! → 1 s de sonido de licuadora + la licuadora licuando en pantalla
+    const btn = q('#bt-use');
+    const svg = q('#bt-svg');
+    const txt0 = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `${icon('cup')} Licuando…`;
+    svg.classList.add('blending');
+    licuar();
+    try { svg.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { /* si no se puede, sigue */ }
+    await new Promise(r => setTimeout(r, 1300));
+    svg.classList.remove('blending');
+    btn.innerHTML = txt0;
+    btn.disabled = false;
     const s = await sugerirTipo(date, items);
     setDraft(newDraft({ date, type: s.type, name: 'Batido', source: 'batido', items, mult: 1, note: desc.trim().slice(0, 140), _hint: s.hint }));
     sel.clear();
     desc = '';
+    check();                              // "check" al añadirse a los platos
     location.hash = '#/nuevo';
   };
 

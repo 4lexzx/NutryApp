@@ -8,8 +8,10 @@ let buf = null;
 let cargando = null;
 let bufCheck = null;
 let cargandoCheck = null;
+let bufLic = null;
+let cargandoLic = null;
 
-export function setSonidos(v) { activos = v !== false; if (activos) { cargarSonido(); cargarCheck(); } }
+export function setSonidos(v) { activos = v !== false; if (activos) { cargarSonido(); cargarCheck(); cargarLicuar(); } }
 export function sonidosActivos() { return activos; }
 
 function audioCtx() {
@@ -56,6 +58,23 @@ function cargarCheck() {
   return cargandoCheck;
 }
 
+/** Descarga y decodifica el ruido de la licuadora (~1 s). */
+function cargarLicuar() {
+  if (bufLic) return Promise.resolve(bufLic);
+  if (!cargandoLic) {
+    cargandoLic = fetch('./sfx/licuar.wav')
+      .then(r => (r && r.ok ? r.arrayBuffer() : Promise.reject(new Error('sin archivo'))))
+      .then(ab => new Promise((res, rej) => {
+        const c = audioCtx();
+        if (!c) rej(new Error('sin audio'));
+        else c.decodeAudioData(ab, res, rej);
+      }))
+      .then(b => { bufLic = b; return b; })
+      .catch(() => null);
+  }
+  return cargandoLic;
+}
+
 function tocar(buffer, gain) {
   try {
     const c = audioCtx();
@@ -79,6 +98,16 @@ export function check() {
   } catch (e) { /* silencio */ }
 }
 
+/** Suena la licuadora (~1 s) — al pulsar ¡Licuar!. */
+export function licuar() {
+  if (!activos) return;
+  try {
+    const c = audioCtx();
+    if (!c || !bufLic) { cargarLicuar(); return; }
+    tocar(bufLic, 0.9);
+  } catch (e) { /* silencio */ }
+}
+
 /** Suena el clic (si está encendido y el archivo ya cargó). */
 export function clic() {
   if (!activos) return;
@@ -99,7 +128,7 @@ export function clic() {
 const IMPORTANTE = [
   '#t-go', '#f-go', '#ai-retry',
   '#ed-save', '#ed-re', '#ed-base', '#ed-fav', '#ed-del',
-  '#pk-ok', '#ci-ok', '#bt-use', '#gy-save',
+  '#pk-ok', '#ci-ok', '#gy-save',
   '#s-key-save', '#s-key-test', '#s-water-save',
   '#s-install', '#s-backup', '#s-restore', '#s-csv1', '#s-csv2', '#s-csvall', '#s-clear',
   '#p-save', '#m-save', '#w-add', '#we-ok', '#we-del',
@@ -112,6 +141,7 @@ const IMPORTANTE = [
 export function initSonidos() {
   cargarSonido();
   cargarCheck();
+  cargarLicuar();
   let presion = null; // { el, x, y, id } del último botón importante pulsado
   document.addEventListener('pointerdown', e => {
     presion = null;
