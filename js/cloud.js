@@ -235,7 +235,12 @@ async function aplicar(filas) {
       if (f.borrado || f.data == null) {
         await DB.del(f.tienda, id);
       } else if (f.tienda === 'kv') {
-        await DB.kvSet(Object.assign({}, f.data, { k: f.fila_id }));
+        const nuevo = Object.assign({}, f.data, { k: f.fila_id });
+        if (f.fila_id === 'settings') {
+          const loc = await DB.kvGet('settings');
+          if (loc && loc.apiKey) nuevo.apiKey = loc.apiKey;  // la clave de Gemini solo existe en tu dispositivo
+        }
+        await DB.kvSet(nuevo);
       } else {
         await DB.put(f.tienda, f.data);
       }
