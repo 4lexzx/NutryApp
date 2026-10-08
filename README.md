@@ -558,6 +558,9 @@ bundler ni servidor propio.
 - **Fórmulas de metas**: `js/nutrition.js` (`calcTargets`).
 - **Colores/diseño**: `css/styles.css` (variables en `:root` y `[data-theme="light"]`).
 - **Nombre y colores del ícono**: `icons/` (PNG) y `manifest.webmanifest`.
+- **Sonidos**: archivos `.wav` en `sfx/` (tocar, check, licuar, fogata y agua). El del agua es una
+  **grabación real** (“Pouring Water” de Universfield vía **Pixabay**, Pixabay Content License:
+  uso libre, incluso comercial, sin atribución).
 - **Versión de la app**: se ve en **Ajustes → Acerca de** (`js/views/settings.js`, constante
   `VERSION`, formato `1.2.x`). **En cada cambio publicado sube el último dígito** (1.2.0 → 1.2.1
   → 1.2.2…) para que el usuario sepa de un vistazo si ya tiene la última actualización.
