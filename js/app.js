@@ -170,18 +170,39 @@ function setupSW() {
   const habiaControlador = !!navigator.serviceWorker.controller;
   let primeraVez = true;
   let recargando = false;
-  let avisoAct = false;
 
   // ¿Hay una versión nueva esperando? Señal global para el botón de Ajustes.
   window.__nutriAct = false;
+  const aplicarAct = async () => {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg && reg.waiting) reg.waiting.postMessage('skipWaiting');
+      else location.reload();
+    } catch (e) { location.reload(); }
+  };
+  window.__nutriAplicarAct = aplicarAct;
+
   const marcarActualizacion = () => {
     if (window.__nutriAct) return;
     window.__nutriAct = true;
     document.dispatchEvent(new CustomEvent('nutri-actualizacion'));
-    if (!avisoAct) {
-      avisoAct = true;
-      toast('Hay una nueva versión de la app: toca "Actualizar" en Ajustes.', 'ok');
-    }
+    if (sessionStorage.getItem('ng.updOculta') === '1') return;
+    if (document.querySelector('.upd-bar')) return;
+    const bar = document.createElement('div');
+    bar.className = 'upd-bar';
+    bar.setAttribute('role', 'status');
+    bar.innerHTML = '<span>' + icon('refresh') + ' Nueva versión lista</span>' +
+      '<button type="button" class="upd-go">Actualizar</button>' +
+      '<button type="button" class="upd-later" aria-label="Cerrar aviso">&times;</button>';
+    bar.querySelector('.upd-go').onclick = () => {
+      bar.querySelector('.upd-go').disabled = true;
+      aplicarAct();
+    };
+    bar.querySelector('.upd-later').onclick = () => {
+      sessionStorage.setItem('ng.updOculta', '1');
+      bar.remove();
+    };
+    document.body.appendChild(bar);
   };
   window.__nutriMarcarAct = marcarActualizacion;
 

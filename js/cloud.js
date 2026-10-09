@@ -6,14 +6,27 @@
    - La cola de pendientes vive en kv['syncq'] y NUNCA se sube. */
 
 import { DB, conAplicacionNube } from './db.js';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, nubeConfigurada } from './config.js';
-import { toast } from './util.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, nubeConfigurada, nubeAutomaticaOk } from './config.js';
+import { toast, todayISO, toISODate } from './util.js';
+import { currentUser } from './auth.js';
+import { calcTargets } from './nutrition.js';
 
 const SES = 'ng.nube';        // localStorage: sesión Supabase
+const OFF = 'ng.nube.off';     // localStorage: '1' = el usuario desconectó la nube a mano
 const COLA = 'syncq';         // kv: pendientes por subir {clave: op}
 const ULT = 'cloudUlt';       // kv: corte de la última bajada (fecha del servidor)
 const KV_NO_SUBIR = new Set([COLA, ULT, 'users']);
 const TIENDAS = ['meals', 'weights', 'favorites', 'water', 'platos'];
+
+/* Credenciales derivadas del candado local: el usuario nunca las ve y sus
+   datos quedan en una cuenta de nube con su mismo usuario/contraseña. */
+export function emailNubeDe(u) { return String(u || '').trim().toLowerCase() + '@nutrigym.app'; }
+function passNubeDe(p) {
+  const s = String(p || '');
+  return s.length >= 6 ? s : s + '0'.repeat(6 - s.length);   // Supabase exige mínimo 6
+}
+function autoOff() { try { return localStorage.getItem(OFF) === '1'; } catch (e) { return false; } }
+function autoOn() { try { localStorage.removeItem(OFF); } catch (e) { /* sin localStorage */ } }
 
 /* ---------------- sesión ---------------- */
 function sesion() {
@@ -68,6 +81,7 @@ export async function crearCuenta(email, pass) {
   const d = await postAuth('/auth/v1/signup', { email, password: pass });
   if (d && d.access_token) {
     guardaTokens(d, email);
+    autoOn();
     await primerSincronizado();
     return { confirmada: true };
   }
@@ -80,6 +94,7 @@ async function primerSincronizado() {
   const baj = await bajar(true).catch(() => 0);
   await empujar().catch(() => {});
   const r = await subirTodo();
+  await subirPerfilSocial().catch(() => {});
   if (vacia) {
     toast(`Nube conectada. Subí tus datos: ${r.subidas} registro${r.subidas === 1 ? '' : 's'}.`, 'ok');
   } else {
@@ -93,8 +108,39 @@ export async function conectar(email, pass) {
   if (!nubeConfigurada()) throw new Error('La nube todavía no está configurada en la app.');
   const d = await postAuth('/auth/v1/token?grant_type=password', { email, password: pass });
   guardaTokens(d, email);
+  autoOn();
   await primerSincronizado();
   return emailSesion();
+}
+
+/* Conexión automática: con el mismo usuario/contraseña del candado local se
+   entra en la nube (sin tocar nada). Si la cuenta no existe, se crea. */
+export async function conectarAutomatica(usuario, passLocal) {
+  if (!nubeConfigurada() || !nubeAutomaticaOk()) return false;
+  if (haySesion()) return true;
+  if (autoOff()) return false;
+  const email = emailNubeDe(usuario);
+  const pass = passNubeDe(passLocal);
+  try {
+    const d = await postAuth('/auth/v1/token?grant_type=password', { email, password: pass });
+    guardaTokens(d, email);
+  } catch (e) {
+    let creado = false;
+    try {
+      const s = await postAuth('/auth/v1/signup', { email, password: pass });
+      if (s && s.access_token) { guardaTokens(s, email); creado = true; }
+    } catch (e2) { /* la cuenta ya existe u otro fallo: probamos a entrar */ }
+    if (!creado && !haySesion()) {
+      try {
+        const d2 = await postAuth('/auth/v1/token?grant_type=password', { email, password: pass });
+        guardaTokens(d2, email);
+      } catch (e3) { return false; }
+    }
+  }
+  if (!haySesion()) return false;   // pidió confirmar el correo: seguimos en local
+  autoOn();
+  try { await primerSincronizado(); } catch (e) { /* sin red u otro fallo: seguimos */ }
+  return true;
 }
 
 export async function desconectar() {
@@ -107,6 +153,7 @@ export async function desconectar() {
   }
   guardaSesion(null);
   _uid = '';
+  try { localStorage.setItem(OFF, '1'); } catch (e) { /* sin localStorage */ }   // no reconectar sola
 }
 
 async function token() {
@@ -166,14 +213,6 @@ async function escribirCola(q) {
   if (Object.keys(q).length) await DB.kvSet({ k: COLA, q });
   else await DB.kvDel(COLA);
 }
-function limpiarDato(tienda, obj) {
-  if (tienda === 'kv' && obj && obj.k === 'settings') {
-    const c = Object.assign({}, obj);
-    delete c.apiKey;              // la clave de Gemini NUNCA viaja a la nube
-    return c;
-  }
-  return obj;
-}
 export async function encolar(tienda, id, op, data) {
   if (!haySesion()) return false;
   if (tienda === 'kv' && KV_NO_SUBIR.has(id)) return false;
@@ -181,7 +220,7 @@ export async function encolar(tienda, id, op, data) {
   const clave = tienda + ':' + id;
   q[clave] = op === 'del'
     ? { tienda, id, op: 'del', ts: Date.now() }
-    : { tienda, id, op: 'put', data: limpiarDato(tienda, data), ts: Date.now() };
+    : { tienda, id, op: 'put', data, ts: Date.now() };
   await escribirCola(q);
   programarSinc();
   return true;
@@ -241,7 +280,10 @@ async function aplicar(filas) {
         const nuevo = Object.assign({}, f.contenido, { k: f.clave });
         if (f.clave === 'settings') {
           const loc = await DB.kvGet('settings');
-          if (loc && loc.apiKey) nuevo.apiKey = loc.apiKey;  // la clave de Gemini solo existe en tu dispositivo
+          // la nube manda, salvo que la fila vieja ni siquiera traiga la clave
+          if (loc && loc.apiKey && !Object.prototype.hasOwnProperty.call(f.contenido, 'apiKey')) {
+            nuevo.apiKey = loc.apiKey;
+          }
         }
         await DB.kvSet(nuevo);
       } else {
@@ -290,6 +332,7 @@ export async function sincronizar({ silencioso = false } = {}) {
   try {
     const subidas = await empujar();
     const bajadas = await bajar(false);
+    await subirPerfilSocial().catch(() => {});
     if (!silencioso && (subidas || bajadas)) {
       const partes = [];
       if (subidas) partes.push(subidas + ' subidas');
@@ -344,13 +387,13 @@ export async function subirTodo() {
     for (const r of rows) {
       const id = claveFila(t, r);
       if (id === undefined || id === null) continue;
-      filas.push({ tienda: t, fila_id: String(id), data: limpiarDato(t, r) });
+      filas.push({ tienda: t, fila_id: String(id), data: r });
     }
   }
   const kvs = await DB.kvAll();
   for (const r of kvs) {
     if (KV_NO_SUBIR.has(r.k)) continue;
-    filas.push({ tienda: 'kv', fila_id: String(r.k), data: limpiarDato('kv', r) });
+    filas.push({ tienda: 'kv', fila_id: String(r.k), data: r });
   }
   const me = uidSesion();
   if (!me) throw new Error('Sin sesión en la nube.');
@@ -377,4 +420,119 @@ export async function bajarTodo() {
   const n = await bajar(true);
   avisarUI();
   return n;
+}
+
+/* ---------------- perfil social + amigos ---------------- */
+export function uidNube() { return uidSesion(); }
+
+function isoHoy() { return todayISO(); }
+
+/* Racha de comidas: días seguidos con al menos un registro (si hoy aún no
+   comiste, se mide hasta ayer para no cortar la racha a media jornada). */
+function rachaComidas(meals) {
+  const fechas = new Set(meals.map(m => m && m.date).filter(Boolean));
+  const d = new Date();
+  if (!fechas.has(todayISO())) d.setDate(d.getDate() - 1);
+  let r = 0;
+  for (; ;) {
+    const k = toISODate(d);
+    if (!fechas.has(k)) break;
+    r++;
+    d.setDate(d.getDate() - 1);
+  }
+  return r;
+}
+
+/* Resumen del día que ven tus amigos: kcal de hoy, meta y racha. */
+async function calcularPerfilSocial() {
+  const prof = (await DB.kvGet('profile')) || {};
+  let meta = (prof.targets && prof.targets.kcal) ? Number(prof.targets.kcal) : 0;
+  if (!meta && prof.weight && prof.height && prof.age) meta = calcTargets(prof).kcal || 0;
+  const meals = await DB.all('meals').catch(() => []);
+  const hoy = isoHoy();
+  let kcal = 0;
+  for (const m of meals) {
+    if (m && m.date === hoy) kcal += Number((m.totals && m.totals.kcal) || 0);
+  }
+  kcal = Math.round(kcal);
+  return {
+    usuario: currentUser() || '',
+    foto: prof.foto || null,
+    bio: prof.bio || '',
+    meta_kcal: Math.round(meta) || 0,
+    kcal_hoy: kcal,
+    cumplio: !!(meta && kcal >= meta),
+    racha: rachaComidas(meals),
+    actualizado: new Date().toISOString()
+  };
+}
+
+/* Sube tu ficha social (la llama la sincronización: queda siempre al día). */
+export async function subirPerfilSocial() {
+  if (!haySesion()) return false;
+  const me = uidSesion();
+  if (!me) return false;
+  const datos = await calcularPerfilSocial();
+  if (!datos.usuario) return false;
+  await rest('/perfiles?on_conflict=user_id', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: [Object.assign({ user_id: me }, datos)]
+  });
+  return true;
+}
+
+/* Perfiles de todos los usuarios (para pintar a tus amigos). */
+export async function bajarPerfiles() {
+  const r = await rest('/perfiles?select=*&limit=5000');
+  return r.d || [];
+}
+
+/* Tus amistades (pendientes en cualquier dirección + aceptadas). */
+export async function misAmistades() {
+  const me = uidSesion();
+  if (!me) return [];
+  const r = await rest('/amistades?select=*&or=(uno.eq.' + me + ',dos.eq.' + me + ')&limit=1000');
+  return r.d || [];
+}
+
+/* Pide amistad por usuario (el otro la acepta desde su Perfil). */
+export async function pedirAmistad(usuario) {
+  const nom = String(usuario || '').trim().toLowerCase();
+  if (!nom) return { ok: false, msg: 'Escribe un usuario.' };
+  const me = uidSesion();
+  if (!me) return { ok: false, msg: 'Sin sesión en la nube.' };
+  const r = await rest('/perfiles?select=user_id,usuario&usuario=eq.' + encodeURIComponent(nom) + '&limit=1');
+  const p = (r.d || [])[0];
+  if (!p) return { ok: false, msg: 'No hay nadie con ese usuario todavía.' };
+  if (p.user_id === me) return { ok: false, msg: 'Ese eres tú.' };
+  const ya = await rest('/amistades?select=*,id&or=(and(uno.eq.' + me + ',dos.eq.' + p.user_id +
+    '),and(uno.eq.' + p.user_id + ',dos.eq.' + me + '))&limit=1');
+  if ((ya.d || []).length) return { ok: false, msg: 'Ya existe una solicitud entre ustedes.' };
+  await rest('/amistades', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: { uno: me, dos: p.user_id, estado: 'pendiente', actualizado: new Date().toISOString() }
+  });
+  return { ok: true, usuario: p.usuario || nom };
+}
+
+/* Acepta o rechaza una solicitud (la ve el destino). */
+export async function responderAmistad(id, aceptar) {
+  if (aceptar) {
+    await rest('/amistades?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: { estado: 'aceptada', actualizado: new Date().toISOString() }
+    });
+  } else {
+    await rest('/amistades?id=eq.' + encodeURIComponent(id), { method: 'DELETE' });
+  }
+  return true;
+}
+
+/* Cancela una solicitud que tú enviaste (o quita la amistad). */
+export async function quitarAmistad(id) {
+  await rest('/amistades?id=eq.' + encodeURIComponent(id), { method: 'DELETE' });
+  return true;
 }

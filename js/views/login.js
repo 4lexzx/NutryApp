@@ -1,8 +1,9 @@
-/* Pantalla de acceso: candado local, sin servidor.
-   Muestra dos formularios: iniciar sesión y crear usuario (este dispositivo). */
+/* Pantalla de acceso: candado local + nube automática.
+   Al entrar (o crear usuario), los datos se conectan solos a la nube. */
 
 import { icon } from '../icons.js';
 import { verify, createUser, setSession } from '../auth.js';
+import { conectarAutomatica } from '../cloud.js';
 
 export async function render(root, onOk) {
   root.innerHTML = `
@@ -68,7 +69,7 @@ export async function render(root, onOk) {
         <button class="auth-link" id="rg-back" type="button">Ya tengo una cuenta</button>
       </form>
 
-      <p class="auth-hint">${icon('shield')}<span>Tus datos se guardan solo en este dispositivo. No hay cuenta en internet.</span></p>
+      <p class="auth-hint">${icon('upload')}<span>Entras con tu usuario y tus datos quedan guardados en tu cuenta, en cualquier dispositivo.</span></p>
     </div>`;
 
   const form = root.querySelector('#auth-form');
@@ -101,7 +102,7 @@ export async function render(root, onOk) {
     form.classList.toggle('hidden', creating);
     regForm.classList.toggle('hidden', !creating);
     sub.textContent = creating
-      ? 'Crea tu usuario en este dispositivo'
+      ? 'Crea tu usuario: tus datos quedan en tu cuenta'
       : 'Inicia sesión para ver tus comidas del día';
     clearError();
     clearRegError();
@@ -130,6 +131,14 @@ export async function render(root, onOk) {
     if (typeof onOk === 'function') onOk(user);
   };
 
+  /* La nube se conecta sola (en segundo plano, sin bloquear la app). */
+  const autoNube = (user, pass) => {
+    try {
+      const p = conectarAutomatica(user, pass);
+      if (p && p.catch) p.catch(() => {});
+    } catch (e) { /* sin nube la app sigue en local */ }
+  };
+
   form.addEventListener('submit', async e => {
     e.preventDefault();
     const u = userInput.value.trim();
@@ -143,6 +152,7 @@ export async function render(root, onOk) {
       const r = await verify(u, p);
       if (!r.ok) { showError(errBox, form, userInput, r.msg); return; }
       enter(r.user);
+      autoNube(r.user, p);
     } catch (err) {
       showError(errBox, form, userInput, 'No se pudo comprobar el acceso. Inténtalo de nuevo.');
     } finally {
@@ -166,6 +176,7 @@ export async function render(root, onOk) {
       const r = await createUser(u, p);
       if (!r.ok) { showError(regErrBox, regForm, regUser, r.msg); return; }
       enter(r.user);
+      autoNube(r.user, p);
     } catch (err) {
       showError(regErrBox, regForm, regUser, 'No se pudo crear el usuario. Inténtalo de nuevo.');
     } finally {

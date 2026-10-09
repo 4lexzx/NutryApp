@@ -4,13 +4,16 @@ import { DB, getProfile, saveProfile } from '../db.js';
 import { icon } from '../icons.js';
 import { calcTargets, bmr, tdee, ACTIVIDADES, OBJETIVOS, SEXOS } from '../nutrition.js';
 import { lineChart } from '../charts.js';
-import { todayISO, esc, num, toast, confirmSheet, openSheet, fmtShortDate, fromISODate, toISODate, uid, DIAS } from '../util.js';
+import { todayISO, esc, num, toast, confirmSheet, openSheet, fmtShortDate, fromISODate, toISODate, uid, DIAS, pickFile, fileToDataURL, resizeImage } from '../util.js';
+import { currentUser } from '../auth.js';
+import { haySesion, uidNube, pedirAmistad, misAmistades, responderAmistad, quitarAmistad, bajarPerfiles } from '../cloud.js';
 import { PLAN_RANGOS, PLAN_RANGO_DEF, rangoLabel } from './gym.js';
 
 export async function render(root) {
   const p = (await getProfile()) || {
     weight: '', height: '', age: '', sex: 'hombre', activity: 1.55, objective: 'mantenimiento'
   };
+  const conNube = haySesion();
   const gymRango = (p.gymDays && PLAN_RANGOS.indexOf(p.gymDays) >= 0) ? p.gymDays : PLAN_RANGO_DEF;
   const weights = (await DB.all('weights')).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const isNew = !(await getProfile());
@@ -20,6 +23,40 @@ export async function render(root) {
 
   root.innerHTML = `
     <h1>Mi perfil</h1>
+
+    <div class="card">
+      <div class="card-title"><h3>${icon('user')} Perfil social</h3>
+        <span class="badge ${conNube ? 'ok' : 'warn'}">${conNube ? 'en la nube' : 'solo local'}</span></div>
+      <div class="soc-head">
+        <div class="avatar">${p.foto ? `<img src="${p.foto}" alt="Foto de perfil">` : icon('user')}</div>
+        <div style="flex:1;min-width:0">
+          <b>${esc(currentUser() || '')}</b>
+          <div class="hint" style="margin:3px 0 0">Este es tu usuario: así te encuentran tus amigos.</div>
+          <div class="row" style="margin-top:8px;gap:8px">
+            <button class="btn btn-sm btn-outline" id="p-photo" type="button">${icon('camera')} ${p.foto ? 'Cambiar foto' : 'Poner foto'}</button>
+            ${p.foto ? '<button class="btn btn-sm btn-ghost" id="p-photo-del" type="button">Quitar</button>' : ''}
+          </div>
+        </div>
+      </div>
+      <label class="field"><span class="lbl">Bio (opcional, la ven tus amigos)</span>
+        <textarea id="p-bio" maxlength="140" style="min-height:68px" placeholder="Ej. Entreno 4 veces por semana">${esc(p.bio || '')}</textarea></label>
+      <button class="btn btn-primary btn-block" id="p-social" type="button">${icon('check')} Guardar perfil social</button>
+      <div class="hint">La foto y la bio se guardan en tu cuenta y se suben solas con la sincronización.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><h3>${icon('userCheck')} Amigos</h3>
+        <span class="badge" id="am-badge" style="display:none">0</span></div>
+      ${!conNube ? `<div class="note">Conecta la nube para tener amigos y ver cómo llevan su día. Tu usuario sería <b>${esc(currentUser() || '')}</b>.</div>` : `
+      <div class="row" style="margin-bottom:6px">
+        <input id="am-in" type="text" placeholder="Buscar amigo por usuario" autocapitalize="none" autocorrect="off" autocomplete="off">
+        <button class="btn btn-primary" id="am-add" type="button" style="flex:none">${icon('plus')}</button>
+      </div>
+      <div id="am-req"></div>
+      <div id="am-out"></div>
+      <div id="am-list"></div>
+      <p class="tiny muted" id="am-empty" style="display:none"></p>`}
+    </div>
 
     <div class="card">
       <div class="card-title"><h3>${icon('barChart')} Datos</h3>${isNew ? '<span class="badge warn">nuevo</span>' : ''}</div>
@@ -101,6 +138,159 @@ export async function render(root) {
       ${!weights.length ? '<p class="tiny muted">Aún no hay registros.</p>' : ''}
     </div>
   `;
+
+  // ---- perfil social: foto y bio ----
+  const guardarSocial = async cambios => {
+    const base = (await getProfile()) || {
+      weight: '', height: '', age: '', sex: 'hombre', activity: 1.55, objective: 'mantenimiento'
+    };
+    await saveProfile(Object.assign(base, cambios));
+  };
+
+  const photoBtn = root.querySelector('#p-photo');
+  if (photoBtn) photoBtn.onclick = async () => {
+    const f = await pickFile('image/*');
+    if (!f) return;
+    try {
+      const dUrl = await resizeImage(await fileToDataURL(f), 320, 0.82);
+      await guardarSocial({ foto: dUrl });
+      toast('Foto de perfil guardada.', 'ok');
+      render(root);
+    } catch (e) { toast('No pude cargar esa imagen.', 'warn'); }
+  };
+  const photoDel = root.querySelector('#p-photo-del');
+  if (photoDel) photoDel.onclick = async () => {
+    await guardarSocial({ foto: null });
+    toast('Foto quitada.', 'ok');
+    render(root);
+  };
+  const socialBtn = root.querySelector('#p-social');
+  if (socialBtn) socialBtn.onclick = async () => {
+    const bio = (root.querySelector('#p-bio').value || '').trim().slice(0, 140);
+    await guardarSocial({ bio });
+    toast('Perfil social guardado. Tus amigos ya lo ven.', 'ok');
+    render(root);
+  };
+
+  // ---- amigos: solicitudes + el día de tus amigos ----
+  if (conNube) cargarAmigos();
+
+  async function cargarAmigos() {
+    const badge = root.querySelector('#am-badge');
+    if (!badge) return;
+    const reqBox = root.querySelector('#am-req');
+    const outBox = root.querySelector('#am-out');
+    const listBox = root.querySelector('#am-list');
+    const empty = root.querySelector('#am-empty');
+    const me = uidNube();
+    let amis = [], perfs = [];
+    try {
+      [amis, perfs] = await Promise.all([misAmistades(), bajarPerfiles()]);
+    } catch (e) {
+      empty.style.display = '';
+      empty.textContent = 'No pude cargar amigos. Revisa tu conexión con la nube.';
+      return;
+    }
+    const buscar = id => perfs.find(x => x.user_id === id) || null;
+    const avatar = id => { const pf = buscar(id); return pf && pf.foto ? `<img src="${pf.foto}" alt="">` : icon('user'); };
+    const nombre = id => { const pf = buscar(id); return (pf && pf.usuario) || 'amigo'; };
+
+    const entrantes = amis.filter(a => a.estado === 'pendiente' && a.dos === me);
+    const salientes = amis.filter(a => a.estado === 'pendiente' && a.uno === me);
+    const aceptadas = amis.filter(a => a.estado === 'aceptada');
+
+    badge.style.display = aceptadas.length ? '' : 'none';
+    badge.className = 'badge ok';
+    badge.textContent = String(aceptadas.length);
+
+    reqBox.innerHTML = entrantes.length ? `<div class="divider"></div><b>Solicitudes recibidas</b>` + entrantes.map(a => `
+      <div class="list-item am-item">
+        <div class="avatar xs">${avatar(a.uno)}</div>
+        <div class="li-main"><div class="li-t">${esc(nombre(a.uno))}</div>
+          <div class="li-s">quiere ser tu amigo</div></div>
+        <div class="li-end">
+          <button class="btn btn-sm btn-primary" data-am-ok="${a.id}" type="button" title="Aceptar">${icon('check')}</button>
+          <button class="btn btn-sm btn-ghost" data-am-no="${a.id}" type="button" title="Rechazar">${icon('x')}</button>
+        </div>
+      </div>`).join('') : '';
+
+    outBox.innerHTML = salientes.length ? `<div class="divider"></div><b>Solicitudes enviadas</b>` + salientes.map(a => `
+      <div class="list-item am-item">
+        <div class="avatar xs">${avatar(a.dos)}</div>
+        <div class="li-main"><div class="li-t">${esc(nombre(a.dos))}</div>
+          <div class="li-s">esperando respuesta…</div></div>
+        <div class="li-end"><button class="btn btn-sm btn-ghost" data-am-x="${a.id}" type="button" title="Cancelar">${icon('x')}</button></div>
+      </div>`).join('') : '';
+
+    const hoy = todayISO();
+    listBox.innerHTML = aceptadas.length ? `<div class="divider"></div><b>Hoy</b>` + aceptadas.map(a => {
+      const fid = a.uno === me ? a.dos : a.uno;
+      const pf = buscar(fid) || {};
+      const meta = Number(pf.meta_kcal) || 0;
+      const kcal = Number(pf.kcal_hoy) || 0;
+      const ok = !!pf.cumplio;
+      const racha = Number(pf.racha) || 0;
+      const viejo = !pf.actualizado || toISODate(new Date(pf.actualizado)) !== todayISO();
+      const detalle = meta ? `${num(kcal)} / ${num(meta)} kcal` : `${num(kcal)} kcal`;
+      const estado = ok ? 'meta ✓' : (meta ? Math.round(kcal / meta * 100) + '%' : num(kcal));
+      return `
+      <div class="list-item am-item" style="cursor:default">
+        <div class="avatar sm">${avatar(fid)}</div>
+        <div class="li-main">
+          <div class="li-t">${esc(nombre(fid))}</div>
+          <div class="li-s">${viejo ? 'aún sin datos de hoy' : detalle}${racha ? ' · ' + icon('flame') + ' ' + racha + (racha === 1 ? ' día' : ' días') : ''}</div>
+          ${pf.bio ? `<div class="am-bio">${esc(pf.bio)}</div>` : ''}
+        </div>
+        <div class="li-end">${viejo ? '' : `<span class="badge ${ok ? 'ok' : 'warn'}">${estado}</span>`}</div>
+      </div>`;
+    }).join('') : '';
+
+    const nada = !entrantes.length && !salientes.length && !aceptadas.length;
+    empty.style.display = nada ? '' : 'none';
+    if (nada) empty.textContent = 'Aún no tienes amigos. Busca arriba con su usuario (el nombre con el que entra a la app).';
+
+    root.querySelectorAll('[data-am-ok]').forEach(b => b.onclick = async () => {
+      try {
+        await responderAmistad(Number(b.dataset.amOk), true);
+        toast('Amistad aceptada.', 'ok');
+      } catch (e) { toast('No pude aceptar. Revisa la nube.', 'warn'); }
+      cargarAmigos();
+    });
+    root.querySelectorAll('[data-am-no]').forEach(b => b.onclick = async () => {
+      try {
+        await responderAmistad(Number(b.dataset.amNo), false);
+        toast('Solicitud rechazada.', 'ok');
+      } catch (e) { toast('No pude rechazar. Revisa la nube.', 'warn'); }
+      cargarAmigos();
+    });
+    root.querySelectorAll('[data-am-x]').forEach(b => b.onclick = async () => {
+      try {
+        await quitarAmistad(Number(b.dataset.amX));
+        toast('Solicitud cancelada.', 'ok');
+      } catch (e) { toast('No pude cancelar. Revisa la nube.', 'warn'); }
+      cargarAmigos();
+    });
+  }
+
+  async function buscarAmigo() {
+    const v = (root.querySelector('#am-in').value || '').trim().toLowerCase();
+    if (!v) { toast('Escribe el usuario de tu amigo.', 'warn'); return; }
+    let r;
+    try {
+      r = await pedirAmistad(v);
+    } catch (e) { toast('No pude buscar. Revisa la nube.', 'warn'); return; }
+    if (r.ok) {
+      root.querySelector('#am-in').value = '';
+      toast(`Solicitud enviada a ${r.usuario}.`, 'ok');
+      cargarAmigos();
+    } else {
+      toast(r.msg, 'warn');
+    }
+  }
+  const amAdd = root.querySelector('#am-add');
+  if (amAdd) amAdd.onclick = buscarAmigo;
+  const amIn = root.querySelector('#am-in');
+  if (amIn) amIn.onkeydown = e => { if (e.key === 'Enter') buscarAmigo(); };
 
   // ---- guardar perfil ----
   root.querySelector('#p-save').onclick = async () => {

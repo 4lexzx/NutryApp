@@ -35,7 +35,7 @@ celular** y viaja únicamente en cada consulta a `/api/ai`, que solo hace de pue
 |---|---|---|
 | Interfaz (pantallas) | HTML + CSS + JavaScript puro (sin frameworks) | No |
 | Tus datos (perfil, comidas, pesos, favoritos) | **IndexedDB** (base de datos de tu navegador) | No |
-| Sincronizarlos con la nube (**opcional**) | **Supabase** (cuenta propia, con RLS) | **Sí, solo eso** |
+| Sincronizarlos con la nube (**automática al iniciar sesión**) | **Supabase** (cuenta propia, con RLS) | **Sí, solo eso** |
 | Ver el día, el historial y los gráficos | Se lee de IndexedDB | No |
 | Guardar comidas, editar, favoritos | Se escribe en IndexedDB | No |
 | **Análisis de platos con IA** | Tu clave de Gemini (pegada en Ajustes → IA) enviada a `/api/ai` en **Vercel**, que llama a **Gemini** | **Sí, solo eso** |
@@ -54,7 +54,8 @@ APP_Nutri/
 │   └── ai.js                  ← servidor: recibe la foto/texto + tu clave y llama a Gemini
 ├── supabase/
 │   ├── schema.sql             ← SQL para crear la base de la nube: tabla `registros` + vistas legibles
-│   └── migracion_v2_1.sql     ← SQL para ordenar una base ya existente (renombra `datos` → `registros`)
+│   ├── migracion_v2_1.sql     ← SQL para ordenar una base ya existente (renombra `datos` → `registros`)
+│   └── migracion_v2_2_social.sql ← SQL para añadir el perfil social: `perfiles` (foto, bio, racha) y `amistades`
 ├── icons/                     ← íconos PNG (192, 512 y maskable)
 ├── css/styles.css             ← diseño oscuro/claro, móvil primero, botones grandes
 └── js/
@@ -89,9 +90,10 @@ APP_Nutri/
    de modelo en **Ajustes → IA** (o seguir a mano: no gasta cuota).
 2. **Costo: $0.** Mientras **no actives la facturación** en Google Cloud, solo existe la cuota
    gratuita. Nunca actives Billing para esta app.
-3. **Tu API key de Gemini se guarda solo en el celular donde la pegas** (Ajustes → IA). No se sube
-   a la nube ni queda en el servidor: viaja únicamente en esa petición a `/api/ai`. Usa una clave
-   con cuota gratuita y **no actives facturación**.
+3. **Tu API key de Gemini vive en Ajustes → IA**: si la nube está conectada se guarda **en tu
+   cuenta de la nube** (solo tú puedes verla, con las políticas RLS) y aparece en cualquier
+   dispositivo donde entres; si no, se queda en ese celular. Para analizar viaja únicamente en
+   esa petición a `/api/ai`. Usa una clave con cuota gratuita y **no actives facturación**.
 4. **Si borras los datos del navegador (o actualizas Android de forma agresiva), pierdes el
    historial** (a menos que tengas la nube conectada, que lo restaura solo). También puedes hacer
    respaldos `.json` seguido (paso 8).
@@ -266,6 +268,10 @@ caracteres, y ya queda creada **solo en ese dispositivo**. No hace falta exporta
 
 1. **Perfil** (pestaña 💪): peso, estatura, edad, sexo, nivel de actividad y objetivo
    (déficit / mantenimiento / ganar músculo sin ganar grasa / superávit).
+   Con la nube conectada, arriba tienes tu **perfil social**: tu **foto** y tu **bio** (se suben
+   solas con la sincronización) y la tarjeta **Amigos**: busca a alguien **por usuario**, acepta
+   o rechaza solicitudes y mira el día de tus amigas/os — **kcal de hoy contra su meta, si la
+   cumplieron y su racha** — sin ver nada más de su información.
 2. Pulsa **“🧮 Calcular mis metas”**. Verás:
    - tu **gasto calórico (TDEE)** y la fórmula usada paso a paso (Mifflin-St Jeor × factor de
      actividad, luego el % del objetivo: −20% déficit, 0% mantenimiento y recomposición,
@@ -475,10 +481,6 @@ decirte que lo dejaste manual.
   iPhone** (PWA
    instalada en la pantalla de inicio, iOS 16.4+) mientras la app esté abierta o en segundo plano;
    al tocar el aviso se abre **Hoy**. Todo se programa en tu celular, sin servidores ni costo.
-- **💛 Avisos de ánimo** (mismo lugar: **Ajustes → Recordatorios**): un chip aparte, apagado por
-   defecto, que te manda **una frase motivadora al día** a la hora que elijas (por defecto **17:30**),
-   determinista: el mismo día siempre es la misma frase y al día siguiente cambia. Trae **hora
-   editable** y botón **“Probar aviso de ánimo”** para verla al instante; se apaga con el mismo chip.
 
 ### Historial (📊)
 
@@ -603,7 +605,7 @@ bundler ni servidor propio.
   la descarga de los archivos nuevos en el celular.
 - **URL de la nube y configuración**: `js/config.js` (URL y clave pública de Supabase; la clave
   pública no es secreta, pero si prefieres no subirla, déjala vacía y pégala en el navegador).
-- **Sincronización**: `js/cloud.js`; estructura de la nube en `supabase/schema.sql` (o `supabase/migracion_v2_1.sql` si tu base es de una versión anterior).
+- **Sincronización**: `js/cloud.js`; estructura de la nube en `supabase/schema.sql` (usa `supabase/migracion_v2_1.sql` si tu base viene de una versión anterior, y `supabase/migracion_v2_2_social.sql` para añadir el perfil social: `perfiles` y `amistades`).
 - **Servidor de IA**: `api/ai.js` (recibe la petición en Vercel —con la clave que envía el cliente
   en ese mismo request— y llama a Gemini). `vercel.json` solo ajusta el tiempo máximo (60 s).
 
@@ -620,9 +622,11 @@ python -m http.server 8080
 
 ## 12. La nube (Supabase): sincronizar tus datos
 
-La app **siempre** guarda primero en tu celular; la nube es **opcional** y se enciende desde
-**Ajustes → Nube**. Usas **tu propia cuenta de Supabase** (gratis para empezar): nadie más ve tus
-datos gracias a las políticas de seguridad (RLS) de la tabla.
+La app **siempre** guarda primero en tu celular y, **en cuanto entras con tu usuario, la nube se
+conecta sola** (mismo usuario y contraseña del candado): tus datos quedan en **tu cuenta**, en
+cualquier dispositivo donde entres. Usas **tu propia cuenta de Supabase** (gratis para empezar):
+nadie más ve tus datos gracias a las políticas de seguridad (RLS) de la tabla. La tarjeta
+**Nube** de Ajustes te deja desconectar, sincronizar a mano o crear otra cuenta si quieres.
 
 ### 12.1 Crear la base de datos (una sola vez)
 
@@ -631,6 +635,7 @@ datos gracias a las políticas de seguridad (RLS) de la tabla.
 3. Abre el archivo `supabase/schema.sql` de este repo, cópialo **tal cual** y pégalo → **Run**
    (debe decir “Success”). Eso crea la tabla `registros` con permisos RLS: cada cuenta solo ve lo suyo,
    y las vistas **comidas, pesos, agua, favoritos, platos y ajustes** (léen como tablas simples).
+   También crea las tablas del **perfil social** (`perfiles` con foto/bio/racha y `amistades`).
 4. En **Authentication → Sign In / Providers**: **desactiva “Confirm email”** (así tu cuenta
    queda lista al instante; es tu cuenta privada).
 
@@ -643,13 +648,14 @@ datos gracias a las políticas de seguridad (RLS) de la tabla.
 
 ### 12.3 Conectar (en cada dispositivo)
 
-1. **Ajustes → Nube**.
-2. Si es la primera vez: pulsa **Crear cuenta** (correo + contraseña de la nube — anótalas).
-   Si ya tienes: escribe usuario y contraseña y pulsa **Conectar**.
-3. La app **sube todo lo que tengas** y te muestra el conteo (*“Subí tus datos: N registros”*).
-4. El badge de la tarjeta te dice el estado: **conectada**, **desconectada**,
+1. **Entra con tu usuario del candado** y la nube se conecta sola: usa ese mismo usuario y
+   contraseña para generar la cuenta de Supabase (el correo queda como
+   `tuusuario@nutrigym.app`; nunca escribes ni ves esas credenciales).
+2. La app **sube todo lo que tengas** y te muestra el conteo (*"Subí tus datos: N registros"*);
+   si la nube ya tenía datos de otro dispositivo, **baja** esos también.
+3. El badge de la tarjeta **Nube** (Ajustes) te dice el estado: **conectada**, **desconectada**,
    **N cambios pendientes** o **Todo sincronizado**. También hay botones **Subir todo**,
-   **Bajar todo** y **Sincronizar**.
+   **Bajar todo** y **Sincronizar**, y puedes crear/conectar **otra cuenta a mano** si quieres.
 
 ### Cómo se comporta
 
@@ -658,8 +664,9 @@ datos gracias a las políticas de seguridad (RLS) de la tabla.
   volver (el badge te avisa). Al abrir la app o volver a conectar, **baja** los últimos cambios.
 - **La primera vez que conectas**: si tu nube está vacía, sube todo lo local; si ya hay datos en
   la nube, baja esos y los mezcla con los tuyos (gana lo más reciente).
-- **No se sincronizan**: tu clave de Gemini (se queda en el celular donde la pegaste), la **lista de
-  usuarios** del candado local ni el historial de cambios pendientes.
+- **No se sincronizan**: la **lista de usuarios** del candado local ni el historial de cambios
+  pendientes. (Tu clave de Gemini **sí** viaja con tu cuenta de la nube, para tenerla en todos
+  tus dispositivos; solo tú puedes leerla.)
 - Dos dispositivos con la misma cuenta nube ven **los mismos datos**. El candado local de la app
   (usuario `alexsu`) sigue existiendo: protege la app en ese dispositivo, no sustituye a la cuenta
   de la nube.

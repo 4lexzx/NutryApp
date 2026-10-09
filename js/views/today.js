@@ -83,8 +83,6 @@ export async function render(root, params) {
       </div>
     </div>
 
-    <div class="disclaimer"><span>${icon('alert')}</span><span>Los valores son <b>estimaciones</b> (IA + tabla de referencia), no mediciones exactas.</span></div>
-
     ${gymCard(gym, date, gymBonus, gy)}
 
     <div class="card">

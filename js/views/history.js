@@ -78,8 +78,6 @@ export async function render(root, args, query) {
       <div class="tiny muted">Promedio total del período: <b>${num(sums.kcal)} kcal</b> · ${num(sums.p)} g proteína · ${num(sums.c)} g carbos · ${num(sums.f)} g grasas</div>
     </div>
 
-    <div class="disclaimer"><span>${icon('alert')}</span><span>Valores estimados. Comparar promedios tiene más sentido que fijarse en un solo día.</span></div>
-
     ${isWeek ? weekRows(stat, goal) : monthRows(stat)}
   `;
 

@@ -46,9 +46,8 @@ export async function renderStart(root, args, query) {
 
     <div id="lg-body"></div>
 
-    ${!hasKey ? `<div class="note">${icon('key')} <b>Todavía no configuraste Gemini.</b> La app funciona igual para registrar
-      comidas <b>manual</b> o desde <b>favoritos</b> sin gastar cuota. Si quieres el análisis automático con IA,
-      ve a <a href="#/ajustes">Ajustes → IA</a> y pega tu API key.<br><a href="#/ia">Cómo obtener una key gratis →</a></div>` : ''}
+    ${!hasKey ? `<div class="note">${icon('key')} Falta tu API key: pégala en <a href="#/ajustes">Ajustes</a>.
+      <a href="#/ia">Cómo obtener una gratis →</a></div>` : ''}
   `;
 
   root.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
@@ -94,9 +93,8 @@ function renderFoto(body, date, hasKey) {
       <label class="field" style="margin-top:12px"><span class="lbl">Descripción opcional (mejora la precisión)</span>
         <textarea id="f-desc" rows="2" placeholder="Ej. almuerzo de gimnasio, con poco arroz y doble presa de pollo">${esc(state.desc)}</textarea></label>
       <button class="btn btn-accent btn-lg btn-block" id="f-go" type="button">${icon('sparkles')} Analizar con la IA${n > 1 ? ` (${n} fotos)` : ''}</button>
-      ${!hasKey ? `<div class="hint">Necesitas tu API key: <a href="#/ajustes">Ajustes → IA</a>.</div>` : ''}
+      ${!hasKey ? `<div class="hint">Falta tu API key: pégala en <a href="#/ajustes">Ajustes</a>.</div>` : ''}
       ${n > 1 ? `<div class="hint">Se analizará foto por foto y todo se junta en un solo plato (nombres, ingredientes y totales).</div>` : ''}
-      <div class="hint">Las fotos se envían <b>solo</b> a Google Gemini para el análisis; no se suben a ningún otro servidor.</div>
     </div>
     <div class="hero-actions">
       <button class="btn btn-block" id="f-manual" type="button">${icon('pencil')} Escribir / ingresar a mano</button>
@@ -120,8 +118,8 @@ function renderTexto(body, date, hasKey) {
       <label class="field"><span class="lbl">¿Qué comiste?</span>
         <textarea id="t-desc" rows="4" placeholder="Ej. 1 lomo saltado con arroz (poco), 1 vaso de chicha morada, 1 presa de pollo a la brasa">${esc(state.desc)}</textarea></label>
       <button class="btn btn-accent btn-lg btn-block" id="t-go" type="button">${icon('sparkles')} Analizar con la IA</button>
-      ${!hasKey ? `<div class="hint">Necesitas tu API key: <a href="#/ajustes">Ajustes → IA</a>.</div>` : ''}
-      <div class="hint">No consume fotos (usa menos cuota). También puedes guardar sin IA desde la pestaña “Manual”.</div>
+      ${!hasKey ? `<div class="hint">Falta tu API key: pégala en <a href="#/ajustes">Ajustes</a>.</div>` : ''}
+      <div class="hint">También puedes guardar sin analizar desde la pestaña “Manual”.</div>
     </div>`;
   body.querySelector('#t-desc').oninput = e => { state.desc = e.target.value; };
   body.querySelector('#t-go').onclick = () => runAI({ date, hasKey, usePhoto: false });
@@ -181,7 +179,6 @@ async function renderFavoritos(body, date, favorites) {
     <div class="card">
       <div class="card-title"><h3>${icon('star')} Tus platos guardados</h3>
         <span class="badge">${favorites.length}</span></div>
-      <p class="tiny muted">Reutilizar un favorito <b>no gasta consultas</b> a la IA.</p>
       ${favorites.length ? favorites.map(f => {
     const t = computeTotals(f.items);
     return `<button class="list-item" data-f="${f.id}" type="button">
@@ -386,7 +383,7 @@ function preguntarVariante(a) {
       <div class="chips big">
         ${a.opciones.map(o => `<button type="button" class="chip" data-ac="${esc(o)}">${esc(o)}</button>`).join('')}
       </div>
-      <button class="btn btn-ghost btn-block" type="button" data-ac-skip style="margin-top:12px">Omitir (que la IA suponga)</button>`,
+      <button class="btn btn-ghost btn-block" type="button" data-ac-skip style="margin-top:12px">Omitir</button>`,
       { sticky: true });
     const onEsc = e => { if (e.key === 'Escape') terminar(null); };
     const terminar = v => { document.removeEventListener('keydown', onEsc); s.close(); resolve(v); };
@@ -517,10 +514,10 @@ async function runAI({ date, hasKey, usePhoto }) {
       const suf = plan.mult !== 1 ? ` ×${qtyTexto(plan.mult)}` : '';
       await montarDraftIA({
         date, name: base.nombre || desc, source: 'base', items, photo: '',
-        note: notaPlato('Base local · sin gastar cuota', { supuestos: base.supuestos }),
+        note: notaPlato('Base local', { supuestos: base.supuestos }),
         mult: plan.mult, baseClave: clave
       });
-      toast(`Tu base local: ${base.nombre || desc}${suf} (sin consultar la IA).`, 'ok');
+      toast(`Base local: ${base.nombre || desc}${suf}.`, 'ok');
       return;
     }
   }
@@ -529,10 +526,10 @@ async function runAI({ date, hasKey, usePhoto }) {
   body.innerHTML = `
     <div class="card loading-block">
       <div class="spinner"></div>
-      <b>Analizando con Gemini…</b>
+      <b>Analizando…</b>
       <p class="small muted">${nFotos > 1 ? `<b id="ai-prog">Foto 1 de ${nFotos}: analizando…</b><br>` : ''}
       Estos pasos pueden tardar entre 5 y 25 segundos.<br>
-      ${usePhoto ? `Enviando ${nFotos} foto${nFotos === 1 ? '' : 's'} + tus instrucciones de IA` : 'Enviando descripción + tus instrucciones de IA'}.</p>
+      ${usePhoto ? `Enviando ${nFotos} foto${nFotos === 1 ? '' : 's'}…` : 'Procesando tu descripción…'}</p>
       <button class="btn btn-ghost btn-sm" id="ai-cancel" type="button">Cancelar</button>
     </div>`;
 
@@ -609,7 +606,7 @@ async function runAI({ date, hasKey, usePhoto }) {
         : `Porción ×${plan.mult}: los gramos ya salen ajustados`;
       toast(`${como} (lo pediste tú). Revisa antes de guardar.`, 'ok');
     } else if (sumG > 700) {
-      toast(`La IA estimó ${Math.round(sumG)} g para un solo plato: revisa los gramos antes de guardar.`, 'warn');
+      toast(`Sugerencia: ${Math.round(sumG)} g para un solo plato; revisa los gramos antes de guardar.`, 'warn');
     } else {
       toast('Plato detectado. Revisa y corrige antes de guardar.', 'ok');
     }
@@ -623,8 +620,8 @@ async function runAI({ date, hasKey, usePhoto }) {
         <div class="col">
           <button class="btn btn-primary btn-block" id="ai-retry" type="button">Reintentar</button>
           <a class="btn btn-block" href="#/registrar?d=${date}">Elegir otra opción</a>
-          <a class="btn btn-ghost btn-block" href="#/ajustes">Ir a Ajustes → IA</a>
-          <button class="btn btn-ghost btn-block" id="ai-manual" type="button">${icon('pencil')} Ingresar a mano (sin IA)</button>
+          <a class="btn btn-ghost btn-block" href="#/ajustes">Ir a Ajustes</a>
+          <button class="btn btn-ghost btn-block" id="ai-manual" type="button">${icon('pencil')} Ingresar a mano</button>
         </div>
       </div>`;
     body.querySelector('#ai-retry').onclick = () => runAI({ date, hasKey, usePhoto });
@@ -668,12 +665,11 @@ async function montarDraftIA(o) {
   location.hash = '#/nuevo';
 }
 
-/** Nota del plato: comentario de la IA + supuestos + confianza. */
+/** Nota del plato: comentario + supuestos de la estimación. */
 function notaPlato(comentario, res) {
   const p = [];
   if (comentario) p.push(String(comentario).slice(0, 140));
   if (res && res.supuestos && res.supuestos.length) p.push('Supuestos: ' + res.supuestos.join('; ').slice(0, 140));
-  if (res && res.confianza != null) p.push(Math.round(res.confianza * 100) + '% seguro');
   return p.join(' · ').slice(0, 240);
 }
 
@@ -687,7 +683,7 @@ async function guardarBaseDesdeEditor(d) {
     ? d.items.map(it => ({ ...it, gramos: Math.round((Number(it.gramos) || 0) / mult * 10) / 10 }))
     : d.items;
   await guardarPlatoBase({ clave, consultas: [clave, claveConsulta(limpio)].filter(Boolean), nombre: limpio, items, fuente: 'usuario' });
-  toast(`Porción estándar guardada: "${limpio}" (sin gastar cuota en tu próxima consulta).`, 'ok');
+  toast(`Porción estándar guardada: "${limpio}".`, 'ok');
 }
 
 /**
@@ -753,7 +749,7 @@ async function reanalizarDraft(d) {
     maxTotalG: oldG > 0 ? Math.round(oldG * 1.15) : 0,
     mult, multLocal: true
   });
-  if (!res.items || !res.items.length) throw new Error('La IA no devolvió ingredientes.');
+  if (!res.items || !res.items.length) throw new Error('No se detectaron ingredientes. Intenta de nuevo.');
   const fusion = fusionarReanalisis(d.items || [], res.items);
   d.items = fusion.items;
   const t = computeTotals(d.items);
@@ -761,7 +757,7 @@ async function reanalizarDraft(d) {
     ? ` Mantuvimos ${fusion.conservados} corrección${fusion.conservados === 1 ? '' : 'es'} manual${fusion.conservados === 1 ? '' : 'es'}.`
     : '';
   if (oldG > 0 && t.grams > oldG + 15) {
-    toast(`Ojo: la IA subió las porciones de ${oldG} g a ${t.grams} g. Bájalas a mano si no te cuadran (${t.kcal} kcal).${conservados}`, 'warn');
+    toast(`Ojo: las porciones subieron de ${oldG} g a ${t.grams} g (${t.kcal} kcal). Bájalas a mano si no te cuadran.${conservados}`, 'warn');
   } else {
     toast(`Porciones recalculadas: ${t.grams} g y ${t.kcal} kcal.${conservados} Revisa y guarda.`, 'ok');
   }

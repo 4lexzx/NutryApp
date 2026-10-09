@@ -202,7 +202,7 @@ export async function render(root, args, query) {
       <label class="field"><span class="lbl">¿Qué echaste y en cuánto?</span>
         <textarea id="bt-desc" rows="2" placeholder="Ej. medio vaso de leche, 2 cucharadas de avena, 3 almendras, 200 g de plátano…">${esc(desc)}</textarea></label>
       <button class="btn btn-outline btn-block" id="bt-recalc" type="button">${icon('sparkles')} Aplicar y recalcular</button>
-      <div class="hint">Se procesa solo en tu celular (sin IA): ajusta y agrega los ingredientes que reconozca. El texto se guarda como nota del plato.</div>
+      <div class="hint">Se procesa solo en tu celular: ajusta y agrega los ingredientes que reconozca. El texto se guarda como nota del plato.</div>
     </div>
 
     <div class="card" id="bt-picker">

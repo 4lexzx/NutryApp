@@ -9,7 +9,7 @@ import { clearSession, currentUser } from '../auth.js';
 import { nubeConfigurada } from '../config.js';
 import { haySesion, emailSesion, crearCuenta, conectar, desconectar, pendientes, sincronizar, subirTodo, bajarTodo, subidasEnNube } from '../cloud.js';
 import { setSonidos, clic } from '../sound.js';
-import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe, guardarMotivacion, mensajeDelDia } from '../notif.js';
+import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe } from '../notif.js';
 
 const VERSION = '2.0.0';
 let hAct = null;   // oyente del evento "hay actualización" (uno solo, sin duplicar)
@@ -31,9 +31,6 @@ export async function render(root) {
     : perm === 'denied' ? 'El navegador bloqueó los avisos. Actívalos desde el candado/🔒 de la barra de direcciones (permisos del sitio) y vuelve aquí.'
     : perm === 'unsupported' ? 'Este navegador no permite notificaciones.'
     : 'Al activar, el navegador te pedirá permiso para mostrarte avisos.';
-  const motiv = (s.motiv && typeof s.motiv === 'object') ? s.motiv : { on: false, h: '17:30' };
-  const motivActivo = perm === 'granted' && motiv.on === true;
-  const motivH = /^\d{2}:\d{2}$/.test(motiv.h || '') ? motiv.h : '17:30';
   const nubeOk = nubeConfigurada();
   const conNube = haySesion();
   const nubePend = conNube ? await pendientes().catch(() => 0) : 0;
@@ -102,8 +99,8 @@ export async function render(root) {
           <button class="btn btn-sm btn-ghost" id="s-base-clear" type="button" ${nBase ? '' : 'disabled'}>Borrar</button>
         </div>
       </div>
-      <p class="tiny muted" style="margin-top:10px">Tu clave de Gemini se guarda <b>solo en este celular</b> (IndexedDB):
-        no se sube a la nube ni viaja en el código público. Cada análisis la usa a través de /api/ai y la función la
+      <p class="tiny muted" style="margin-top:10px">Tu clave queda guardada en tu perfil de la nube: viaja contigo a
+        otros dispositivos y solo tú puedes verla. Cada análisis la usa a través de /api/ai y la función la
         descarta al terminar.</p>
     </div>
 
@@ -132,16 +129,6 @@ export async function render(root) {
         <button class="btn btn-block" id="s-rem-test" type="button">Probar aviso</button>
       </div>
       <div class="hint" id="s-rem-estado">${remEstado}</div>
-      <div class="divider"></div>
-      <b class="small">${icon('heart')} Notificaciones de motivación</b>
-      <div class="tiny muted" style="margin:2px 0 8px">Un empujón de ánimo al día, con una frase distinta cada vez.</div>
-      <div class="rem-rows">
-        <div class="rem-row">
-          <button type="button" class="chip ${motivActivo ? 'active' : ''}" id="s-motiv-on">Avisos de ánimo</button>
-          <input type="time" id="s-motiv-h" value="${motivH}" aria-label="Hora del aviso de ánimo">
-        </div>
-      </div>
-      <button class="btn btn-block" id="s-motiv-test" type="button">Probar aviso de ánimo</button>
     </div>
 
     <div class="card">
@@ -169,8 +156,8 @@ export async function render(root) {
     <div class="card" id="s-nube">
       <div class="card-title"><h3>${icon('upload')} Nube (respaldo en internet)</h3>
         <span class="badge ${!nubeOk ? 'warn' : conNube ? 'ok' : 'warn'}" id="nb-badge">${!nubeOk ? 'sin configurar' : conNube ? 'conectada' : 'desconectada'}</span></div>
-      <p class="small muted">Con una cuenta en la nube, tus datos se guardan también en Supabase: puedes verlos en
-        otro dispositivo y tienes un respaldo en internet. <b>Sin nube la app funciona igual</b> (todo local en el celular).</p>
+      <p class="small muted">Al iniciar sesión tus datos se guardan <b>solos</b> en tu cuenta (Supabase): los ves en
+        cualquier dispositivo y tienes respaldo en internet. El respaldo local (.json) sigue disponible como copia extra.</p>
       ${!nubeOk ? `
         <div class="note">${icon('alert')} La nube de esta instalación todavía no está configurada
           (falta la URL y la clave pública de Supabase en <b>js/config.js</b>).</div>` : (!conNube ? `
@@ -208,7 +195,7 @@ export async function render(root) {
             <div class="tiny muted">Sesión activa en este dispositivo</div>
           </div>
         </div>
-        <span class="badge ok">${icon('lock')} local</span>
+        <span class="badge ${conNube ? 'ok' : 'warn'}">${conNube ? icon('upload') + ' nube' : icon('lock') + ' local'}</span>
       </div>
       <button class="btn btn-danger btn-block" id="s-logout" type="button">${icon('logout')} Cerrar sesión</button>
       <p class="tiny muted" style="margin-top:10px">Al cerrar sesión volverás a la pantalla de acceso.
@@ -217,15 +204,13 @@ export async function render(root) {
 
     <div class="card">
       <div class="card-title"><h3>${icon('info')} Acerca de</h3></div>
-      <p class="small muted">Nutri Gym v${VERSION} · PWA con nube opcional (Supabase) e IA con tu propia clave de Gemini.<br>
-      Tus datos viven <b>en este celular</b> (IndexedDB); si conectas la nube en Ajustes, se copian a tu cuenta de
-      Supabase para verlos en otros dispositivos. Para la IA, cada quien pega su clave gratis en Ajustes → IA.</p>
+      <p class="small muted">Nutri Gym v${VERSION} · PWA con nube (Supabase) e IA con tu propia clave de Gemini.<br>
+      Tus datos y tu perfil viven <b>en tu cuenta</b>: al iniciar sesión se suben y se bajan solos. El respaldo
+      .json es opcional, por si un día quieres copia fuera de la nube.</p>
       <div class="col" style="margin:10px 0 4px">
         <button class="btn btn-primary btn-block" id="s-update" type="button" disabled>${icon('check')} Estás al día</button>
         <div class="hint" id="s-update-hint">Última versión instalada: v${VERSION}. Si sale una nueva, este botón se activa.</div>
       </div>
-      <div class="note">${icon('alert')} Los valores nutricionales son <b>estimaciones</b> generadas por IA y tablas de referencia.
-        No sustituyen la opinión de un nutricionista.</div>
       <div class="note danger">${icon('lock')} Consejo: haz un <b>respaldo .json</b> al menos una vez por semana y guárdalo en
         Google Drive, tu PC o por correo. Si borras los datos del navegador, se pierde el historial.</div>
     </div>
@@ -252,11 +237,8 @@ export async function render(root) {
     if (actBtn.disabled) return;
     actBtn.disabled = true;
     actBtn.innerHTML = icon('refresh') + ' Actualizando…';
-    try {
-      const reg = await navigator.serviceWorker.getRegistration();
-      if (reg && reg.waiting) reg.waiting.postMessage('skipWaiting');   // controllerchange recarga
-      else location.reload();
-    } catch (e) { location.reload(); }
+    if (window.__nutriAplicarAct) window.__nutriAplicarAct();
+    else location.reload();
     // Si por lo que sea no llega el cambio, volvemos a dejar el botón usable.
     setTimeout(() => {
       if (document.contains(actBtn) && window.__nutriAct) refrescAct();
@@ -348,8 +330,8 @@ export async function render(root) {
     };
     const s = openSheet(`
       <h2>Mis porciones estándar</h2>
-      <p class="small muted">Platos analizados que salen siempre igual (y sin gastar cuota) cuando los vuelves a escribir.
-        Si guardaste uno sin querer, quítalo aquí y la próxima vez la IA lo analizará de nuevo.</p>
+      <p class="small muted">Porciones que salen siempre igual cuando vuelves a escribir el plato.
+        Si guardaste una sin querer, quítala aquí.</p>
       <div id="base-lista">
         ${lista.length ? lista.map(filaHTML).join('')
         : '<div class="empty" style="padding:16px">Todavía no guardas ninguna porción estándar.</div>'}
@@ -358,9 +340,9 @@ export async function render(root) {
     const refrescarContador = () => {
       const n = s.root.querySelectorAll('[data-del]').length;
       const cnt = root.querySelector('#s-base-count');
-      if (cnt) cnt.textContent = n === 0
-        ? 'Sin porciones guardadas: los primeros análisis se repiten solo una vez'
-        : `${n} porción${n === 1 ? '' : 'es'} guardada${n === 1 ? '' : 's'} · salen igual y sin gastar cuota`;
+      if (cnt)       cnt.textContent = n === 0
+        ? 'Sin porciones guardadas'
+        : `${n} porción${n === 1 ? '' : 'es'} guardada${n === 1 ? '' : 's'} · salen igual siempre`;
       const clear = root.querySelector('#s-base-clear');
       if (clear) clear.disabled = n === 0;
       if (!n) {
@@ -375,7 +357,7 @@ export async function render(root) {
         const fila = btn.closest('.spread');
         if (fila) fila.remove();
         refrescarContador();
-        toast('Porción estándar quitada: la próxima consulta la IA la analizará de nuevo.', 'ok');
+        toast('Porción estándar quitada.', 'ok');
       };
     });
   };
@@ -383,7 +365,7 @@ export async function render(root) {
   root.querySelector('#s-base-clear').onclick = async () => {
     const ok = await confirmSheet({
       title: '¿Borrar la base de platos?',
-      msg: 'Se olvidarán los platos que la IA ya analizó: la próxima vez que consultes uno gastará 1 consulta de nuevo. Tus comidas guardadas NO se tocan.',
+      msg: 'Se olvidarán las porciones estándar guardadas. Tus comidas guardadas NO se tocan.',
       okText: 'Borrar', danger: true
     });
     if (!ok) return;
@@ -529,41 +511,6 @@ export async function render(root) {
       const cuerpo = await cuerpoMacros();
       const ok = await notificar('NutriGym', cuerpo);
       if (ok) toast('Aviso enviado: míralo en la barra de notificaciones.', 'ok');
-      render(root);
-    } else {
-      toast('Sin permiso de avisos todavía.', 'warn');
-    }
-  };
-
-  /* motivación */
-  root.querySelector('#s-motiv-on').onclick = async () => {
-    const activar = !motivActivo;
-    if (activar) {
-      let r = ('Notification' in window) ? Notification.permission : null;
-      if (r !== 'granted') r = await pedirPermiso();
-      if (r !== 'granted') {
-        toast(r === 'denied'
-          ? 'El navegador bloqueó los avisos: actívalos en los permisos del sitio.'
-          : 'Este navegador no permite notificaciones.', 'warn');
-        return;
-      }
-    }
-    await guardarMotivacion({ on: activar });
-    toast(activar ? `¡Avisos de ánimo encendidos! Te escribiré a las ${motivH}.` : 'Avisos de ánimo apagados.', 'ok');
-    render(root);
-  };
-  root.querySelector('#s-motiv-h').onchange = async e => {
-    const v = e.target.value;
-    if (!/^\d{2}:\d{2}$/.test(v || '')) { toast('Esa hora no es válida.', 'warn'); return; }
-    await guardarMotivacion({ h: v });
-    toast(`Aviso de ánimo: te escribiré a las ${v}.`, 'ok');
-  };
-  root.querySelector('#s-motiv-test').onclick = async () => {
-    let r = ('Notification' in window) ? Notification.permission : null;
-    if (r !== 'granted') r = await pedirPermiso();
-    if (r === 'granted') {
-      const ok = await notificar('NutriGym', mensajeDelDia(todayISO()), 'nutri-anim');
-      toast(ok ? 'Aviso de ánimo enviado: míralo en la barra.' : 'No se pudo enviar el aviso.', ok ? 'ok' : 'warn');
       render(root);
     } else {
       toast('Sin permiso de avisos todavía.', 'warn');

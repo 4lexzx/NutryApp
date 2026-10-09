@@ -169,8 +169,8 @@ export function mountEditor(root, draft, opts = {}) {
   const reBtn = q('#ed-re');
   if (reBtn && opts.onReanalyze) reBtn.addEventListener('click', async () => {
     const ok = await confirmSheet({
-      title: '¿Re-analizar con la IA?',
-      msg: 'La IA estimará otra vez los ingredientes con la foto/nombre actuales (1 consulta de tu cuota diaria). Tus correcciones manuales (gramos o nombres que cambiaste) se conservan y podrás editar todo antes de guardar.',
+      title: '¿Re-analizar?',
+      msg: 'Se recalcularán los ingredientes con la foto/nombre actuales. Tus correcciones manuales (gramos o nombres cambiados) se conservan.',
       okText: 'Re-analizar'
     });
     if (!ok) return;
@@ -192,7 +192,7 @@ export function mountEditor(root, draft, opts = {}) {
   if (baseBtn && opts.onGuardarBase) baseBtn.addEventListener('click', async () => {
     const ok = await confirmSheet({
       title: '¿Guardar como tu porción estándar?',
-      msg: 'La próxima vez que escribas este plato (o "2 platos de él") saldrá exactamente con estos gramos, sin gastar cuota de IA. Puedes borrarlo luego en Ajustes → Base de platos.',
+      msg: 'La próxima vez que escribas este plato (o "2 platos de él") saldrá exactamente con estos gramos. Puedes borrarlo luego en Ajustes → Base de platos.',
       okText: 'Guardar'
     });
     if (!ok) return;
@@ -228,8 +228,6 @@ function itemRowHTML(it, i) {
 
 function editorHTML(draft, opts) {
   return `
-  <div class="disclaimer"><span>${icon('alert')}</span><span>Valores <b>estimados</b> por IA o por tabla de referencia. Revisa y corrige porciones antes de guardar.</span></div>
-
   <div class="card">
     <div class="card-title"><h2>${draft.id ? 'Editar plato' : 'Nuevo plato'}</h2>
       ${draft.source ? `<span class="badge ${draft.source === 'base' ? 'ok' : 'ai'}">${draft.source === 'ia' ? `${icon('sparkles')} IA` : draft.source === 'base' ? `${icon('book')} Base local` : draft.source === 'favorito' ? `${icon('star')} Favorito` : draft.source === 'texto' ? `${icon('note')} Texto` : draft.source === 'batido' ? `${icon('cup')} Batido` : `${icon('pencil')} Manual`}</span>` : ''}
@@ -261,8 +259,8 @@ function editorHTML(draft, opts) {
       <button id="ed-add" class="btn btn-sm btn-outline" type="button">＋ Añadir</button>
     </div>
     <div id="ed-items"></div>
-    ${opts.onReanalyze ? `<button id="ed-re" class="btn btn-ghost btn-block" type="button" style="margin-top:8px">${icon('sparkles')} Re-analizar con la IA</button>
-    <div id="ed-re-hint" class="tiny muted hidden" style="margin-top:6px">Cambiaste el nombre de un ingrediente: pulsa arriba para que la IA recalcule el plato (tus gramos corregidos se conservan).</div>` : ''}
+    ${opts.onReanalyze ? `<button id="ed-re" class="btn btn-ghost btn-block" type="button" style="margin-top:8px">${icon('sparkles')} Re-analizar</button>
+    <div id="ed-re-hint" class="tiny muted hidden" style="margin-top:6px">Cambiaste el nombre de un ingrediente: pulsa arriba para recalcular el plato (tus gramos corregidos se conservan).</div>` : ''}
     ${opts.onGuardarBase ? `<button id="ed-base" class="btn btn-ghost btn-block" type="button" style="margin-top:8px">${icon('book')} Usar como mi porción estándar</button>` : ''}
     <div id="ed-over" class="over-msg hidden"></div>
   </div>

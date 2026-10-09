@@ -507,6 +507,30 @@ input.num, .num { font-variant-numeric: tabular-nums; }
 [data-theme="light"] .toast.warn > span:first-child .ic { color: var(--warn); }
 @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 
+/* ---------- Barra de nueva versión ---------- */
+.upd-bar {
+  position: fixed; left: 12px; right: 12px; margin: 0 auto; max-width: 520px;
+  bottom: calc(var(--nav-h) + 70px + env(safe-area-inset-bottom));
+  z-index: 91;
+  background: rgba(44, 44, 46, .96); color: #fff;
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  border-radius: 15px; padding: 10px 8px 10px 16px;
+  display: flex; gap: 10px; align-items: center; justify-content: space-between;
+  box-shadow: var(--shadow); font-size: .9rem; font-weight: 500;
+  animation: toastIn .24s cubic-bezier(.2, .8, .2, 1);
+}
+[data-theme="light"] .upd-bar { background: rgba(255, 255, 255, .97); color: #000; }
+.upd-bar > span { display: flex; gap: 8px; align-items: center; }
+.upd-bar > span .ic { width: 17px; height: 17px; color: var(--brand); }
+.upd-bar .upd-go {
+  border: none; background: var(--brand); color: #fff; cursor: pointer;
+  border-radius: 10px; padding: 9px 15px; font-size: .88rem; font-weight: 600;
+}
+.upd-bar .upd-later {
+  border: none; background: none; color: inherit; opacity: .5; cursor: pointer;
+  font-size: 1.15rem; line-height: 1; padding: 6px 9px;
+}
+
 /* ---------- Modal / bottom sheet ---------- */
 #modal-root { position: relative; z-index: 80; }
 .sheet-back {
@@ -981,3 +1005,20 @@ code.codeblock {
   text-shadow: 0 0 18px rgba(255, 100, 0, .85);
   animation: popIn .4s .25s cubic-bezier(.2, .9, .3, 1.35) backwards;
 }
+
+/* ===== Perfil social + amigos ===== */
+.soc-head { display: flex; gap: 14px; align-items: center; margin-bottom: 14px; }
+.avatar {
+  width: 68px; height: 68px; flex: none; border-radius: 50%;
+  background: color-mix(in srgb, var(--brand) 18%, var(--card-2));
+  color: var(--brand); display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border: 2.5px solid color-mix(in srgb, var(--brand) 45%, transparent);
+}
+.avatar .ic { width: 34px; height: 34px; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar.sm { width: 44px; height: 44px; border-width: 2px; }
+.avatar.sm .ic { width: 22px; height: 22px; }
+.avatar.xs { width: 34px; height: 34px; border-width: 1.5px; }
+.avatar.xs .ic { width: 17px; height: 17px; }
+.am-item .li-end { display: flex; gap: 6px; align-items: center; }
+.am-bio { font-size: .85rem; color: var(--txt-2); margin-top: 3px; }
