@@ -53,7 +53,8 @@ APP_Nutri/
 ├── api/
 │   └── ai.js                  ← servidor: recibe la foto/texto + tu clave y llama a Gemini
 ├── supabase/
-│   └── schema.sql             ← SQL para crear la tabla de la nube (se pega una vez)
+│   ├── schema.sql             ← SQL para crear la base de la nube: tabla `registros` + vistas legibles
+│   └── migracion_v2_1.sql     ← SQL para ordenar una base ya existente (renombra `datos` → `registros`)
 ├── icons/                     ← íconos PNG (192, 512 y maskable)
 ├── css/styles.css             ← diseño oscuro/claro, móvil primero, botones grandes
 └── js/
@@ -602,7 +603,7 @@ bundler ni servidor propio.
   la descarga de los archivos nuevos en el celular.
 - **URL de la nube y configuración**: `js/config.js` (URL y clave pública de Supabase; la clave
   pública no es secreta, pero si prefieres no subirla, déjala vacía y pégala en el navegador).
-- **Sincronización**: `js/cloud.js`; SQL de la tabla en `supabase/schema.sql`.
+- **Sincronización**: `js/cloud.js`; estructura de la nube en `supabase/schema.sql` (o `supabase/migracion_v2_1.sql` si tu base es de una versión anterior).
 - **Servidor de IA**: `api/ai.js` (recibe la petición en Vercel —con la clave que envía el cliente
   en ese mismo request— y llama a Gemini). `vercel.json` solo ajusta el tiempo máximo (60 s).
 
@@ -628,7 +629,8 @@ datos gracias a las políticas de seguridad (RLS) de la tabla.
 1. Entra a <https://supabase.com> → **New project** (elige nombre, región y contraseña de admin).
 2. En el panel lateral: **SQL Editor → New query**.
 3. Abre el archivo `supabase/schema.sql` de este repo, cópialo **tal cual** y pégalo → **Run**
-   (debe decir “Success”). Eso crea la tabla `datos` con permisos RLS: cada cuenta solo ve lo suyo.
+   (debe decir “Success”). Eso crea la tabla `registros` con permisos RLS: cada cuenta solo ve lo suyo,
+   y las vistas **comidas, pesos, agua, favoritos, platos y ajustes** (léen como tablas simples).
 4. En **Authentication → Sign In / Providers**: **desactiva “Confirm email”** (así tu cuenta
    queda lista al instante; es tu cuenta privada).
 

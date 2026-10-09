@@ -198,12 +198,12 @@ async function empujar() {
   for (let i = 0; i < filas.length; i += 40) {
     const lote = filas.slice(i, i + 40).map(f => ({
       user_id: me,
-      tienda: f.tienda,
-      fila_id: String(f.id),
-      data: f.op === 'del' ? null : f.data,
-      borrado: f.op === 'del'
+      coleccion: f.tienda,
+      clave: String(f.id),
+      contenido: f.op === 'del' ? null : f.data,
+      eliminado: f.op === 'del'
     }));
-    await rest('/datos?on_conflict=user_id,tienda,fila_id', {
+    await rest('/registros?on_conflict=user_id,coleccion,clave', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: lote
@@ -230,22 +230,22 @@ async function aplicar(filas) {
   let n = 0;
   await conAplicacionNube(async () => {
     for (const f of filas) {
-      if (!f || !f.tienda) continue;
-      const clave = f.tienda + ':' + f.fila_id;
+      if (!f || !f.coleccion) continue;
+      const clave = f.coleccion + ':' + f.clave;
       const q = await leerCola();
       if (q[clave]) continue;                    // cambio local pendiente: manda lo local
-      const id = idLocal(f.tienda, f.fila_id);
-      if (f.borrado || f.data == null) {
-        await DB.del(f.tienda, id);
-      } else if (f.tienda === 'kv') {
-        const nuevo = Object.assign({}, f.data, { k: f.fila_id });
-        if (f.fila_id === 'settings') {
+      const id = idLocal(f.coleccion, f.clave);
+      if (f.eliminado || f.contenido == null) {
+        await DB.del(f.coleccion, id);
+      } else if (f.coleccion === 'kv') {
+        const nuevo = Object.assign({}, f.contenido, { k: f.clave });
+        if (f.clave === 'settings') {
           const loc = await DB.kvGet('settings');
           if (loc && loc.apiKey) nuevo.apiKey = loc.apiKey;  // la clave de Gemini solo existe en tu dispositivo
         }
         await DB.kvSet(nuevo);
       } else {
-        await DB.put(f.tienda, f.data);
+        await DB.put(f.coleccion, f.contenido);
       }
       n++;
     }
@@ -263,10 +263,10 @@ async function bajar(completo = false) {
   const me = uidSesion();
   if (!me) throw new Error('Sesión de la nube inválida: vuelve a conectar.');
   const desde = (ult && ult.v) ? '&actualizado=gt.' + encodeURIComponent(ult.v) : '';
-  const base = '/datos?select=*&user_id=eq.' + me + '&order=actualizado.asc&limit=5000';
+  const base = '/registros?select=*&user_id=eq.' + me + '&order=actualizado.asc&limit=5000';
   const [vivas, muertas] = await Promise.all([
-    rest(base + '&borrado=eq.false' + desde),
-    rest(base + '&borrado=eq.true&limit=1000' + desde)
+    rest(base + '&eliminado=eq.false' + desde),
+    rest(base + '&eliminado=eq.true&limit=1000' + desde)
   ]);
   const n = await aplicar([...(vivas.d || []), ...(muertas.d || [])]);
   await DB.kvSet({ k: ULT, v: corteSeguro(vivas.fecha || muertas.fecha) });
@@ -329,10 +329,10 @@ export async function contarLocal() {
   return c;
 }
 async function contarNube() {
-  const r = await rest('/datos?select=tienda&borrado=eq.false&limit=10000');
+  const r = await rest('/registros?select=coleccion&eliminado=eq.false&limit=10000');
   const filas = r.d || [];
   const c = { meals: 0, weights: 0, favorites: 0, water: 0, platos: 0, kv: 0 };
-  for (const f of filas) if (c[f.tienda] !== undefined) c[f.tienda]++;
+  for (const f of filas) if (c[f.coleccion] !== undefined) c[f.coleccion]++;
   c.total = filas.length;
   return c;
 }
@@ -356,9 +356,9 @@ export async function subirTodo() {
   if (!me) throw new Error('Sin sesión en la nube.');
   for (let i = 0; i < filas.length; i += 40) {
     const lote = filas.slice(i, i + 40).map(f => ({
-      user_id: me, tienda: f.tienda, fila_id: f.fila_id, data: f.data, borrado: false
+      user_id: me, coleccion: f.tienda, clave: f.fila_id, contenido: f.data, eliminado: false
     }));
-    await rest('/datos?on_conflict=user_id,tienda,fila_id', {
+    await rest('/registros?on_conflict=user_id,coleccion,clave', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: lote

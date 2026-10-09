@@ -1,44 +1,63 @@
 -- ============================================================
--- Nutri Gym v2.1 — Esquema de la nube (Supabase)
--- Cómo usarlo:
---   1) Abre tu proyecto de Supabase → SQL Editor → New query
---   2) Pega TODO este archivo
---   3) Pulsa Run (▶). Se puede ejecutar varias veces sin romper nada.
+-- Nutri Gym v2.1 — Migración de tu base EXISTENTE
+-- Renombra la tabla "datos" a "registros" con nombres entendibles
+-- y crea las vistas legibles (comidas, pesos, agua…).
+-- NO borra ni modifica ningún dato.
+-- Cómo usarlo: SQL Editor → New query → pega TODO → Run (▶).
+-- Se puede ejecutar varias veces sin romper nada (es idempotente).
 -- ============================================================
 
--- 1) Tabla única que guarda TODOS tus datos sincronizados.
---    coleccion = tipo de dato: meals | weights | favorites | water | platos | kv
---                (kv guarda ajustes, perfil, prompt de IA, agua por día, gym…)
---    clave     = identificador de la fila dentro de esa colección
---    contenido = el registro completo en JSON
---    eliminado = marca de "tombstone": si borras algo en un dispositivo,
---                el resto de dispositivos también lo borra
-create table if not exists public.registros (
-  user_id uuid not null references auth.users on delete cascade,
-  coleccion text not null,
-  clave text not null,
-  contenido jsonb,
-  actualizado timestamptz not null default now(),
-  eliminado boolean not null default false,
-  primary key (user_id, coleccion, clave)
-);
+-- 1) Renombres (si algo ya está renombrado, este bloque lo salta)
+do $$
+begin
+  if to_regclass('public.datos') is not null then
+    alter table public.datos rename to registros;
+  end if;
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'registros'
+               and column_name = 'tienda') then
+    alter table public.registros rename column tienda to coleccion;
+  end if;
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'registros'
+               and column_name = 'fila_id') then
+    alter table public.registros rename column fila_id to clave;
+  end if;
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'registros'
+               and column_name = 'data') then
+    alter table public.registros rename column data to contenido;
+  end if;
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'registros'
+               and column_name = 'borrado') then
+    alter table public.registros rename column borrado to eliminado;
+  end if;
+end $$;
 
--- Para bajar solo lo nuevo desde la última sincronización
+-- 2) Índice con nombre claro (si el viejo aún existe, lo renombra)
+do $$
+begin
+  if exists (select 1 from pg_class c
+             join pg_namespace n on n.oid = c.relnamespace
+             where c.relname = 'datos_user_actualizado_idx' and n.nspname = 'public') then
+    alter index public.datos_user_actualizado_idx rename to registros_user_actualizado_idx;
+  end if;
+end $$;
 create index if not exists registros_user_actualizado_idx
   on public.registros (user_id, actualizado);
 
--- 2) Seguridad (RLS): cada cuenta SOLO ve y edita SUS filas.
---    Sin esto, la clave pública "anon" del navegador podría leer
---    los datos de otros; con esto, Supabase los bloquea siempre.
+-- 3) Seguridad (RLS): cada cuenta SOLO ve y edita SUS filas.
 alter table public.registros enable row level security;
 
+drop policy if exists "datos_propios" on public.registros;
 drop policy if exists "registros_propios" on public.registros;
 create policy "registros_propios" on public.registros
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
--- 3) Vistas legibles: como si fueran tablas separadas.
+-- 4) Vistas legibles: como si fueran tablas separadas.
 --    Cada vista muestra SOLO tus filas vivas y en lenguaje claro.
 --    (security_invoker = la vista respeta los permisos de arriba.)
 
