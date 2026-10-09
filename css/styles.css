@@ -544,7 +544,7 @@ select:disabled { opacity: .55; cursor: default; }
 .upd-bar {
   position: fixed; left: 12px; right: 12px; margin: 0 auto; max-width: 520px;
   bottom: calc(var(--nav-h) + 70px + env(safe-area-inset-bottom));
-  z-index: 91;
+  z-index: 79;
   background: rgba(44, 44, 46, .96); color: #fff;
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
   border-radius: 15px; padding: 10px 8px 10px 16px;
