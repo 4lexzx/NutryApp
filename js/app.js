@@ -15,6 +15,7 @@ import * as ia from './views/ia.js';
 import * as login from './views/login.js';
 import * as gym from './views/gym.js';
 import * as batido from './views/batido.js';
+import * as social from './views/social.js';
 
 const view = () => document.getElementById('view');
 
@@ -31,7 +32,7 @@ function parseHash() {
   return { path, query };
 }
 
-const NAV_OF = { hoy: 'hoy', registrar: 'registrar', nuevo: 'registrar', editar: 'registrar', historial: 'historial', perfil: 'perfil', ajustes: 'ajustes', ia: 'ajustes', gym: 'hoy', batido: 'registrar' };
+const NAV_OF = { hoy: 'hoy', registrar: 'registrar', nuevo: 'registrar', editar: 'registrar', historial: 'historial', social: 'social', perfil: 'perfil', ajustes: 'ajustes', ia: 'ajustes', gym: 'hoy', batido: 'registrar' };
 
 async function route() {
   const { path, query } = parseHash();
@@ -69,6 +70,7 @@ async function route() {
       case 'editar': await log.renderEdit(root, path.slice(1), query); break;
       case 'historial': await history.render(root, path.slice(1), query); break;
       case 'perfil': await profile.render(root, path.slice(1), query); break;
+      case 'social': await social.render(root); break;
       case 'ajustes': await settings.render(root, path.slice(1), query); break;
       case 'ia': await ia.render(root, path.slice(1), query); break;
       case 'gym': await gym.render(root, path.slice(1), query); break;
@@ -271,7 +273,11 @@ function setupNube() {
   import('./cloud.js').then(c => {
     if (c.haySesion()) {
       // primera vez con sesión en esta visita: subida/bajada COMPLETA a la BD
-      setTimeout(() => c.sincronizarInicial().catch(() => {}), 2500);
+      setTimeout(() => {
+        c.sincronizarInicial().catch(() => {}).then(() => {
+          import('./views/social.js').then(m => m.actualizarBadgeNav()).catch(() => {});
+        });
+      }, 2500);
       setInterval(() => {
         if (c.haySesion() && navigator.onLine) c.sincronizarInicial().catch(() => {});
       }, 10 * 60 * 1000);

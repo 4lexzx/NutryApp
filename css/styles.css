@@ -166,9 +166,16 @@ h1 .ic, h2 .ic, h3 .ic, h4 .ic { width: 1.05em; height: 1.05em; color: var(--bra
   padding-bottom: env(safe-area-inset-bottom);
 }
 .navitem {
+  position: relative;
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 3px; color: var(--txt-3); font-size: .64rem; font-weight: 500;
   letter-spacing: .01em; min-width: 0; padding-top: 3px;
+}
+.navdot {
+  position: absolute; top: 4px; left: 50%; margin-left: 3px;
+  min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px;
+  background: var(--danger); color: #fff;
+  font-size: .58rem; font-weight: 700; line-height: 15px; text-align: center;
 }
 .navitem .navico { line-height: 1; height: 26px; display: grid; place-items: center; }
 .navitem.active { color: var(--brand); }
@@ -1022,3 +1029,6 @@ code.codeblock {
 .avatar.xs .ic { width: 17px; height: 17px; }
 .am-item .li-end { display: flex; gap: 6px; align-items: center; }
 .am-bio { font-size: .85rem; color: var(--txt-2); margin-top: 3px; }
+.am-prog { height: 6px; border-radius: 4px; background: var(--hairline); overflow: hidden; margin-top: 6px; }
+.am-prog i { display: block; height: 100%; background: var(--warn); border-radius: 4px; transition: width .3s; }
+.am-prog.ok i { background: var(--brand); }

@@ -45,8 +45,9 @@ export async function render(root, onOk) {
           <label class="auth-field">
             <span class="auth-lbl">${icon('user')}<span>Usuario nuevo</span></span>
             <input id="rg-user" type="text" inputmode="text" autocapitalize="none"
-                   autocorrect="off" spellcheck="false" placeholder="ej. camila"
+                   autocorrect="off" spellcheck="false" placeholder="ej. camila123"
                    autocomplete="username" enterkeyhint="next">
+            <span class="hint">Solo minúsculas, números y . _ - · sin espacios ni ñ</span>
           </label>
           <label class="auth-field">
             <span class="auth-lbl">${icon('lock')}<span>Contraseña</span></span>
@@ -119,7 +120,11 @@ export async function render(root, onOk) {
 
   userInput.addEventListener('input', clearError);
   passInput.addEventListener('input', clearError);
-  regUser.addEventListener('input', clearRegError);
+  regUser.addEventListener('input', () => {
+    // el usuario solo admite minúsculas, números y . _ - (se limpia al escribir)
+    regUser.value = regUser.value.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+    clearRegError();
+  });
   regPass.addEventListener('input', clearRegError);
   regPass2.addEventListener('input', clearRegError);
 

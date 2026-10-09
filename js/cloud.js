@@ -526,6 +526,9 @@ export async function misAmistades() {
 export async function pedirAmistad(usuario) {
   const nom = String(usuario || '').trim().toLowerCase();
   if (!nom) return { ok: false, msg: 'Escribe un usuario.' };
+  if (!/^[a-z0-9._-]{3,20}$/.test(nom)) {
+    return { ok: false, msg: 'Ese usuario no es válido: solo minúsculas, números, punto o guion (sin espacios ni ñ).' };
+  }
   const me = uidSesion();
   if (!me) return { ok: false, msg: 'Sin sesión en la nube.' };
   const r = await rest('/perfiles?select=user_id,usuario&usuario=eq.' + encodeURIComponent(nom) + '&limit=1');

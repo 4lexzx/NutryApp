@@ -61,8 +61,8 @@ export async function seedUsers() {
 export async function createUser(username, password) {
   const u = String(username || '').trim().toLowerCase();
   const p = String(password || '');
-  if (!/^[\p{L}\p{N}._-]{3,20}$/u.test(u)) {
-    return { ok: false, msg: 'El usuario debe tener de 3 a 20 letras o números (sin espacios).' };
+  if (!/^[a-z0-9._-]{3,20}$/.test(u)) {
+    return { ok: false, msg: 'El usuario debe tener de 3 a 20 caracteres: solo minúsculas, números, punto, guion o guion bajo. Sin espacios ni ñ.' };
   }
   if (p.length < 4) return { ok: false, msg: 'La contraseña debe tener al menos 4 caracteres.' };
   const list = await seedUsers();

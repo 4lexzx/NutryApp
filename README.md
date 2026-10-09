@@ -253,10 +253,16 @@ Al abrir la app aparece un candado local (no usa servidor ni internet). Los dato
 | **Contraseña** | `123456` |
 
 **Cada quien con su usuario:** si otra persona usa la app en su celular, que toque
-**“¿Primera vez? Crear usuario”**, escriba su usuario (ej. `camila`) y una contraseña de 4 o más
-caracteres, y ya queda creada **solo en ese dispositivo**. No hace falta exportar ni importar nada:
+**“¿Primera vez? Crear usuario”**, escriba su usuario (ej. `camila123` — **solo minúsculas,
+números, punto, guion o guion bajo**: sin espacios ni ñ) y una contraseña de 4 o más
+caracteres. El candado (usuario y contraseña) queda **solo en ese dispositivo**; en la app
+publicada, **los datos se suben solos a la nube** la primera vez que entras. No hace falta
+exportar ni importar nada:
 
-- Todo queda **solo en el dispositivo donde se crea**: no hay cuentas ni datos en la nube.
+- La **cuenta de la nube se crea sola** por detrás (tu usuario + `@nutrigym.app`): tú nunca
+  ves ni escribes ese correo.
+- **Dos personas con el mismo nombre de usuario**: la segunda no podrá conectar a la nube (la
+  app se lo avisa y puede seguir en local). Elige nombres distintos.
 - Si te equivocas aparece *“Usuario o contraseña incorrectos.”* y puedes volver a intentarlo.
 - Para salir: **Ajustes → Cerrar sesión**; tus comidas, perfil y ajustes quedan guardados.
 - Si dos usuarios están en **el mismo celular**, ven los mismos datos (el candado separa quién entra,
@@ -268,10 +274,12 @@ caracteres, y ya queda creada **solo en ese dispositivo**. No hace falta exporta
 
 1. **Perfil** (pestaña 💪): peso, estatura, edad, sexo, nivel de actividad y objetivo
    (déficit / mantenimiento / ganar músculo sin ganar grasa / superávit).
-   Con la nube conectada, arriba tienes tu **perfil social**: tu **foto** y tu **bio** (se suben
-   solas con la sincronización) y la tarjeta **Amigos**: busca a alguien **por usuario**, acepta
-   o rechaza solicitudes y mira el día de tus amigas/os — **kcal de hoy contra su meta, si la
-   cumplieron y su racha** — sin ver nada más de su información.
+   Arriba tienes tu **perfil social**: tu **foto** y tu **bio** (se suben solas con la
+   sincronización) y el acceso a la pestaña **Social**.
+   En la pestaña **Social** (👥 en la barra de abajo) está la tarjeta **Amigos**: busca a
+   alguien **por usuario**, acepta o rechaza solicitudes y mira el día de tus amigas/os —
+   **kcal de hoy contra su meta con barra de progreso, si la cumplieron y su racha** — sin ver
+   nada más de su información. Un **punto rojo** en el icono 👥 avisa de solicitudes nuevas.
 2. Pulsa **“🧮 Calcular mis metas”**. Verás:
    - tu **gasto calórico (TDEE)** y la fórmula usada paso a paso (Mifflin-St Jeor × factor de
      actividad, luego el % del objetivo: −20% déficit, 0% mantenimiento y recomposición,
@@ -303,8 +311,8 @@ caracteres, y ya queda creada **solo en ese dispositivo**. No hace falta exporta
 
 ## 7. Uso diario
 
-La barra de abajo tiene 5 botones en este orden: **🏠 Hoy · 📊 Historial · ➕ Registrar (en el
-medio) · 💪 Perfil · ⚙️ Ajustes**.
+La barra de abajo tiene 6 botones en este orden: **🏠 Hoy · 📊 Historial · ➕ Registrar (el
+botón redondo) · 👥 Social · 💪 Perfil · ⚙️ Ajustes**.
 
 ### Registrar una comida (botón ＋)
 
