@@ -7,7 +7,7 @@ import { testApiKey, modelOptions } from '../ai.js';
 import { esc, toast, confirmSheet, pickFile, downloadFile, todayISO, openSheet } from '../util.js';
 import { clearSession, currentUser } from '../auth.js';
 import { nubeConfigurada } from '../config.js';
-import { haySesion, emailSesion, crearCuenta, conectar, desconectar, pendientes, sincronizar, subirTodo, bajarTodo, subidasEnNube } from '../cloud.js';
+import { haySesion, emailSesion, emailNubeDe, crearCuenta, conectar, desconectar, pendientes, sincronizar, subirTodo, bajarTodo, subidasEnNube } from '../cloud.js';
 import { setSonidos, clic } from '../sound.js';
 import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe } from '../notif.js';
 
@@ -31,8 +31,10 @@ export async function render(root) {
     : perm === 'denied' ? 'El navegador bloqueó los avisos. Actívalos desde el candado/🔒 de la barra de direcciones (permisos del sitio) y vuelve aquí.'
     : perm === 'unsupported' ? 'Este navegador no permite notificaciones.'
     : 'Al activar, el navegador te pedirá permiso para mostrarte avisos.';
-  const nubeOk = nubeConfigurada();
-  const conNube = haySesion();
+const nubeOk = nubeConfigurada();
+const conNube = haySesion();
+const cuentaOtra = conNube && !!currentUser() &&
+  (emailSesion() || '').toLowerCase() !== emailNubeDe(currentUser());
   const nubePend = conNube ? await pendientes().catch(() => 0) : 0;
 
   root.innerHTML = `
@@ -172,6 +174,8 @@ export async function render(root) {
         <div class="spread" style="margin-bottom:12px">
           <div>
             <b class="small">${esc(emailSesion())}</b>
+            ${cuentaOtra ? `<div class="tiny" style="color:var(--warn,#b45309);margin-top:3px">${icon('alert')}
+              Tu usuario usaría <b>${esc(emailNubeDe(currentUser()))}</b>. Cierra sesión y entra de nuevo para reajustarla.</div>` : ''}
             <div class="tiny muted" id="nb-estado">${nubePend ? `${nubePend} cambio${nubePend === 1 ? '' : 's'} pendiente${nubePend === 1 ? '' : 's'} por subir` : 'Todo sincronizado'}</div>
           </div>
           <button class="btn btn-sm btn-ghost" id="nb-out" type="button">Desconectar</button>
@@ -384,7 +388,7 @@ export async function render(root) {
   };
 
   /* nube (Supabase) */
-  window.__nutriNubeAct = () => {
+  window.__nutriNubeBadge = () => {
     const el = root.querySelector('#nb-estado');
     if (!el || !document.contains(el)) return;
     pendientes().then(p => {
@@ -446,14 +450,14 @@ export async function render(root) {
     const linea = t => `${t}: ${r.antes[t] || 0} → ${r.despues ? (r.despues[t] || 0) : '?'} en la nube`;
     toast(`Listo: subí ${r.subidas} registro${r.subidas === 1 ? '' : 's'}. Verificación: ${linea('meals')}, ${linea('weights')}, ${linea('favorites')}.`, 'ok');
     if (nbRes) nbRes.textContent = ['meals', 'weights', 'favorites', 'platos', 'kv'].map(linea).join(' · ');
-    window.__nutriNubeAct();
+    if (typeof window.__nutriNubeBadge === 'function') window.__nutriNubeBadge();
   };
   const nbDown = root.querySelector('#nb-down');
   if (nbDown) nbDown.onclick = async () => {
     const r = await nbPaso(nbDown, 'Bajando los datos de la nube…', () => bajarTodo());
     if (r === null) return;
     toast(r ? `Bajé ${r} cambio${r === 1 ? '' : 's'} a este dispositivo.` : 'La nube no tiene cambios nuevos.', 'ok');
-    window.__nutriNubeAct();
+    if (typeof window.__nutriNubeBadge === 'function') window.__nutriNubeBadge();
   };
   const nbSync = root.querySelector('#nb-sync');
   if (nbSync) nbSync.onclick = async () => {

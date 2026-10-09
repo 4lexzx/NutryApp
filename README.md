@@ -672,6 +672,11 @@ nadie más ve tus datos gracias a las políticas de seguridad (RLS) de la tabla.
   cada cambio se sube solo en unos segundos. El guardado local es solo **caché** para que abra al
   instante y funcione sin internet.
 
+- **Si tienes la app abierta en otro dispositivo o pestaña, se actualiza sola**: cada vez que vuelves
+  a la pestaña (y cada 10 minutos) la app baja lo nuevo de la nube y **refresca la pantalla donde
+  estés** (Hoy, Historial, Social…) sin que tengas que navegar. En Ajustes → Nube te muestra el
+  correo conectado; si no coincide con el de tu usuario, cierra sesión y vuelve a entrar.
+
 - Cada vez que registras algo (comida, peso, gym, agua, favoritos…), la app lo **encola y lo sube
   solo** en unos segundos; si estás sin internet, queda en una **cola pendiente** y se sube al
   volver (el badge te avisa). Al abrir la app o volver a conectar, **baja** los últimos cambios.

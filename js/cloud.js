@@ -101,6 +101,7 @@ async function primerSincronizado() {
     toast(`Nube conectada como ${emailSesion()}.`, 'ok');
     if (baj) toast(`Bajé ${baj} cambio${baj === 1 ? '' : 's'} de tu otra nube.`, 'ok');
   }
+  avisarUI(null, { inicial: true, bajadas: baj });
   return r;
 }
 
@@ -114,13 +115,19 @@ export async function conectar(email, pass) {
 }
 
 /* Conexión automática: con el mismo usuario/contraseña del candado local se
-   entra en la nube (sin tocar nada). Si la cuenta no existe, se crea. */
+    entra en la nube (sin tocar nada). Si la cuenta no existe, se crea. */
+
 export async function conectarAutomatica(usuario, passLocal) {
   if (!nubeConfigurada() || !nubeAutomaticaOk()) return false;
-  if (haySesion()) return true;
-  if (autoOff()) return false;
   const email = emailNubeDe(usuario);
   const pass = passNubeDe(passLocal);
+  if (haySesion()) {
+    // misma cuenta: ya está; otra cuenta (otro usuario o correo): se reajusta sola
+    if ((emailSesion() || '').toLowerCase() === email) return true;
+    try { desconectar(); } catch (e) { /* seguimos */ }
+    autoOn();
+  }
+  if (autoOff()) return false;
   try {
     const d = await postAuth('/auth/v1/token?grant_type=password', { email, password: pass });
     guardaTokens(d, email);
@@ -339,7 +346,7 @@ export async function sincronizar({ silencioso = false } = {}) {
       if (bajadas) partes.push(bajadas + ' bajadas');
       toast('Nube al día: ' + partes.join(' · ') + '.', 'ok');
     }
-    avisarUI();
+    avisarUI(null, { subidas, bajadas });
     return { ok: true, subidas, bajadas };
   } catch (e) {
     console.error('sync nube:', e);
@@ -351,9 +358,9 @@ export async function sincronizar({ silencioso = false } = {}) {
   }
 }
 
-function avisarUI(err) {
+function avisarUI(err, info) {
   try {
-    if (typeof window.__nutriNubeAct === 'function') window.__nutriNubeAct(err || null);
+    if (typeof window.__nutriNubeAct === 'function') window.__nutriNubeAct(err || null, info || null);
   } catch (e) { /* nada */ }
 }
 
@@ -367,12 +374,12 @@ export async function sincronizarInicial() {
   if (sincronizando) return { ok: false, ocupado: true };
   sincronizando = true;
   try {
-    await bajar(true);
+    const baj = await bajar(true);
     await empujar();
     await subirTodo();
     await subirPerfilSocial();
     inicialHecha = true;
-    avisarUI();
+    avisarUI(null, { inicial: true, bajadas: baj });
     return { ok: true };
   } catch (e) {
     console.error('sync nube inicial:', e);
@@ -435,7 +442,7 @@ export async function subirTodo() {
   }
   const despues = await contarNube().catch(() => null);
   await DB.kvSet({ k: ULT, v: corteSeguro(null) });
-  avisarUI();
+  avisarUI(null, { subidas: filas.length });
   return { antes, despues, subidas: filas.length };
 }
 export async function subidasEnNube() {
@@ -444,7 +451,7 @@ export async function subidasEnNube() {
 }
 export async function bajarTodo() {
   const n = await bajar(true);
-  avisarUI();
+  avisarUI(null, { bajadas: n });
   return n;
 }
 

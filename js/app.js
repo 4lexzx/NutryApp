@@ -5,6 +5,7 @@ import { toast } from './util.js';
 import { initSonidos, setSonidos } from './sound.js';
 import { initRecordatorios } from './notif.js';
 import { seedUsers, isAuthed } from './auth.js';
+import { iniciarSelects } from './selects.js';
 import { icon } from './icons.js';
 import * as today from './views/today.js';
 import * as log from './views/log.js';
@@ -34,7 +35,7 @@ function parseHash() {
 
 const NAV_OF = { hoy: 'hoy', registrar: 'registrar', nuevo: 'registrar', editar: 'registrar', historial: 'historial', social: 'social', perfil: 'perfil', ajustes: 'ajustes', ia: 'ajustes', gym: 'hoy', batido: 'registrar' };
 
-async function route() {
+async function route(opts = {}) {
   const { path, query } = parseHash();
   const name = path[0] || 'hoy';
   const root = view();
@@ -60,7 +61,7 @@ async function route() {
   });
 
   root.innerHTML = `<div class="loading-block"><div class="spinner"></div><div class="small">Cargando…</div></div>`;
-  window.scrollTo(0, 0);
+  if (opts.scroll !== false) window.scrollTo(0, 0);
 
   try {
     switch (name) {
@@ -271,6 +272,13 @@ function setupResume() {
 /* ---------- Nube (Supabase, opcional) ---------- */
 function setupNube() {
   import('./cloud.js').then(c => {
+    // siempre (aunque la sesión llegue después de entrar): al volver a la
+    // pestaña o cada 10 min, bajamos lo que otros dispositivos hayan subido
+    const syncSiHay = () => {
+      if (c.haySesion() && navigator.onLine) c.sincronizarInicial().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) syncSiHay(); });
+    setInterval(syncSiHay, 10 * 60 * 1000);
     if (c.haySesion()) {
       // primera vez con sesión en esta visita: subida/bajada COMPLETA a la BD
       setTimeout(() => {
@@ -278,11 +286,24 @@ function setupNube() {
           import('./views/social.js').then(m => m.actualizarBadgeNav()).catch(() => {});
         });
       }, 2500);
-      setInterval(() => {
-        if (c.haySesion() && navigator.onLine) c.sincronizarInicial().catch(() => {});
-      }, 10 * 60 * 1000);
     }
   }).catch(() => {});
+}
+
+/* La nube avisa a la UI: badge de Ajustes + refresco de la pantalla actual
+   cuando llegan datos de otros dispositivos. */
+function prepararNubeUI() {
+  window.__nutriNubeAct = (err, info) => {
+    try { if (typeof window.__nutriNubeBadge === 'function') window.__nutriNubeBadge(); } catch (e) { /* nada */ }
+    if (err || !info || !(info.bajadas > 0)) return;
+    if (document.querySelector('.sheet-back, .cam-back')) return;   // hoja o cámara abierta
+    const ruta = parseHash().path[0] || 'hoy';
+    // solo las pantallas de lectura; nunca formularios ni editores en curso
+    if (['ajustes', 'registrar', 'nuevo', 'editar', 'ia'].indexOf(ruta) >= 0) return;
+    const a = document.activeElement;
+    if (a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) return;
+    route({ scroll: false }).catch(() => {});
+  };
 }
 
 /* ---------- Init ---------- */
@@ -296,6 +317,8 @@ async function init() {
   setupNetwork();
   setupSW();
   setupResume();
+  iniciarSelects();
+  prepararNubeUI();
   setupNube();
 
   document.getElementById('btn-theme').onclick = async () => {
