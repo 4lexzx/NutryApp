@@ -85,6 +85,21 @@ export async function removeUser(username) {
   return { ok: true };
 }
 
+/* Ajusta la contraseña local a la que se acaba de validar en la nube (el
+   candado y la cuenta quedan con la misma). Si no existía, se crea. */
+export async function setLocalPassword(username, password) {
+  const u = String(username || '').trim().toLowerCase();
+  const p = String(password || '');
+  const list = await seedUsers();
+  const i = list.findIndex(x => x.u === u);
+  const s = newSalt();
+  const h = await hash(p, s);
+  if (i >= 0) list[i] = { u, s, h };
+  else list.push({ u, s, h });
+  await saveUsers(list);
+  return { ok: true, user: u };
+}
+
 export async function verify(username, password) {
   const list = await seedUsers();
   const u = String(username || '').trim().toLowerCase();

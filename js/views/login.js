@@ -2,8 +2,8 @@
    Al entrar (o crear usuario), los datos se conectan solos a la nube. */
 
 import { icon } from '../icons.js';
-import { verify, createUser, removeUser, setSession } from '../auth.js';
-import { conectarAutomatica } from '../cloud.js';
+import { verify, createUser, removeUser, setSession, setLocalPassword } from '../auth.js';
+import { conectarAutomatica, entrarConNube, sincronizarInicial } from '../cloud.js';
 import { toast } from '../util.js';
 
 export async function render(root, onOk) {
@@ -156,6 +156,11 @@ export async function render(root, onOk) {
     new Promise(res => setTimeout(() => res(false), 8000))
   ]);
 
+  /* En producción la app vive EN LA NUBE: entrar exige internet y la
+     contraseña de la cuenta. En localhost se permite el candado local
+     (desarrollo y pruebas). */
+  const enDev = () => /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && !window.__nutriExigirNube;
+
   form.addEventListener('submit', async e => {
     e.preventDefault();
     const u = userInput.value.trim();
@@ -166,12 +171,24 @@ export async function render(root, onOk) {
     goBtn.disabled = true;
     goBtn.innerHTML = '<span class="spinner"></span><span class="lbl">Comprobando…</span>';
     try {
-      const r = await verify(u, p);
-      if (!r.ok) { showError(errBox, form, userInput, r.msg); return; }
-      enter(r.user);
-      autoNube(r.user, p);
+      if (enDev()) {
+        const r = await verify(u, p);
+        if (!r.ok) { showError(errBox, form, userInput, r.msg); return; }
+        enter(r.user);
+        autoNube(r.user, p);
+        return;
+      }
+      // Producción: la cuenta manda — se valida contra la nube y se bajan
+      // los datos ANTES de entrar, para que no veas una app vacía.
+      goBtn.innerHTML = '<span class="spinner"></span><span class="lbl">Entrando en tu cuenta…</span>';
+      await entrarConNube(u, p);
+      await setLocalPassword(u, p);
+      setSession(u);
+      goBtn.innerHTML = '<span class="spinner"></span><span class="lbl">Descargando tus datos…</span>';
+      try { await sincronizarInicial(); } catch (s) { /* la sesión ya está: sincroniza luego */ }
+      enter(u);
     } catch (err) {
-      showError(errBox, form, userInput, 'No se pudo comprobar el acceso. Inténtalo de nuevo.');
+      showError(errBox, form, userInput, String(err && err.message ? err.message : err));
     } finally {
       goBtn.disabled = false;
       goBtn.innerHTML = '<span class="lbl">Iniciar sesión</span>';
@@ -202,6 +219,13 @@ export async function render(root, onOk) {
         passInput.value = '';
         setMode('login');
         showError(errBox, form, userInput, 'Ese usuario ya está registrado en la nube con otra contraseña. Inicia sesión con esas credenciales o crea un usuario distinto.');
+        return;
+      }
+      if (!enDev() && !nube) {
+        // en producción la cuenta vive en la nube: sin internet (o con otra
+        // contraseña) no se crea una cuenta local suelta
+        await removeUser(r.user);
+        showError(regErrBox, regForm, regUser, 'No pude crear la cuenta en la nube. Revisa tu internet, o si ese usuario ya existe usa la contraseña con la que lo registraste.');
         return;
       }
       enter(r.user);

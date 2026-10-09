@@ -1,5 +1,6 @@
 /* Capa de nube (Supabase): cuenta + sincronización de IndexedDB.
-   - SIN nube la app funciona exactamente igual que antes (modo local).
+   - En producción la app vive EN LA NUBE: entrar exige internet y valida
+     el usuario/contraseña contra la cuenta (ver entrarConNube).
    - CON sesión: cada cambio local se encola y se sube solo; al abrir
      se bajan los cambios hechos en otros dispositivos.
    - Conflictos: gana lo último en llegar (last-write-wins).
@@ -28,6 +29,30 @@ function passNubeDe(p) {
 }
 function autoOff() { try { return localStorage.getItem(OFF) === '1'; } catch (e) { return false; } }
 function autoOn() { try { localStorage.removeItem(OFF); } catch (e) { /* sin localStorage */ } }
+
+/* Entrar a la cuenta (producción): valida usuario/contraseña CONTRA la nube.
+   No crea cuentas ni acepta el candado local: la cuenta manda. */
+export async function entrarConNube(usuario, pass) {
+  if (!nubeConfigurada()) throw new Error('La nube no está configurada en esta app.');
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    throw new Error('Sin internet. La app vive en tu cuenta: necesita conexión para entrar.');
+  }
+  const email = emailNubeDe(usuario);
+  const passN = passNubeDe(pass);
+  let d;
+  try {
+    d = await postAuth('/auth/v1/token?grant_type=password', { email, password: passN });
+  } catch (e) {
+    const m = String(e && e.message ? e.message : e);
+    if (/Invalid login credentials|invalid|not confirmed|Bad Request/i.test(m)) {
+      throw new Error('Usuario o contraseña no coinciden con tu cuenta en la nube. Usa el mismo usuario y la MISMA contraseña que en tu otro dispositivo.');
+    }
+    throw new Error('No pude conectar con la nube. Revisa tu internet e inténtalo de nuevo.');
+  }
+  guardaTokens(d, email);
+  autoOn();
+  return email;
+}
 
 /* ---------------- sesión ---------------- */
 function sesion() {

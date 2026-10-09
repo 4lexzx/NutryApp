@@ -637,6 +637,11 @@ cualquier dispositivo donde entres. Usas **tu propia cuenta de Supabase** (grati
 nadie más ve tus datos gracias a las políticas de seguridad (RLS) de la tabla. La tarjeta
 **Nube** de Ajustes te deja desconectar, sincronizar a mano o crear otra cuenta si quieres.
 
+En la versión publicada (producción) el acceso es **solo con la nube**: al entrar se valida el
+usuario y la contraseña contra Supabase **antes** de abrir la app y se bajan tus datos, así que
+en cualquier PC o celular ves lo mismo con **la misma cuenta y la misma contraseña**. En local
+(desarrollo y pruebas) sigue pudiendo entrar con el candado del navegador.
+
 ### 12.1 Crear la base de datos (una sola vez)
 
 1. Entra a <https://supabase.com> → **New project** (elige nombre, región y contraseña de admin).

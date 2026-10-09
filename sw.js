@@ -1,7 +1,7 @@
 /* Service worker: la app abre y funciona SIN internet (los datos están en IndexedDB).
    Solo las consultas a la IA necesitan red. */
 
-const CACHE = 'nutri-gym-v2.1.0';
+const CACHE = 'nutri-gym-v2.1.1';
 
 const PRECACHE = [
   './',
@@ -86,6 +86,23 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(req.url);
   if (url.origin !== location.origin) return; // API de Gemini y externos: siempre red
+
+  // El manifest SIEMPRE de la red: así el icono de la app instalada se
+  // actualiza en el lanzador del celular en cuanto sale versión nueva.
+  if (url.pathname.endsWith('manifest.webmanifest')) {
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(req);
+        const cache = await caches.open(CACHE);
+        cache.put('./manifest.webmanifest', fresh.clone()).catch(() => null);
+        return fresh;
+      } catch (e) {
+        const cache = await caches.open(CACHE);
+        return (await cache.match('./manifest.webmanifest')) || Response.error();
+      }
+    })());
+    return;
+  }
 
   // Navegación (abrir la app): red primero, respaldo desde caché
   if (req.mode === 'navigate') {
