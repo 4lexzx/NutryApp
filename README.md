@@ -659,6 +659,11 @@ nadie más ve tus datos gracias a las políticas de seguridad (RLS) de la tabla.
 
 ### Cómo se comporta
 
+- **Al abrir la app con la nube conectada hace una sincronización completa**: baja todo, sube la
+  cola y **deja TODO en la base de datos** (comidas, pesos, perfil, ajustes, foto y bio). Después,
+  cada cambio se sube solo en unos segundos. El guardado local es solo **caché** para que abra al
+  instante y funcione sin internet.
+
 - Cada vez que registras algo (comida, peso, gym, agua, favoritos…), la app lo **encola y lo sube
   solo** en unos segundos; si estás sin internet, queda en una **cola pendiente** y se sube al
   volver (el badge te avisa). Al abrir la app o volver a conectar, **baja** los últimos cambios.

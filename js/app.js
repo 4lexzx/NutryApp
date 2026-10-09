@@ -270,9 +270,10 @@ function setupResume() {
 function setupNube() {
   import('./cloud.js').then(c => {
     if (c.haySesion()) {
-      setTimeout(() => c.sincronizar({ silencioso: true }).catch(() => {}), 2500);
+      // primera vez con sesión en esta visita: subida/bajada COMPLETA a la BD
+      setTimeout(() => c.sincronizarInicial().catch(() => {}), 2500);
       setInterval(() => {
-        if (c.haySesion() && navigator.onLine) c.sincronizar({ silencioso: true }).catch(() => {});
+        if (c.haySesion() && navigator.onLine) c.sincronizarInicial().catch(() => {});
       }, 10 * 60 * 1000);
     }
   }).catch(() => {});

@@ -323,7 +323,7 @@ function programarSinc(ms = 1500) {
   tSinc = setTimeout(() => { sincronizar({ silencioso: true }).catch(() => {}); }, ms);
 }
 window.addEventListener('online', () => {
-  if (haySesion()) sincronizar({ silencioso: true }).catch(() => {});
+  if (haySesion()) sincronizarInicial().catch(() => {});
 });
 
 export async function sincronizar({ silencioso = false } = {}) {
@@ -355,6 +355,32 @@ function avisarUI(err) {
   try {
     if (typeof window.__nutriNubeAct === 'function') window.__nutriNubeAct(err || null);
   } catch (e) { /* nada */ }
+}
+
+/* Sincronización COMPLETA al abrir la app con sesión: baja todo, sube la cola
+   y garantiza que TODO lo local esté en la base de datos (sin toasts).
+   Si algo falla, no se marca y se reintenta en el próximo evento online. */
+let inicialHecha = false;
+export async function sincronizarInicial() {
+  if (!haySesion()) return { ok: false, nada: true };
+  if (inicialHecha) return sincronizar({ silencioso: true });
+  if (sincronizando) return { ok: false, ocupado: true };
+  sincronizando = true;
+  try {
+    await bajar(true);
+    await empujar();
+    await subirTodo();
+    await subirPerfilSocial();
+    inicialHecha = true;
+    avisarUI();
+    return { ok: true };
+  } catch (e) {
+    console.error('sync nube inicial:', e);
+    avisarUI(e);
+    return { ok: false, error: e };
+  } finally {
+    sincronizando = false;
+  }
 }
 
 /* ---------------- migración: subir todo / contar ---------------- */
