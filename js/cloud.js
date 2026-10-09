@@ -10,6 +10,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY, nubeConfigurada, nubeAutomaticaOk } fr
 import { toast, todayISO, toISODate } from './util.js';
 import { currentUser } from './auth.js';
 import { calcTargets } from './nutrition.js';
+import { cargarGym, calcRacha } from './views/gym.js';
 
 const SES = 'ng.nube';        // localStorage: sesión Supabase
 const OFF = 'ng.nube.off';     // localStorage: '1' = el usuario desconectó la nube a mano
@@ -136,7 +137,10 @@ export async function conectarAutomatica(usuario, passLocal) {
     try {
       const s = await postAuth('/auth/v1/signup', { email, password: pass });
       if (s && s.access_token) { guardaTokens(s, email); creado = true; }
-    } catch (e2) { /* la cuenta ya existe u otro fallo: probamos a entrar */ }
+    } catch (e2) {
+      // la cuenta ya existe en la nube con OTRA contraseña: no seguir en silencio
+      if (/already|registrad|existe/i.test(String(e2 && e2.message))) return 'existe';
+    }
     if (!creado && !haySesion()) {
       try {
         const d2 = await postAuth('/auth/v1/token?grant_type=password', { email, password: pass });
@@ -476,7 +480,7 @@ function rachaComidas(meals) {
   return r;
 }
 
-/* Resumen del día que ven tus amigos: kcal de hoy, meta y racha. */
+/* Resumen del día que ven tus amigos: kcal de hoy, meta y racha + flags. */
 async function calcularPerfilSocial() {
   const prof = (await DB.kvGet('profile')) || {};
   let meta = (prof.targets && prof.targets.kcal) ? Number(prof.targets.kcal) : 0;
@@ -488,6 +492,7 @@ async function calcularPerfilSocial() {
     if (m && m.date === hoy) kcal += Number((m.totals && m.totals.kcal) || 0);
   }
   kcal = Math.round(kcal);
+  const pub = k => prof[k] !== false;      // por defecto todo público
   return {
     usuario: currentUser() || '',
     foto: prof.foto || null,
@@ -496,11 +501,105 @@ async function calcularPerfilSocial() {
     kcal_hoy: kcal,
     cumplio: !!(meta && kcal >= meta),
     racha: rachaComidas(meals),
+    pub_perfil: pub('pub_perfil'),
+    pub_comidas: pub('pub_comidas'),
+    pub_historial: pub('pub_historial'),
+    pub_agua: pub('pub_agua'),
+    pub_gym: pub('pub_gym'),
     actualizado: new Date().toISOString()
   };
 }
 
-/* Sube tu ficha social (la llama la sincronización: queda siempre al día). */
+/* Lo que tus amigos pueden ver de ti (secciones según tus flags de privacidad). */
+async function calcularCompartido() {
+  const prof = (await DB.kvGet('profile')) || {};
+  let meta = (prof.targets && prof.targets.kcal) ? Number(prof.targets.kcal) : 0;
+  if (!meta && prof.weight && prof.height && prof.age) meta = calcTargets(prof).kcal || 0;
+  const meals = await DB.all('meals').catch(() => []);
+  const hoy = isoHoy();
+
+  let kcal = 0;
+  const comidas = [];
+  const porFecha = {};
+  for (const m of meals) {
+    if (!m || !m.date) continue;
+    const k = Math.round(Number((m.totals && m.totals.kcal) || 0));
+    porFecha[m.date] = porFecha[m.date] || { k: 0, n: 0 };
+    porFecha[m.date].k += k;
+    porFecha[m.date].n++;
+    if (m.date === hoy) {
+      kcal += k;
+      comidas.push({
+        t: m.type || '',
+        n: String(m.name || '').slice(0, 80),
+        k,
+        h: m.createdAt ? new Date(m.createdAt).toTimeString().slice(0, 5) : ''
+      });
+    }
+  }
+  comidas.sort((a, b) => String(a.h).localeCompare(String(b.h)));
+
+  const historial = [];
+  const d = new Date(hoy + 'T12:00:00');
+  for (let i = 0; i < 14; i++) {
+    const f = toISODate(d);
+    const e = porFecha[f];
+    historial.push({ f, k: e ? Math.round(e.k) : 0, n: e ? e.n : 0 });
+    d.setDate(d.getDate() - 1);
+  }
+
+  const kvs = await DB.kvAll().catch(() => []);
+  const set = (await DB.kvGet('settings')) || {};
+  const aguaMeta = Number(set.waterGoal) || 8;
+  let aguaHoy = 0;
+  const fechasAgua = new Set();
+  for (const r of kvs) {
+    if (!r || !r.k || r.k.slice(0, 6) !== 'water:') continue;
+    const gl = Number(r.glasses) || 0;
+    if (gl > 0) fechasAgua.add(r.k.slice(6));
+    if (r.k.slice(6) === hoy) aguaHoy = gl;
+  }
+  let rachaAgua = 0;
+  {
+    const dd = new Date();
+    if (!fechasAgua.has(toISODate(dd))) dd.setDate(dd.getDate() - 1);
+    for (; ;) {
+      if (!fechasAgua.has(toISODate(dd))) break;
+      rachaAgua++;
+      dd.setDate(dd.getDate() - 1);
+    }
+  }
+
+  let gymRacha = 0, gymHoy = false, gymPlan = '';
+  try {
+    const gy = await cargarGym();
+    const r = calcRacha(gy.regs, gy.plan, hoy);
+    gymRacha = r.dias;
+    gymPlan = String(gy.plan || '');
+    const hoyReg = gy.regs[hoy];
+    gymHoy = !!(hoyReg && hoyReg.ido);
+  } catch (e) { /* sin gym */ }
+
+  let peso = 0;
+  try {
+    const pesos = (await DB.all('weights')).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    if (pesos.length) peso = Number(pesos[pesos.length - 1].kg) || 0;
+  } catch (e) { /* sin pesos */ }
+
+  return {
+    comidas,
+    historial,
+    agua: { v: aguaHoy, meta: aguaMeta, r: rachaAgua },
+    gym: { ido: gymHoy, r: gymRacha, dias: gymPlan },
+    kcal: Math.round(kcal),
+    meta: Math.round(meta) || 0,
+    cumplio: !!(meta && kcal >= meta),
+    racha: rachaComidas(meals),
+    peso
+  };
+}
+
+/* Sube tu ficha social y lo que compartís (la llama la sincronización). */
 export async function subirPerfilSocial() {
   if (!haySesion()) return false;
   const me = uidSesion();
@@ -512,12 +611,36 @@ export async function subirPerfilSocial() {
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: [Object.assign({ user_id: me }, datos)]
   });
+  try {
+    const contenido = await calcularCompartido();
+    await rest('/compartido?on_conflict=user_id', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: [{ user_id: me, contenido, actualizado: new Date().toISOString() }]
+    });
+  } catch (e) {
+    const msg = String(e && e.message ? e.message : e);
+    if (/404|not.?found|compartido/i.test(msg)) {
+      let avisado = false;
+      try { avisado = localStorage.getItem('ng.mig23') === '1'; } catch (ev) { /* sin storage */ }
+      if (!avisado) {
+        try { localStorage.setItem('ng.mig23', '1'); } catch (ev) { /* nada */ }
+        toast('Falta aplicar la migración v2.3 en Supabase (migracion_v2_3_social.sql).', 'warn');
+      }
+    }
+  }
   return true;
 }
 
-/* Perfiles de todos los usuarios (para pintar a tus amigos). */
+/* Perfiles visibles: los tuyos y los de tus amigos (lo decide la nube). */
 export async function bajarPerfiles() {
   const r = await rest('/perfiles?select=*&limit=5000');
+  return r.d || [];
+}
+
+/* Lo que tus amigos publicaron (comidas, historial, agua, gym…). */
+export async function bajarCompartido() {
+  const r = await rest('/compartido?select=*&limit=5000');
   return r.d || [];
 }
 
@@ -538,8 +661,8 @@ export async function pedirAmistad(usuario) {
   }
   const me = uidSesion();
   if (!me) return { ok: false, msg: 'Sin sesión en la nube.' };
-  const r = await rest('/perfiles?select=user_id,usuario&usuario=eq.' + encodeURIComponent(nom) + '&limit=1');
-  const p = (r.d || [])[0];
+  const r = await rest('/rpc/buscar_usuario', { method: 'POST', body: { q: nom } });
+  const p = (r.d || []).find(x => String(x.usuario || '').toLowerCase() === nom) || null;
   if (!p) return { ok: false, msg: 'No hay nadie con ese usuario todavía.' };
   if (p.user_id === me) return { ok: false, msg: 'Ese eres tú.' };
   const ya = await rest('/amistades?select=*,id&or=(and(uno.eq.' + me + ',dos.eq.' + p.user_id +

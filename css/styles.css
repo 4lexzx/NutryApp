@@ -711,8 +711,10 @@ code.codeblock {
   background: var(--brand); color: #fff;
   display: grid; place-items: center;
   box-shadow: 0 10px 26px rgba(52, 199, 89, .3);
+  overflow: hidden;
 }
 .auth-badge .ic { width: 32px; height: 32px; }
+.auth-badge-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .auth-title {
   font-size: 1.9rem; font-weight: 700; letter-spacing: -.03em; margin-bottom: 6px;
 }
@@ -1058,3 +1060,24 @@ code.codeblock {
 .am-prog { height: 6px; border-radius: 4px; background: var(--hairline); overflow: hidden; margin-top: 6px; }
 .am-prog i { display: block; height: 100%; background: var(--warn); border-radius: 4px; transition: width .3s; }
 .am-prog.ok i { background: var(--brand); }
+.acerca-logo { width: 26px; height: 26px; border-radius: 8px; vertical-align: middle; margin-right: 2px; }
+.am-friend:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.am-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.am-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: .78rem; font-weight: 600; color: var(--txt-2);
+  background: var(--card-2); border: 1px solid var(--hairline);
+  border-radius: 999px; padding: 3px 9px;
+}
+.am-chip .ic { width: 13px; height: 13px; }
+.am-meals { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 5px; }
+.am-meals li { font-size: .85rem; color: var(--txt-2); }
+.am-meals li b { color: var(--txt); font-weight: 600; }
+.am-meals .am-meal-h { opacity: .65; margin-right: 4px; font-variant-numeric: tabular-nums; }
+.am-meals .am-meals-more { opacity: .55; font-style: italic; }
+.am-meals.big li {
+  display: flex; justify-content: space-between; gap: 8px;
+  padding: 7px 10px; background: var(--card-2);
+  border: 1px solid var(--hairline); border-radius: 10px;
+}
+.am-meals.big .am-meal-n { flex: 1; color: var(--txt); }

@@ -20,6 +20,7 @@ export async function render(root) {
   const t = (p.weight && p.height && p.age) ? calcTargets(p) : null;
   const manual = !!(p.targets && p.targets.kcal);
   const goal = manual ? p.targets : t;
+  const pp = k => p[k] !== false;   // por defecto todo público
 
   root.innerHTML = `
     <h1>Mi perfil</h1>
@@ -43,6 +44,21 @@ export async function render(root) {
       <button class="btn btn-primary btn-block" id="p-social" type="button">${icon('check')} Guardar perfil social</button>
       <a class="btn btn-outline btn-block" href="#/social" style="margin-top:8px">${icon('userCheck')} Ver amigos y su día</a>
       <div class="hint">La foto y la bio se guardan en tu cuenta y se suben solas con la sincronización.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><h3>${icon('lock')} Privacidad</h3></div>
+      <p class="small muted">Elige qué ven tus amigos. Si apagas todo, tu perfil queda privado y no ven nada
+        (tú siempre te ves a ti mismo). Se aplica la próxima vez que se sincronice.</p>
+      <div class="row" style="flex-wrap:wrap;gap:8px">
+        <button type="button" class="chip ${pp('pub_perfil') ? 'active' : ''}" data-pub="pub_perfil">Foto y bio</button>
+        <button type="button" class="chip ${pp('pub_comidas') ? 'active' : ''}" data-pub="pub_comidas">Comidas de hoy</button>
+        <button type="button" class="chip ${pp('pub_historial') ? 'active' : ''}" data-pub="pub_historial">Historial</button>
+        <button type="button" class="chip ${pp('pub_agua') ? 'active' : ''}" data-pub="pub_agua">Agua y racha</button>
+        <button type="button" class="chip ${pp('pub_gym') ? 'active' : ''}" data-pub="pub_gym">Gimnasio y racha</button>
+      </div>
+      <div class="hint" style="margin-top:10px">Con “Comidas de hoy” tus amigos ven qué comiste (nombre y kcal), no fotos.</div>
+      <button class="btn btn-primary btn-block" id="p-priv" type="button" style="margin-top:12px">${icon('check')} Guardar privacidad</button>
     </div>
 
     <div class="card">
@@ -159,6 +175,24 @@ export async function render(root) {
     render(root);
   };
 
+  // ---- privacidad: qué ve cada amigo ----
+  const privBtn = root.querySelector('#p-priv');
+  if (privBtn) {
+    root.querySelectorAll('[data-pub]').forEach(b => b.onclick = () => b.classList.toggle('active'));
+    privBtn.onclick = async () => {
+      const cambios = {};
+      root.querySelectorAll('[data-pub]').forEach(b => {
+        cambios[b.dataset.pub] = b.classList.contains('active');
+      });
+      await guardarSocial(cambios);
+      const todoOff = !cambios.pub_perfil && !cambios.pub_comidas && !cambios.pub_historial && !cambios.pub_agua && !cambios.pub_gym;
+      toast(todoOff
+        ? 'Privacidad guardada: tu perfil está privado (solo tú te ves).'
+        : 'Privacidad guardada: tus amigos verán solo lo que marcaste.', 'ok');
+      render(root);
+    };
+  }
+
   // ---- amigos: están en la pestaña Social (#/social) ----
 
   // ---- guardar perfil ----
@@ -174,7 +208,8 @@ export async function render(root) {
     };
     if (!next.weight || !next.height || !next.age) { toast('Completa peso, estatura y edad.', 'warn'); return; }
     next.targets = p.targets || null;
-    await saveProfile(next);
+    // mezclamos con lo que ya había: si no, se perderían foto, bio y privacidad
+    await saveProfile(Object.assign({}, p, next));
     toast('Perfil guardado. Metas recalculadas.', 'ok');
     render(root);
   };

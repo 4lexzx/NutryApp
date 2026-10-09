@@ -55,7 +55,8 @@ APP_Nutri/
 ├── supabase/
 │   ├── schema.sql             ← SQL para crear la base de la nube: tabla `registros` + vistas legibles
 │   ├── migracion_v2_1.sql     ← SQL para ordenar una base ya existente (renombra `datos` → `registros`)
-│   └── migracion_v2_2_social.sql ← SQL para añadir el perfil social: `perfiles` (foto, bio, racha) y `amistades`
+│   ├── migracion_v2_2_social.sql ← SQL para añadir el perfil social: `perfiles` (foto, bio, racha) y `amistades`
+│   └── migracion_v2_3_social.sql ← SQL para la privacidad: flags en `perfiles` + tabla `compartido` (comidas/historial de amigos)
 ├── icons/                     ← íconos PNG (192, 512 y maskable)
 ├── css/styles.css             ← diseño oscuro/claro, móvil primero, botones grandes
 └── js/
@@ -613,7 +614,7 @@ bundler ni servidor propio.
   la descarga de los archivos nuevos en el celular.
 - **URL de la nube y configuración**: `js/config.js` (URL y clave pública de Supabase; la clave
   pública no es secreta, pero si prefieres no subirla, déjala vacía y pégala en el navegador).
-- **Sincronización**: `js/cloud.js`; estructura de la nube en `supabase/schema.sql` (usa `supabase/migracion_v2_1.sql` si tu base viene de una versión anterior, y `supabase/migracion_v2_2_social.sql` para añadir el perfil social: `perfiles` y `amistades`).
+- **Sincronización**: `js/cloud.js`; estructura de la nube en `supabase/schema.sql` (usa `supabase/migracion_v2_1.sql` si tu base viene de una versión anterior, `supabase/migracion_v2_2_social.sql` para añadir el perfil social: `perfiles` y `amistades`, y `supabase/migracion_v2_3_social.sql` para la privacidad: flags de visibilidad en `perfiles` + tabla `compartido` con lo que cada uno publica a sus amigos).
 - **Servidor de IA**: `api/ai.js` (recibe la petición en Vercel —con la clave que envía el cliente
   en ese mismo request— y llama a Gemini). `vercel.json` solo ajusta el tiempo máximo (60 s).
 

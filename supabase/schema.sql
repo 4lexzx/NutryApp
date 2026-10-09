@@ -102,8 +102,9 @@ select
 from public.registros
 where coleccion = 'kv' and clave not like '%:%' and not eliminado;
 
--- 4) Perfil social: foto, bio y el resumen del día (kcal, meta, racha).
---    La app lo sube sola en cada sincronización; los amigos lo ven tal cual.
+-- 4) Perfil social: usuario, foto, bio y flags de privacidad (qué compartís).
+--    Lo que compartís (comidas, historial, agua, gym) vive en la tabla
+--    `compartido` del punto 6. La app lo sube sola en cada sincronización.
 create table if not exists public.perfiles (
   user_id uuid primary key references auth.users on delete cascade,
   usuario text not null default '',
@@ -113,16 +114,50 @@ create table if not exists public.perfiles (
   kcal_hoy int default 0,
   cumplio boolean default false,
   racha int default 0,
+  pub_perfil boolean not null default true,
+  pub_comidas boolean not null default true,
+  pub_historial boolean not null default true,
+  pub_agua boolean not null default true,
+  pub_gym boolean not null default true,
   actualizado timestamptz not null default now()
 );
 
+create index if not exists perfiles_usuario_idx on public.perfiles (usuario);
+
 alter table public.perfiles enable row level security;
 
--- todos los usuarios autenticados pueden ver los perfiles (para buscar amigos);
--- solo tú puedes editar el tuyo.
+-- ¿son amigos? (la usan las políticas)
+create or replace function public.es_amigo(other uuid)
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select exists (
+    select 1 from public.amistades a
+    where a.estado = 'aceptada'
+      and ((a.uno = auth.uid() and a.dos = other) or (a.dos = auth.uid() and a.uno = other))
+  );
+$$;
+revoke all on function public.es_amigo(uuid) from public;
+grant execute on function public.es_amigo(uuid) to authenticated;
+
+-- buscar usuarios para enviar solicitudes (sin exponer perfiles completos)
+create or replace function public.buscar_usuario(q text)
+returns table (user_id uuid, usuario text, foto text)
+language sql stable security definer set search_path = public
+as $$
+  select p.user_id, p.usuario, p.foto
+  from public.perfiles p
+  where p.usuario ilike '%' || q || '%'
+  order by p.usuario
+  limit 20;
+$$;
+revoke all on function public.buscar_usuario(text) from public;
+grant execute on function public.buscar_usuario(text) to authenticated;
+
+-- perfiles: solo tú y tus amigos lo ven
 drop policy if exists "perfiles_ver" on public.perfiles;
 create policy "perfiles_ver" on public.perfiles
-  for select to authenticated using (true);
+  for select to authenticated using (auth.uid() = user_id or public.es_amigo(user_id));
 
 drop policy if exists "perfiles_mio" on public.perfiles;
 create policy "perfiles_mio" on public.perfiles
@@ -156,3 +191,29 @@ create policy "amistades_responder" on public.amistades
 drop policy if exists "amistades_quitar" on public.amistades;
 create policy "amistades_quitar" on public.amistades
   for delete using (auth.uid() = uno or auth.uid() = dos);
+
+-- 6) Compartido: lo que publicás para tus amigos (comidas de hoy con nombre
+--    y kcal, historial de días, agua, gym, peso…). Se sube solo en cada
+--    sincronización. Tus amigos lo ven solo si tenés algo publicado; qué
+--    secciones mostrar lo decide la app según tus flags de `perfiles`.
+create table if not exists public.compartido (
+  user_id uuid primary key references auth.users on delete cascade,
+  contenido jsonb not null default '{}'::jsonb,
+  actualizado timestamptz not null default now()
+);
+
+alter table public.compartido enable row level security;
+
+drop policy if exists "compartido_mio" on public.compartido;
+create policy "compartido_mio" on public.compartido
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "compartido_amigos" on public.compartido;
+create policy "compartido_amigos" on public.compartido
+  for select to authenticated using (
+    public.es_amigo(user_id) and exists (
+      select 1 from public.perfiles p
+      where p.user_id = compartido.user_id
+        and (p.pub_perfil or p.pub_comidas or p.pub_historial or p.pub_agua or p.pub_gym)
+    )
+  );

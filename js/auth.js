@@ -73,6 +73,18 @@ export async function createUser(username, password) {
   return { ok: true, user: u };
 }
 
+/* Borra un usuario de ESTE dispositivo (se usa si la cuenta ya existe en la
+   nube con otra contraseña y no queremos crear una cuenta duplicada). */
+export async function removeUser(username) {
+  const list = await getUsers();
+  const u = String(username || '').trim().toLowerCase();
+  const next = list.filter(x => x.u !== u);
+  if (next.length === list.length) return { ok: false, msg: 'Usuario no encontrado.' };
+  if (!next.length) return { ok: false, msg: 'No se puede borrar el último usuario.' };
+  await saveUsers(next);
+  return { ok: true };
+}
+
 export async function verify(username, password) {
   const list = await seedUsers();
   const u = String(username || '').trim().toLowerCase();

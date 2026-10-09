@@ -2,13 +2,14 @@
    Al entrar (o crear usuario), los datos se conectan solos a la nube. */
 
 import { icon } from '../icons.js';
-import { verify, createUser, setSession } from '../auth.js';
+import { verify, createUser, removeUser, setSession } from '../auth.js';
 import { conectarAutomatica } from '../cloud.js';
+import { toast } from '../util.js';
 
 export async function render(root, onOk) {
   root.innerHTML = `
     <div class="auth">
-      <div class="auth-badge" aria-hidden="true">${icon('dumbbell')}</div>
+      <div class="auth-badge" aria-hidden="true"><img class="auth-badge-img" src="icons/icon-192-v3.png" alt=""></div>
       <h1 class="auth-title">Nutri Gym</h1>
       <p class="auth-sub" id="au-sub">Inicia sesión para ver tus comidas del día</p>
 
@@ -140,9 +141,20 @@ export async function render(root, onOk) {
   const autoNube = (user, pass) => {
     try {
       const p = conectarAutomatica(user, pass);
-      if (p && p.catch) p.catch(() => {});
+      if (p && p.then) p.then(nube => {
+        if (nube === 'existe') {
+          toast('La nube tiene otra contraseña para esta cuenta: tus datos quedan solo en este dispositivo.', 'warn');
+        }
+      }).catch(() => {});
     } catch (e) { /* sin nube la app sigue en local */ }
   };
+
+  /* Para el registro: esperamos a la nube (con tope) para detectar cuentas
+     ya registradas con otra contraseña. */
+  const conNube = (user, pass) => Promise.race([
+    Promise.resolve(conectarAutomatica(user, pass)).catch(() => false),
+    new Promise(res => setTimeout(() => res(false), 8000))
+  ]);
 
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -180,8 +192,19 @@ export async function render(root, onOk) {
     try {
       const r = await createUser(u, p);
       if (!r.ok) { showError(regErrBox, regForm, regUser, r.msg); return; }
+      // comprobamos la nube ANTES de entrar: si el usuario ya existe allá con
+      // otra contraseña, no creamos una cuenta duplicada.
+      regGoBtn.innerHTML = '<span class="spinner"></span><span class="lbl">Conectando…</span>';
+      const nube = await conNube(r.user, p);
+      if (nube === 'existe') {
+        await removeUser(r.user);
+        userInput.value = u;
+        passInput.value = '';
+        setMode('login');
+        showError(errBox, form, userInput, 'Ese usuario ya está registrado en la nube con otra contraseña. Inicia sesión con esas credenciales o crea un usuario distinto.');
+        return;
+      }
       enter(r.user);
-      autoNube(r.user, p);
     } catch (err) {
       showError(regErrBox, regForm, regUser, 'No se pudo crear el usuario. Inténtalo de nuevo.');
     } finally {

@@ -17,6 +17,7 @@ import * as login from './views/login.js';
 import * as gym from './views/gym.js';
 import * as batido from './views/batido.js';
 import * as social from './views/social.js';
+import * as amigo from './views/amigo.js';
 
 const view = () => document.getElementById('view');
 
@@ -33,7 +34,7 @@ function parseHash() {
   return { path, query };
 }
 
-const NAV_OF = { hoy: 'hoy', registrar: 'registrar', nuevo: 'registrar', editar: 'registrar', historial: 'historial', social: 'social', perfil: 'perfil', ajustes: 'ajustes', ia: 'ajustes', gym: 'hoy', batido: 'registrar' };
+const NAV_OF = { hoy: 'hoy', registrar: 'registrar', nuevo: 'registrar', editar: 'registrar', historial: 'historial', social: 'social', amigo: 'social', perfil: 'perfil', ajustes: 'ajustes', ia: 'ajustes', gym: 'hoy', batido: 'registrar' };
 
 async function route(opts = {}) {
   const { path, query } = parseHash();
@@ -72,6 +73,7 @@ async function route(opts = {}) {
       case 'historial': await history.render(root, path.slice(1), query); break;
       case 'perfil': await profile.render(root, path.slice(1), query); break;
       case 'social': await social.render(root); break;
+      case 'amigo': await amigo.render(root, path.slice(1)); break;
       case 'ajustes': await settings.render(root, path.slice(1), query); break;
       case 'ia': await ia.render(root, path.slice(1), query); break;
       case 'gym': await gym.render(root, path.slice(1), query); break;
@@ -234,7 +236,10 @@ function setupSW() {
 
   const registrar = async () => {
     try {
-      const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+      // updateViaCache:'none': el navegador siempre mira sw.js a la red
+      // (sin él, la PWA instalada se quedaba vieja y había que reinstalarla).
+      const reg = await navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' });
+      navigator.serviceWorker.__nutriReg = reg;
       vigilar(reg);
       const buscar = () => { if (navigator.onLine) reg.update().catch(() => {}); };
       setTimeout(buscar, 3000);                       // al abrir
@@ -244,12 +249,23 @@ function setupSW() {
   };
   if (document.readyState === 'complete') registrar();
   else window.addEventListener('load', registrar, { once: true });
+
+  // Si hay una versión nueva esperando y el usuario NO está escribiendo ni
+  // con una hoja abierta, la aplicamos sola al volver a la app: así la PWA
+  // instalada se pone al día sin desinstalar nada.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    try {
+      const reg = navigator.serviceWorker.__nutriReg;
+      if (reg && reg.waiting && !enFormulario()) reg.waiting.postMessage('skipWaiting');
+    } catch (e) { /* nada */ }
+  });
 }
 
 /* ---------- Volver de segundo plano (cámara, galería u otra app) ---------- */
 function setupResume() {
   let ocultoEn = 0;
-  const RUTAS_REFRESH = ['hoy', 'registrar', 'historial'];   // las demás tienen formularios
+  const RUTAS_REFRESH = ['hoy', 'registrar', 'historial', 'social', 'amigo'];   // las demás tienen formularios
   const refrescar = () => {
     if (!window.__nutriListo) return;
     try { log.alVolverDeFoto(); } catch (e) { /* nada */ }

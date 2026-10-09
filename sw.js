@@ -1,7 +1,7 @@
 /* Service worker: la app abre y funciona SIN internet (los datos están en IndexedDB).
    Solo las consultas a la IA necesitan red. */
 
-const CACHE = 'nutri-gym-v2.0.0';
+const CACHE = 'nutri-gym-v2.1.0';
 
 const PRECACHE = [
   './',
@@ -27,6 +27,7 @@ const PRECACHE = [
   './js/charts.js',
   './js/export.js',
   './js/editor.js',
+  './js/selects.js',
   './js/views/today.js',
   './js/views/log.js',
   './js/views/history.js',
@@ -36,10 +37,12 @@ const PRECACHE = [
   './js/views/login.js',
   './js/views/gym.js',
   './js/views/batido.js',
-  './icons/icon-192-v2.png',
-  './icons/icon-512-v2.png',
-  './icons/icon-maskable-512-v2.png',
-  './icons/notif-badge.png'
+  './js/views/social.js',
+  './js/views/amigo.js',
+  './icons/icon-192-v3.png',
+  './icons/icon-512-v3.png',
+  './icons/icon-maskable-512-v3.png',
+  './icons/notif-badge-v3.png'
 ];
 
 self.addEventListener('install', event => {
@@ -48,8 +51,8 @@ self.addEventListener('install', event => {
     await Promise.all(PRECACHE.map(url =>
       cache.add(new Request(url, { cache: 'reload' })).catch(() => null)
     ));
-    // No skipWaiting: la versión nueva queda en espera y el usuario la aplica
-    // con el botón "Actualizar" de Ajustes (o sola al cerrar del todo la app).
+    // No skipWaiting: la versión nueva queda en espera y la app la aplica sola
+    // al volver a la pestaña (o con el botón "Actualizar" de Ajustes).
   })());
 });
 

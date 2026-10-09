@@ -11,7 +11,7 @@ import { haySesion, emailSesion, emailNubeDe, crearCuenta, conectar, desconectar
 import { setSonidos, clic } from '../sound.js';
 import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe } from '../notif.js';
 
-const VERSION = '2.0.0';
+const VERSION = '2.1.0';
 let hAct = null;   // oyente del evento "hay actualización" (uno solo, sin duplicar)
 
 export async function render(root) {
@@ -207,7 +207,7 @@ const cuentaOtra = conNube && !!currentUser() &&
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>${icon('info')} Acerca de</h3></div>
+      <div class="card-title"><h3><img class="acerca-logo" src="icons/icon-192-v3.png" alt=""> ${icon('info')} Acerca de</h3></div>
       <p class="small muted">Nutri Gym v${VERSION} · PWA con nube (Supabase) e IA con tu propia clave de Gemini.<br>
       Tus datos y tu perfil viven <b>en tu cuenta</b>: al iniciar sesión se suben y se bajan solos. El respaldo
       .json es opcional, por si un día quieres copia fuera de la nube.</p>

@@ -1,9 +1,9 @@
 /* Social (pestaña): amigos — solicitudes, buscar por usuario y el día de
-   tus amigos: kcal, meta, racha y bio (sus logros de hoy). */
+   tus amigos (si lo publican): comidas de hoy, kcal, agua, gym y rachas. */
 
 import { icon } from '../icons.js';
 import { esc, num, toast, todayISO, toISODate } from '../util.js';
-import { haySesion, uidNube, pedirAmistad, misAmistades, responderAmistad, quitarAmistad, bajarPerfiles } from '../cloud.js';
+import { haySesion, uidNube, pedirAmistad, misAmistades, responderAmistad, quitarAmistad, bajarPerfiles, bajarCompartido } from '../cloud.js';
 import { currentUser } from '../auth.js';
 
 export async function render(root) {
@@ -55,15 +55,21 @@ export async function render(root) {
     const listBox = root.querySelector('#am-list');
     const empty = root.querySelector('#am-empty');
     const me = uidNube();
-    let amis = [], perfs = [];
+    let amis = [], perfs = [], comps = [];
     try {
-      [amis, perfs] = await Promise.all([misAmistades(), bajarPerfiles()]);
+      [amis, perfs, comps] = await Promise.all([misAmistades(), bajarPerfiles(), bajarCompartido()]);
     } catch (e) {
-      empty.style.display = '';
-      empty.textContent = 'No pude cargar amigos. Revisa tu conexión con la nube.';
-      return;
+      // sin la tabla `compartido` (migración vieja) seguimos con los datos básicos
+      try {
+        [amis, perfs] = await Promise.all([misAmistades(), bajarPerfiles()]);
+      } catch (e2) {
+        empty.style.display = '';
+        empty.textContent = 'No pude cargar amigos. Revisa tu conexión con la nube.';
+        return;
+      }
     }
     const buscar = id => perfs.find(x => x.user_id === id) || null;
+    const compDe = id => { const r = comps.find(x => x.user_id === id); return (r && r.contenido) || null; };
     const avatar = id => { const pf = buscar(id); return pf && pf.foto ? `<img src="${pf.foto}" alt="">` : icon('user'); };
     const nombre = id => { const pf = buscar(id); return (pf && pf.usuario) || 'amigo'; };
 
@@ -99,24 +105,41 @@ export async function render(root) {
     listBox.innerHTML = aceptadas.length ? `<div class="divider"></div><b>El día de tus amigos</b>` + aceptadas.map(a => {
       const fid = a.uno === me ? a.dos : a.uno;
       const pf = buscar(fid) || {};
-      const meta = Number(pf.meta_kcal) || 0;
-      const kcal = Number(pf.kcal_hoy) || 0;
-      const ok = !!pf.cumplio;
-      const racha = Number(pf.racha) || 0;
+      const c = compDe(fid) || {};
+      const pub = k => pf[k] !== false;   // por defecto todo público (perfiles viejos)
+      const privado = !pub('pub_perfil') && !pub('pub_comidas') && !pub('pub_agua') && !pub('pub_gym');
+      // datos nuevos (`compartido`) o los básicos de siempre (perfiles)
+      const meta = Number(c.meta) || Number(pf.meta_kcal) || 0;
+      const kcal = Number(c.kcal) || Number(pf.kcal_hoy) || 0;
+      const ok = c.cumplio !== undefined ? !!c.cumplio : !!pf.cumplio;
+      const racha = pub('pub_comidas') ? (Number(c.racha) || Number(pf.racha) || 0) : 0;
+      const agua = pub('pub_agua') && c.agua ? Number(c.agua.r) || 0 : 0;
+      const gym = pub('pub_gym') && c.gym ? Number(c.gym.r) || 0 : 0;
+      const comidas = pub('pub_comidas') && Array.isArray(c.comidas) ? c.comidas : [];
       const viejo = !pf.actualizado || toISODate(new Date(pf.actualizado)) !== hoy;
       const pct = meta ? Math.max(0, Math.min(100, Math.round(kcal / meta * 100))) : 0;
       const detalle = meta ? `${num(kcal)} / ${num(meta)} kcal` : `${num(kcal)} kcal`;
       const estado = ok ? 'meta ✓' : (meta ? pct + '%' : num(kcal));
+      const bio = pub('pub_perfil') && pf.bio ? `<div class="am-bio">${esc(pf.bio)}</div>` : '';
+      const rachas = (agua || gym || racha) ? `<div class="am-chips">${
+        racha ? `<span class="am-chip">${icon('flame')} ${racha}</span>` : ''}${
+        agua ? `<span class="am-chip">${icon('droplet')} ${agua}</span>` : ''}${
+        gym ? `<span class="am-chip">${icon('dumbbell')} ${gym}</span>` : ''}</div>` : '';
+      const comidaLista = comidas.length ? `<ul class="am-meals">${comidas.slice(0, 3).map(m => `
+        <li><span class="am-meal-h">${esc(m.h || '')}</span> ${esc(m.n || '')} <b>${num(m.k || 0)}</b></li>`).join('')}${comidas.length > 3 ? `<li class="am-meals-more">+ ${comidas.length - 3} más…</li>` : ''}</ul>` : '';
       return `
-      <div class="list-item am-item" style="cursor:default">
+      <div class="list-item am-item am-friend" data-friend="${esc(fid)}" role="button" tabindex="0" style="cursor:pointer">
         <div class="avatar sm">${avatar(fid)}</div>
         <div class="li-main">
-          <div class="li-t">${esc(nombre(fid))}</div>
-          <div class="li-s">${viejo ? 'aún sin datos de hoy' : detalle}${racha ? ' · ' + icon('flame') + ' ' + racha + (racha === 1 ? ' día' : ' días') : ''}</div>
-          ${!viejo && meta ? `<div class="am-prog ${ok ? 'ok' : ''}"><i style="width:${pct}%"></i></div>` : ''}
-          ${pf.bio ? `<div class="am-bio">${esc(pf.bio)}</div>` : ''}
+          <div class="li-t">${esc(nombre(fid))} ${icon('chevronRight')}</div>
+          ${bio}
+          ${privado
+            ? `<div class="li-s">${icon('lock')} perfil privado</div>`
+            : `${pub('pub_comidas') && !viejo ? `<div class="li-s">${detalle}</div>` : `<div class="li-s">aún sin datos de hoy</div>`}
+               ${!viejo && meta ? `<div class="am-prog ${ok ? 'ok' : ''}"><i style="width:${pct}%"></i></div>` : ''}
+               ${comidaLista}${rachas}`}
         </div>
-        <div class="li-end">${viejo ? '' : `<span class="badge ${ok ? 'ok' : 'warn'}">${estado}</span>`}</div>
+        <div class="li-end">${!privado && pub('pub_comidas') && !viejo ? `<span class="badge ${ok ? 'ok' : 'warn'}">${estado}</span>` : ''}</div>
       </div>`;
     }).join('') : '';
 
@@ -144,6 +167,14 @@ export async function render(root) {
         toast('Solicitud cancelada.', 'ok');
       } catch (e) { toast('No pude cancelar. Revisa la nube.', 'warn'); }
       cargarAmigos();
+    });
+    const irAmigo = el => {
+      const fid = el.dataset.friend;
+      if (fid) location.hash = '#/amigo/' + fid;
+    };
+    root.querySelectorAll('[data-friend]').forEach(b => {
+      b.onclick = e => { if (e.target.closest('button')) return; irAmigo(b); };
+      b.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); irAmigo(b); } };
     });
   }
 
