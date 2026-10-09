@@ -76,14 +76,17 @@ export async function crearCuenta(email, pass) {
 
 async function primerSincronizado() {
   const nubeN = await contarNube().catch(() => null);
-  if (nubeN === null || nubeN.total === 0) {
-    const r = await subirTodo();
+  const vacia = !nubeN || !nubeN.total;
+  const baj = await bajar(true).catch(() => 0);
+  await empujar().catch(() => {});
+  const r = await subirTodo();
+  if (vacia) {
     toast(`Nube conectada. Subí tus datos: ${r.subidas} registro${r.subidas === 1 ? '' : 's'}.`, 'ok');
   } else {
-    const b = await sincronizar({ silencioso: true });
     toast(`Nube conectada como ${emailSesion()}.`, 'ok');
-    if (b && b.ok && b.bajadas) toast(`Bajé ${b.bajadas} cambio${b.bajadas === 1 ? '' : 's'} de tu otra nube.`, 'ok');
+    if (baj) toast(`Bajé ${baj} cambio${baj === 1 ? '' : 's'} de tu otra nube.`, 'ok');
   }
+  return r;
 }
 
 export async function conectar(email, pass) {
