@@ -11,7 +11,7 @@ import { haySesion, emailSesion, emailNubeDe, crearCuenta, conectar, desconectar
 import { setSonidos, clic } from '../sound.js';
 import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe } from '../notif.js';
 
-const VERSION = '2.1.2';
+const VERSION = '2.1.3';
 let hAct = null;   // oyente del evento "hay actualización" (uno solo, sin duplicar)
 
 export async function render(root) {
@@ -435,12 +435,12 @@ const cuentaOtra = conNube && !!currentUser() &&
   if (nbOut) nbOut.onclick = async () => {
     const ok = await confirmSheet({
       title: '¿Desconectar la nube?',
-      msg: 'Los datos de este dispositivo quedan como estaban. Puedes volver a conectar cuando quieras.',
+      msg: 'Los datos de este dispositivo quedan como estaban. Se volverá a conectar sola la próxima vez que entres, sin pasos extra.',
       okText: 'Desconectar'
     });
     if (!ok) return;
     await desconectar();
-    toast('Nube desconectada. La app sigue en modo local.', 'ok');
+    toast('Nube desconectada por ahora: se reconecta sola la próxima vez que entres.', 'ok');
     render(root);
   };
   const nbUp = root.querySelector('#nb-up');

@@ -14,7 +14,6 @@ import { calcTargets } from './nutrition.js';
 import { cargarGym, calcRacha } from './views/gym.js';
 
 const SES = 'ng.nube';        // localStorage: sesión Supabase
-const OFF = 'ng.nube.off';     // localStorage: '1' = el usuario desconectó la nube a mano
 const COLA = 'syncq';         // kv: pendientes por subir {clave: op}
 const ULT = 'cloudUlt';       // kv: corte de la última bajada (fecha del servidor)
 const KV_NO_SUBIR = new Set([COLA, ULT, 'users']);
@@ -27,8 +26,6 @@ function passNubeDe(p) {
   const s = String(p || '');
   return s.length >= 6 ? s : s + '0'.repeat(6 - s.length);   // Supabase exige mínimo 6
 }
-function autoOff() { try { return localStorage.getItem(OFF) === '1'; } catch (e) { return false; } }
-function autoOn() { try { localStorage.removeItem(OFF); } catch (e) { /* sin localStorage */ } }
 
 /* Entrar a la cuenta (producción): valida usuario/contraseña CONTRA la nube.
    No crea cuentas ni acepta el candado local: la cuenta manda. */
@@ -50,7 +47,6 @@ export async function entrarConNube(usuario, pass) {
     throw new Error('No pude conectar con la nube. Revisa tu internet e inténtalo de nuevo.');
   }
   guardaTokens(d, email);
-  autoOn();
   return email;
 }
 
@@ -141,7 +137,6 @@ export async function crearCuenta(email, pass, usuario) {
   if (usuario) await registrarUsuarioLocal(email, usuario).catch(() => {});
   if (d && d.access_token) {
     guardaTokens(d, email);
-    autoOn();
     await primerSincronizado();
     return { confirmada: true };
   }
@@ -183,7 +178,6 @@ export async function conectar(email, pass) {
   if (!nubeConfigurada()) throw new Error('La nube todavía no está configurada en la app.');
   const d = await postAuth('/auth/v1/token?grant_type=password', { email, password: pass });
   guardaTokens(d, email);
-  autoOn();
   await primerSincronizado();
   return emailSesion();
 }
@@ -200,9 +194,7 @@ export async function conectarAutomatica(usuario, passLocal) {
   // con el mismo usuario).
   if (haySesion() && (emailSesion() || '').toLowerCase() !== email) {
     try { desconectar(); } catch (e) { /* seguimos */ }
-    autoOn();
   }
-  if (autoOff()) return false;
   try {
     const d = await postAuth('/auth/v1/token?grant_type=password', { email, password: pass });
     guardaTokens(d, email);
@@ -223,7 +215,6 @@ export async function conectarAutomatica(usuario, passLocal) {
     }
   }
   if (!haySesion()) return false;   // pidió confirmar el correo: seguimos en local
-  autoOn();
   try { await primerSincronizado(); } catch (e) { /* sin red u otro fallo: seguimos */ }
   return true;
 }
@@ -236,39 +227,106 @@ export async function desconectar() {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + s.access_token }
     }).catch(() => {});
   }
-  guardaSesion(null);
+  guardaSesion(null);   // solo a mano desde Ajustes: la nube nunca se cae sola
   _uid = '';
-  try { localStorage.setItem(OFF, '1'); } catch (e) { /* sin localStorage */ }   // no reconectar sola
 }
 
-async function token() {
+/* Refresco de la sesión: UNA sola petición a la vez. Si dos llamadas usan el
+   mismo refresh_token en paralelo, el servidor rechaza a la segunda y eso
+   borraba la sesión entera (la app se quedaba 'solo local' sin motivo). */
+let refrescando = null;
+function refrescarSesion(s) {
+  if (!refrescando) {
+    refrescando = (async () => {
+      // otra pestaña (o este mismo refresco) pudo renovar la sesión mientras tanto
+      const vigente = () => {
+        const a = sesion();
+        if (a && a.access_token && a.expires_at && Date.now() < a.expires_at - 60 * 1000) return a;
+        return null;
+      };
+      if (vigente()) return vigente().access_token;
+      try {
+        const d = await postAuth('/auth/v1/token?grant_type=refresh_token', { refresh_token: s.refresh_token });
+        guardaSesion({
+          email: s.email,
+          access_token: d.access_token,
+          refresh_token: d.refresh_token || s.refresh_token,
+          expires_at: Date.now() + (Number(d.expires_in) || 3600) * 1000
+        });
+        return sesion().access_token;
+      } catch (e) {
+        const a = vigente();
+        if (a) return a.access_token;    // ya la había renovado otra pestaña
+        throw e;
+      }
+    })();
+    const limpiar = () => { refrescando = null; };
+    refrescando.then(limpiar, limpiar);
+  }
+  return refrescando;
+}
+
+/* La nube NUNCA se desconecta sola: si el refresco falla (red caída, tope de
+   la nube o token caducado) la sesión se queda guardada y se reintenta sola
+   con esperas crecientes. No hace falta ningún paso manual. */
+let tReintento = null;
+let esperaReintento = 5000;
+let pendiente = false;          // true = hay un fallo de nube por reintentar
+function programaReintento() {
+  pendiente = true;
+  if (tReintento) return;
+  const ms = esperaReintento;
+  esperaReintento = Math.min(ms * 2, 5 * 60 * 1000);
+  tReintento = setTimeout(() => {
+    tReintento = null;
+    if (haySesion() && typeof navigator !== 'undefined' && navigator.onLine) {
+      sincronizar({ silencioso: true }).catch(() => {});
+    }
+  }, ms);
+}
+function reintentoOk() {
+  pendiente = false;
+  if (tReintento) { clearTimeout(tReintento); tReintento = null; }
+  esperaReintento = 5000;
+}
+
+/* Deja la sesión otra vez válida sin tocar nada del usuario. */
+export async function reconectar() {
+  if (!haySesion()) return false;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+  const s = sesion();
+  const vencida = s.expires_at && Date.now() > s.expires_at - 4 * 60 * 1000;
+  if (!vencida && !pendiente) { reintentoOk(); return true; }   // la sesión está bien
+  try {
+    await refrescarSesion(s);
+    reintentoOk();
+    return true;
+  } catch (e) {
+    programaReintento();
+    return false;
+  }
+}
+
+async function token({ forzar = false } = {}) {
   const s = sesion();
   if (!s) return null;
-  if (s.expires_at && Date.now() > s.expires_at - 4 * 60 * 1000) {
-    if (!navigator.onLine) return s.access_token;   // sin red: seguimos con el guardado
-    try {
-      const d = await postAuth('/auth/v1/token?grant_type=refresh_token', { refresh_token: s.refresh_token });
-      guardaSesion({
-        email: s.email,
-        access_token: d.access_token,
-        refresh_token: d.refresh_token || s.refresh_token,
-        expires_at: Date.now() + (Number(d.expires_in) || 3600) * 1000
-      });
-      return sesion().access_token;
-    } catch (e) {
-      guardaSesion(null);
-      _uid = '';
-      throw new Error('Tu sesión de la nube venció: vuelve a conectar en Ajustes → Nube.');
-    }
+  const vencida = s.expires_at && Date.now() > s.expires_at - 4 * 60 * 1000;
+  if (!vencida && !forzar) { reintentoOk(); return s.access_token; }
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return s.access_token;   // sin red: seguimos con la guardada
+  try {
+    const tk = await refrescarSesion(s);
+    reintentoOk();
+    return tk;
+  } catch (e) {
+    // la sesión NUNCA se borra: los cambios siguen encolados y se reintenta sola
+    programaReintento();
+    throw new Error('La nube no responde ahora. Tus datos siguen guardados aquí y se suben solos cuando vuelva.');
   }
-  return s.access_token;
 }
 
 /* ---------------- REST (PostgREST) ---------------- */
 async function rest(patho, { method = 'GET', body, headers = {} } = {}) {
-  const tk = await token();
-  if (!tk) throw new Error('Sin sesión en la nube.');
-  const r = await fetch(SUPABASE_URL + '/rest/v1' + patho, {
+  const llamada = tk => fetch(SUPABASE_URL + '/rest/v1' + patho, {
     method,
     headers: Object.assign({
       apikey: SUPABASE_ANON_KEY,
@@ -277,10 +335,19 @@ async function rest(patho, { method = 'GET', body, headers = {} } = {}) {
     }, headers),
     body: body === undefined ? undefined : JSON.stringify(body)
   });
+  let tk = await token();
+  if (!tk) throw new Error('Sin sesión en la nube.');
+  let r = await llamada(tk);
   if (r.status === 401) {
-    guardaSesion(null);
-    _uid = '';
-    throw new Error('Sesión expirada: vuelve a conectar la nube en Ajustes.');
+    // el access_token venció: refrescamos una vez y volvemos a intentar
+    tk = await token({ forzar: true }).catch(() => null);
+    if (tk) r = await llamada(tk);
+  }
+  if (r.status === 401) {
+    // la nube no aceptó el token: la sesión se queda guardada (aquí no se
+    // desconecta nada) y programamos el reintento para que vuelva sola.
+    programaReintento();
+    throw new Error('La nube no aceptó la sesión por ahora: se reintenta sola y tus datos siguen guardados en este dispositivo.');
   }
   const t = await r.text();
   if (!r.ok) throw new Error('Nube (' + r.status + '): ' + t.slice(0, 220));
@@ -432,6 +499,7 @@ export async function sincronizar({ silencioso = false } = {}) {
     console.error('sync nube:', e);
     if (!silencioso && navigator.onLine) toast('Nube: ' + (e && e.message ? e.message : e), 'warn');
     avisarUI(e);
+    programaReintento();          // reintento sola, sin pedirle nada al usuario
     return { ok: false, error: e };
   } finally {
     sincronizando = false;
@@ -464,6 +532,7 @@ export async function sincronizarInicial() {
   } catch (e) {
     console.error('sync nube inicial:', e);
     avisarUI(e);
+    programaReintento();
     return { ok: false, error: e };
   } finally {
     sincronizando = false;

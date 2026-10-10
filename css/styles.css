@@ -1116,29 +1116,10 @@ code.codeblock {
 .dot.carb { background: var(--carb); }
 .dot.gras { background: var(--grasa); }
 
-/* --- Fila de dos tarjetas (racha + agua) lado a lado --- */
-.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.duo > .card { margin-bottom: 0; }
-.duo-card .card-title { margin-bottom: 6px; }
-.duo-card .card-title h3 { font-size: .82rem; font-weight: 500; color: var(--txt-2); }
-.duo-card .big-num { font-size: 1.5rem; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
-.duo-card .big-num small { font-size: .9rem; font-weight: 600; color: var(--txt-2); }
-
 /* Lamps (dias L M X J V S D) del mockup */
 .lamps { display: flex; gap: 6px; margin-top: 10px; }
 .lamps .lamp { flex: 1; height: 30px; border-radius: 8px; background: var(--seg-bg); }
 .lamps .lamp.on { background: var(--brand); }
-.lampdays { display: flex; gap: 6px; margin-top: 5px; }
-.lampdays span { flex: 1; text-align: center; font-size: .62rem; color: var(--txt-3); }
-
-/* Vasos de agua (pildoras) del mockup */
-.glasses-pills { display: flex; gap: 7px; margin-top: 14px; flex-wrap: wrap; }
-.glasses-pills .gpill {
-  width: 22px; height: 30px; border-radius: 9px;
-  background: var(--seg-bg); border: none; cursor: pointer; padding: 0;
-  transition: background .15s;
-}
-.glasses-pills .gpill.full { background: var(--txt); }
 
 /* --- Tarjeta de comida del mockup: icono cuadrado, kcal a la derecha --- */
 .meal-thumb { border-radius: 14px; }
@@ -1221,20 +1202,7 @@ body.locked .bottomnav { display: none; }
 .dropzone .dz-t { font-weight: 700; margin-top: 10px; }
 .dropzone .dz-s { font-size: .82rem; color: var(--txt-3); margin-top: 3px; }
 
-/* --- Perfil: avatar grande con anillo verde, stats e insignias --- */
-.profile-hero { text-align: center; padding: 6px 0 4px; }
-.profile-avatar {
-  width: 96px; height: 96px; border-radius: 26px; margin: 0 auto;
-  display: grid; place-items: center; font-size: 2.1rem; font-weight: 700;
-  background: var(--card-2); color: var(--txt);
-  border: 2px solid var(--brand);
-}
-.profile-name { font-size: 1.3rem; font-weight: 700; margin-top: 12px; }
-.profile-sub { font-size: .82rem; color: var(--txt-2); margin-top: 2px; }
-.profile-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
-.profile-stats .ps { text-align: center; }
-.profile-stats .ps-v { font-size: 1.15rem; font-weight: 700; }
-.profile-stats .ps-k { font-size: .72rem; color: var(--txt-3); margin-top: 1px; }
+/* --- Perfil: insignias --- */
 .badges-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .badge-tile { text-align: center; }
 .badge-tile .bt-ic {

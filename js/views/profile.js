@@ -22,7 +22,6 @@ export async function render(root) {
   const goal = manual ? p.targets : t;
   const pp = k => p[k] !== false;   // por defecto todo público
   const user = currentUser() || '';
-  const inicial = (user || 'N').charAt(0).toUpperCase();
 
   // datos livianos para las insignias (solo lectura, misma lógica de siempre)
   const hoy = todayISO();
@@ -44,26 +43,10 @@ export async function render(root) {
 
   root.innerHTML = `
     <h1>Perfil</h1>
-    <p class="small muted" style="margin:-8px 0 14px">${esc(user)}</p>
-
-    <div class="card">
-      <div class="profile-hero">
-        ${p.foto
-          ? `<img class="profile-avatar" src="${p.foto}" alt="Foto de perfil" style="object-fit:cover">`
-          : `<div class="profile-avatar">${esc(inicial)}</div>`}
-        <div class="profile-name">${esc(user)}</div>
-        <div class="profile-sub">${conNube ? 'Sincronizado' : 'Solo local'}</div>
-      </div>
-      <div class="profile-stats">
-        <div class="ps"><div class="ps-v">${p.weight ? num(p.weight, 1) + ' kg' : '—'}</div><div class="ps-k">Peso</div></div>
-        <div class="ps"><div class="ps-v">${p.height ? num(p.height) + ' cm' : '—'}</div><div class="ps-k">Altura</div></div>
-        <div class="ps"><div class="ps-v">${p.age || '—'}</div><div class="ps-k">Edad</div></div>
-      </div>
-    </div>
 
     <div class="card">
       <div class="card-title"><h3>${icon('user')} Tu usuario</h3>
-        <span class="badge ${conNube ? 'ok' : 'warn'}">${conNube ? 'en la nube' : 'solo local'}</span></div>
+        <span class="badge ${conNube ? 'ok' : 'warn'}">${conNube ? 'en la nube' : 'sin conectar'}</span></div>
       <div class="soc-head">
         <div class="avatar">${p.foto ? `<img src="${p.foto}" alt="Foto de perfil">` : icon('user')}</div>
         <div style="flex:1;min-width:0">

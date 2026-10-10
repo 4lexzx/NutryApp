@@ -288,6 +288,8 @@ function setupResume() {
 /* ---------- Nube (Supabase, opcional) ---------- */
 function setupNube() {
   import('./cloud.js').then(c => {
+    // la nube se reconecta sola al abrir la app: nunca hay que hacer nada a mano
+    if (c.haySesion() && typeof c.reconectar === 'function') c.reconectar().catch(() => {});
     // siempre (aunque la sesión llegue después de entrar): al volver a la
     // pestaña o cada 10 min, bajamos lo que otros dispositivos hayan subido
     const syncSiHay = () => {
