@@ -1,16 +1,21 @@
 /* Amigo: su perfil tal como él lo publicó — foto, bio, comidas de hoy,
-   historial, agua y gimnasio. Cada sección se ve solo si él la dejó pública. */
+   historial, agua y gimnasio. Si todavía no son amigos, se ve la vista
+   previa pública (foto, bio y resumen de hoy) con el botón para pedir
+   amistad o para aceptar la que él ya te mandó. */
 
 import { icon } from '../icons.js';
 import { esc, num, todayISO, fmtLongDate, fromISODate, toast, confirmSheet } from '../util.js';
 import { barChart } from '../charts.js';
-import { haySesion, uidNube, misAmistades, bajarPerfiles, bajarCompartido, quitarAmistad } from '../cloud.js';
+import {
+  haySesion, uidNube, misAmistades, bajarPerfiles, bajarCompartido,
+  quitarAmistad, pedirAmistad, responderAmistad, verPerfil
+} from '../cloud.js';
 
 export async function render(root, path) {
   const id = String((path && path[0]) || '');
   const volver = `<a class="btn btn-outline btn-block" href="#/social" style="margin-top:10px">${icon('chevronLeft')} Volver a Social</a>`;
   if (!haySesion() || !id) {
-    root.innerHTML = `<h1>Amigo</h1><div class="note">${icon('upload')} Conecta la nube (Ajustes → Nube) para ver perfiles de amigos.${volver}</div>`;
+    root.innerHTML = `<h1>Amigo</h1><div class="note">${icon('upload')} Conecta la nube para ver perfiles de amigos.${volver}</div>`;
     return;
   }
 
@@ -27,39 +32,78 @@ export async function render(root, path) {
     }
   }
 
-  const amistad = amis.find(a => a.estado === 'aceptada' &&
-    ((a.uno === me && a.dos === id) || (a.dos === me && a.uno === id)));
-  if (!amistad) {
-    root.innerHTML = `<h1>Amigo</h1><div class="note">${icon('lock')} Solo los amigos pueden ver este perfil.${volver}</div>`;
+  if (id === me) {
+    root.innerHTML = `<h1>Perfil</h1><div class="note">${icon('user')} Ese eres tú. <a href="#/perfil">Abre tu perfil</a>.${volver}</div>`;
     return;
   }
 
-  const pf = perfs.find(x => x.user_id === id) || {};
+  const fila = amis.find(a => (a.uno === me && a.dos === id) || (a.dos === me && a.uno === id)) || null;
+  const esAmigo = !!(fila && fila.estado === 'aceptada');
+  const esRecibida = !!(fila && fila.estado === 'pendiente' && fila.dos === me);
+  const esEnviada = !!(fila && fila.estado === 'pendiente' && fila.uno === me);
+
+  // si aún no son amigos, su ficha pública viene del RPC (migración v2.5)
+  let pub = perfs.find(x => x.user_id === id) || null;
+  if (!pub && !esAmigo) {
+    try { pub = await verPerfil(id); } catch (e) { pub = null; }
+  }
+  if (!pub) pub = {};
+
   const cr = comps.find(x => x.user_id === id);
   const c = (cr && cr.contenido) || {};
-  const pub = k => pf[k] !== false;   // por defecto todo público (perfiles viejos)
-  const privado = !pub('pub_perfil') && !pub('pub_comidas') && !pub('pub_historial') && !pub('pub_agua') && !pub('pub_gym');
+  const visible = k => pub[k] !== false;   // por defecto todo público (perfiles viejos)
+  const privado = !visible('pub_perfil') && !visible('pub_comidas') &&
+    (!esAmigo || (!visible('pub_historial') && !visible('pub_agua') && !visible('pub_gym')));
 
-  const meta = Number(c.meta) || Number(pf.meta_kcal) || 0;
-  const kcal = Number(c.kcal) || Number(pf.kcal_hoy) || 0;
-  const ok = c.cumplio !== undefined ? !!c.cumplio : !!pf.cumplio;
-  const racha = Number(c.racha) || Number(pf.racha) || 0;
+  const meta = Number(c.meta) || Number(pub.meta_kcal) || 0;
+  const kcal = Number(c.kcal) || Number(pub.kcal_hoy) || 0;
+  const ok = c.cumplio !== undefined ? !!c.cumplio : !!pub.cumplio;
+  const racha = Number(c.racha) || Number(pub.racha) || 0;
   const pct = meta ? Math.max(0, Math.min(100, Math.round(kcal / meta * 100))) : 0;
   const M = c.macros || {};
   const MT = c.metas || {};
-  const nombre = pf.usuario || 'amigo';
-  const foto = pub('pub_perfil') && pf.foto ? `<img src="${pf.foto}" alt="">` : icon('user');
-  const bio = pub('pub_perfil') && pf.bio ? `<p class="small" style="margin:8px 0 0">${esc(pf.bio)}</p>` : '';
+  const nombre = pub.usuario || 'amigo';
+  const foto = visible('pub_perfil') && pub.foto ? `<img src="${pub.foto}" alt="">` : icon('user');
+  const bio = visible('pub_perfil') && pub.bio ? `<p class="small" style="margin:8px 0 0">${esc(pub.bio)}</p>` : '';
 
-  const comidas = pub('pub_comidas') && Array.isArray(c.comidas) ? c.comidas : [];
-  const historial = pub('pub_historial') && Array.isArray(c.historial) ? c.historial : [];
-  const agua = pub('pub_agua') && c.agua ? c.agua : null;
-  const gym = pub('pub_gym') && c.gym ? c.gym : null;
+  const comidas = esAmigo && visible('pub_comidas') && Array.isArray(c.comidas) ? c.comidas : [];
+  const historial = esAmigo && visible('pub_historial') && Array.isArray(c.historial) ? c.historial : [];
+  const agua = esAmigo && visible('pub_agua') && c.agua ? c.agua : null;
+  const gym = esAmigo && visible('pub_gym') && c.gym ? c.gym : null;
 
-  const estadoBadge = (pub('pub_comidas') && meta)
+  const estadoBadge = (esAmigo && visible('pub_comidas') && meta)
     ? `<span class="badge ${ok ? 'ok' : 'warn'}">${ok ? 'meta ✓' : pct + '%'}</span>` : '';
 
-  const seccComidas = pub('pub_comidas') ? `
+  const resumenHoy = (visible('pub_comidas') && (kcal || meta)) ? `
+    <div class="soc-hoy">
+      <div class="soc-hoy-v">${num(kcal)}<span> / ${num(meta || 0)} kcal</span></div>
+      ${meta ? `<div class="am-prog ${ok ? 'ok' : ''}"><i style="width:${Math.min(100, pct)}%"></i></div>` : ''}
+      <div class="tiny muted" style="margin-top:5px">${icon('clock')} ${esc(fmtLongDate(todayISO()))}</div>
+    </div>` : '';
+
+  const chips = (visible('pub_perfil') && (racha || (agua && agua.r) || (gym && gym.r))) ? `<div class="am-chips" style="margin-top:8px">${
+    racha ? `<span class="am-chip">${icon('flame')} racha ${racha}</span>` : ''}${
+    agua && agua.r ? `<span class="am-chip">${icon('droplet')} agua ${agua.r} días</span>` : ''}${
+    gym && gym.r ? `<span class="am-chip">${icon('dumbbell')} gym ${gym.r} días</span>` : ''}</div>` : '';
+
+  const accionAmistad = esAmigo
+    ? `<button class="btn btn-danger btn-block" id="am-del" type="button" style="margin-top:12px">${icon('x')} Dejar de ser amigos</button>`
+    : esRecibida ? `
+      <div class="soc-act">
+        <button class="btn btn-primary" id="am-yes" type="button">${icon('check')} Aceptar amistad</button>
+        <button class="btn btn-outline" id="am-no" type="button">${icon('x')} Rechazar</button>
+      </div>
+      <p class="tiny muted" style="margin:8px 0 0">Te mandó una solicitud: si la aceptas, se verán el día del otro.</p>`
+    : esEnviada ? `
+      <div class="note" style="margin-top:12px">${icon('clock')} Solicitud enviada: esperando que ${esc(nombre)} la acepte.</div>
+      <button class="btn btn-outline btn-block" id="am-cancel" type="button" style="margin-top:8px">${icon('x')} Cancelar solicitud</button>`
+    : `
+      <div class="soc-act" style="margin-top:12px">
+        <button class="btn btn-primary" id="am-add" type="button">${icon('plus')} Añadir amigo</button>
+      </div>
+      <p class="tiny muted" style="margin:8px 0 0">${esc(nombre)} recibirá tu solicitud y podrá aceptarla desde su Social.</p>`;
+
+  const seccComidas = esAmigo && visible('pub_comidas') ? `
     <div class="card">
       <div class="card-title"><h3>${icon('utensils')} Comidas de hoy</h3>${estadoBadge}</div>
       <div class="macro-hero">
@@ -77,13 +121,13 @@ export async function render(root, path) {
       : `<p class="tiny muted" style="margin-top:10px">Todavía no anotó comidas hoy.</p>`}
     </div>` : '';
 
-  const seccHistorial = (pub('pub_historial') && historial.length) ? `
+  const seccHistorial = (esAmigo && visible('pub_historial') && historial.length) ? `
     <div class="card">
       <div class="card-title"><h3>${icon('barChart')} Historial (14 días)</h3></div>
       <div class="chart-box"><canvas id="am-hist"></canvas></div>
     </div>` : '';
 
-  const seccAgua = (pub('pub_agua') && agua) ? `
+  const seccAgua = (esAmigo && visible('pub_agua') && agua) ? `
     <div class="card">
       <div class="card-title"><h3>${icon('droplet')} Agua</h3>
         ${Number(agua.r) ? `<span class="badge ok">${icon('flame')} ${agua.r} día${agua.r === 1 ? '' : 's'}</span>` : ''}</div>
@@ -93,7 +137,7 @@ export async function render(root, path) {
       </div>
     </div>` : '';
 
-  const seccGym = (pub('pub_gym') && gym) ? `
+  const seccGym = (esAmigo && visible('pub_gym') && gym) ? `
     <div class="card">
       <div class="card-title"><h3>${icon('dumbbell')} Gimnasio</h3>
         ${Number(gym.r) ? `<span class="badge ok">${icon('flame')} ${gym.r} día${gym.r === 1 ? '' : 's'}</span>` : ''}</div>
@@ -112,14 +156,17 @@ export async function render(root, path) {
         <div style="flex:1;min-width:0">
           <b>${esc(nombre)}</b>
           ${bio}
-          ${racha && pub('pub_comidas') ? `<div class="am-chips" style="margin-top:6px"><span class="am-chip">${icon('flame')} racha ${racha}</span></div>` : ''}
+          ${chips}
         </div>
       </div>
-      ${privado ? `<div class="note" style="margin-top:10px">${icon('lock')} Este amigo tiene el perfil privado: no comparte nada.</div>` : ''}
-      <button class="btn btn-danger btn-block" id="am-del" type="button" style="margin-top:12px">${icon('x')} Dejar de ser amigos</button>
+      ${resumenHoy}
+      ${privado ? `<div class="note" style="margin-top:10px">${icon('lock')} ${esAmigo ? 'Este amigo tiene el perfil privado: no comparte nada.' : 'Este perfil es privado: solo se ve su usuario.'}</div>` : ''}
+      ${!esAmigo && !privado ? `<div class="note" style="margin-top:10px">${icon('eye')} Vista previa pública: para ver comidas, historial y más, añádelo como amigo.</div>` : ''}
+      ${accionAmistad}
     </div>
 
     ${seccComidas}${seccHistorial}${seccAgua}${seccGym}
+    ${volver}
   `;
 
   if (historial.length > 1) {
@@ -137,17 +184,59 @@ export async function render(root, path) {
 
   const del = root.querySelector('#am-del');
   if (del) del.onclick = async () => {
-    const ok2 = await confirmSheet({
+    const seguro = await confirmSheet({
       title: `¿Dejar de ser amigos con ${nombre}?`,
-      msg: 'Dejarán de ver el día del otro. Cualquiere puede volver a pedir amistad.',
+      msg: 'Dejarán de ver el día del otro. Cualquiera puede volver a pedir amistad.',
       okText: 'Eliminar', danger: true
     });
-    if (!ok2) return;
+    if (!seguro) return;
     try {
-      await quitarAmistad(amistad.id);
+      await quitarAmistad(fila.id);
       toast('Amistad eliminada.', 'ok');
       location.hash = '#/social';
     } catch (e) { toast('No pude eliminar. Revisa la nube.', 'warn'); }
+  };
+
+  const yes = root.querySelector('#am-yes');
+  if (yes) yes.onclick = async () => {
+    try {
+      await responderAmistad(fila.id, true);
+      toast(`Ahora ${nombre} es tu amigo.`, 'ok');
+      render(root, [id]);
+    } catch (e) { toast('No pude aceptar. Revisa la nube.', 'warn'); }
+  };
+  const no = root.querySelector('#am-no');
+  if (no) no.onclick = async () => {
+    try {
+      await responderAmistad(fila.id, false);
+      toast('Solicitud rechazada.', 'ok');
+      location.hash = '#/social';
+    } catch (e) { toast('No pude rechazar. Revisa la nube.', 'warn'); }
+  };
+  const cancel = root.querySelector('#am-cancel');
+  if (cancel) cancel.onclick = async () => {
+    try {
+      await quitarAmistad(fila.id);
+      toast('Solicitud cancelada.', 'ok');
+      render(root, [id]);
+    } catch (e) { toast('No pude cancelar. Revisa la nube.', 'warn'); }
+  };
+  const add = root.querySelector('#am-add');
+  if (add) add.onclick = async () => {
+    add.disabled = true;
+    try {
+      const r = await pedirAmistad(nombre);
+      if (r.ok) {
+        toast(`Solicitud enviada a ${r.usuario}.`, 'ok');
+        render(root, [id]);
+      } else {
+        toast(r.msg, 'warn');
+        add.disabled = false;
+      }
+    } catch (e) {
+      toast('No pude enviar la solicitud. Revisa la nube.', 'warn');
+      add.disabled = false;
+    }
   };
 }
 

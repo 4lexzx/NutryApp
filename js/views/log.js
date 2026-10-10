@@ -33,10 +33,6 @@ export async function renderStart(root, args, query) {
       <a class="btn btn-sm btn-ghost" href="#/hoy/${date}">Volver al día</a>
     </div>
 
-    <div class="hero-actions" style="margin-bottom:12px">
-      <a class="btn btn-block btn-outline" href="#/batido?d=${date}">${icon('cup')} Arma tu batido</a>
-    </div>
-
     <div class="tabs" id="lg-tabs">
       <button class="tab ${state.tab === 'foto' ? 'active' : ''}" data-tab="foto" type="button">${icon('camera')} Foto</button>
       <button class="tab ${state.tab === 'texto' ? 'active' : ''}" data-tab="texto" type="button">${icon('note')} Texto</button>
@@ -90,9 +86,9 @@ function renderFoto(body, date, hasKey) {
         <div class="ph"><img src="${p}" alt="Foto ${i + 1}">
           <button class="ph-x" data-ph-del="${i}" type="button" aria-label="Quitar foto ${i + 1}">✕</button></div>`).join('')}</div>`
       : `<div class="empty" style="padding:22px 12px"><span class="ico">${icon('utensils')}</span><span class="small">Sube una o más fotos, o escribe el plato abajo</span></div>`}
-      <label class="field" style="margin-top:12px"><span class="lbl">Descripción opcional (mejora la precisión)</span>
-        <textarea id="f-desc" rows="2" placeholder="Ej. almuerzo de gimnasio, con poco arroz y doble presa de pollo">${esc(state.desc)}</textarea></label>
-      <button class="btn btn-analyze btn-lg btn-block" id="f-go" type="button">${icon('sparkles')} Analizar con la IA${n > 1 ? ` (${n} fotos)` : ''}</button>
+      <textarea id="f-desc" class="ta-round" rows="3" placeholder="Describe tu plato (opcional)">${esc(state.desc)}</textarea>
+      <a class="bat-row" href="#/batido?d=${date}">${icon('zap')} Arma tu batido ${icon('chevronRight')}</a>
+      <button class="btn btn-analyze btn-lg btn-block" style="margin-top:12px" id="f-go" type="button">${icon('sparkles')} Analizar con la IA${n > 1 ? ` (${n} fotos)` : ''}</button>
       ${!hasKey ? `<div class="hint">Falta tu API key: pégala en <a href="#/ajustes">Ajustes</a>.</div>` : ''}
       ${n > 1 ? `<div class="hint">Se analizará foto por foto y todo se junta en un solo plato (nombres, ingredientes y totales).</div>` : ''}
     </div>
@@ -115,9 +111,9 @@ function renderTexto(body, date, hasKey) {
   body.innerHTML = `
     <div class="card">
       <div class="card-title"><h3>${icon('note')} Describe tu plato</h3></div>
-      <label class="field"><span class="lbl">¿Qué comiste?</span>
-        <textarea id="t-desc" rows="4" placeholder="Ej. 1 lomo saltado con arroz (poco), 1 vaso de chicha morada, 1 presa de pollo a la brasa">${esc(state.desc)}</textarea></label>
-      <button class="btn btn-analyze btn-lg btn-block" id="t-go" type="button">${icon('sparkles')} Analizar con la IA</button>
+      <textarea id="t-desc" class="ta-round" rows="4" placeholder="Ej. 1 lomo saltado con arroz (poco), 1 vaso de chicha morada, 1 presa de pollo a la brasa">${esc(state.desc)}</textarea>
+      <a class="bat-row" href="#/batido?d=${date}">${icon('zap')} Arma tu batido ${icon('chevronRight')}</a>
+      <button class="btn btn-analyze btn-lg btn-block" style="margin-top:12px" id="t-go" type="button">${icon('sparkles')} Analizar con la IA</button>
       ${!hasKey ? `<div class="hint">Falta tu API key: pégala en <a href="#/ajustes">Ajustes</a>.</div>` : ''}
       <div class="hint">También puedes guardar sin analizar desde la pestaña “Manual”.</div>
     </div>`;
@@ -145,7 +141,8 @@ async function renderManual(body, date) {
         <button class="btn btn-primary btn-lg btn-block" id="m-rev" type="button" ${state.draft.items.length ? '' : 'disabled'}>
           Revisar y guardar (${state.draft.items.length}) →</button>
         <a class="btn btn-block" href="#/hoy/${date}">Cancelar</a>
-      </div>`;
+      </div>
+      <a class="bat-row" href="#/batido?d=${date}">${icon('zap')} Arma tu batido ${icon('chevronRight')}</a>`;
     const list = body.querySelector('#m-list');
     const drawList = q => {
       const res = searchFoods(q);
@@ -188,7 +185,8 @@ async function renderFavoritos(body, date, favorites) {
         </button>`;
   }).join('') : `<div class="empty"><span class="ico">${icon('star')}</span><b>No tienes favoritos aún</b>
         <p class="small muted">Guarda un plato desde el editor (botón “Guardar favorito”) y aquí aparecerá.</p></div>`}
-    </div>`;
+    </div>
+    <a class="bat-row" href="#/batido?d=${date}">${icon('zap')} Arma tu batido ${icon('chevronRight')}</a>`;
   body.querySelectorAll('[data-f]').forEach(b => b.onclick = () => {
     const f = favorites.find(x => String(x.id) === b.dataset.f);
     if (!f) return;

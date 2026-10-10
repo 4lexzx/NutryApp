@@ -11,7 +11,7 @@ import { haySesion, emailSesion, emailNubeDe, pendientes } from '../cloud.js';
 import { setSonidos, clic } from '../sound.js';
 import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe } from '../notif.js';
 
-const VERSION = '2.1.4';
+const VERSION = '2.1.6';
 let hAct = null;   // oyente del evento "hay actualización" (uno solo, sin duplicar)
 
 export async function render(root) {
@@ -118,12 +118,17 @@ const cuentaOtra = conNube && !!currentUser() &&
       <div class="card-title"><h3>${icon('clock')} Recordatorios de comidas</h3>
         <span class="badge ${remBadge}" id="s-rem-badge">${remBadgeTxt}</span></div>
       <p class="small muted">Avisos para que no se te olvide anotar lo que comiste. Marca las comidas y
-        ponles la hora que quieras; el aviso te muestra cuántas kcal y proteína llevas hoy.</p>
+        ponles la hora que quieras: escríbela con el teclado o toca el reloj para elegirla. El aviso
+        te muestra cuántas kcal y proteína llevas hoy.</p>
       <div class="rem-rows" id="s-rem-chips">
         ${RECORDS_DEF.map(r => `
         <div class="rem-row">
           <button type="button" class="chip ${remIds.indexOf(r.id) >= 0 ? 'active' : ''}" data-rem="${r.id}">${r.l}</button>
-          <input type="time" data-remh="${r.id}" value="${horaDe({ rem }, r.id)}" aria-label="Hora del recordatorio de ${r.l}">
+          <input type="text" inputmode="numeric" maxlength="5" class="rem-txt" data-remt="${r.id}"
+            value="${horaDe({ rem }, r.id)}" aria-label="Hora del recordatorio de ${r.l} (escríbela o toca el reloj)">
+          <button type="button" class="btn btn-sm btn-ghost rem-clock" data-remc="${r.id}"
+            title="Elegir con el reloj" aria-label="Elegir la hora de ${r.l} con el reloj">${icon('clock')}</button>
+          <input type="time" class="rem-picker" data-remh="${r.id}" value="${horaDe({ rem }, r.id)}" tabindex="-1" aria-hidden="true">
         </div>`).join('')}
       </div>
       <div class="col" style="margin-top:12px">
@@ -409,11 +414,41 @@ const cuentaOtra = conNube && !!currentUser() &&
     const r = RECORDS_DEF.find(x => x.id === b.dataset.rem);
     toast(activo ? `${r.l}: recordatorio marcado.` : `${r.l}: recordatorio desmarcado.`, 'ok');
   });
-  root.querySelectorAll('[data-remh]').forEach(inp => inp.onchange = async () => {
-    const ok = await guardarHoraRecordatorio(inp.dataset.remh, inp.value);
-    if (!ok) { toast('Esa hora no es válida.', 'warn'); return; }
-    const r = RECORDS_DEF.find(x => x.id === inp.dataset.remh);
-    toast(`${r.l}: te avisaré a las ${inp.value}.`, 'ok');
+  // hora de cada recordatorio: se escribe a mano o se elige con el reloj
+  const guardaHora = async (id, valor, entrada) => {
+    const ok = await guardarHoraRecordatorio(id, valor);
+    if (!ok) {
+      toast('Esa hora no es válida.', 'warn');
+      if (entrada) entrada.value = horaDe({ rem }, id);
+      return;
+    }
+    const r = RECORDS_DEF.find(x => x.id === id);
+    toast(`${r.l}: te avisaré a las ${valor}.`, 'ok');
+    root.querySelectorAll('[data-remt="' + id + '"]').forEach(i => { i.value = valor; });
+    root.querySelectorAll('[data-remh="' + id + '"]').forEach(i => { i.value = valor; });
+  };
+  root.querySelectorAll('[data-remt]').forEach(inp => {
+    inp.onchange = () => {
+      const v = (inp.value || '').trim();
+      const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(v);
+      if (!m) {
+        toast('Escribe la hora así: 08:00 o 13:30.', 'warn');
+        inp.value = horaDe({ rem }, inp.dataset.remt);
+        return;
+      }
+      const norm = String(m[1]).padStart(2, '0') + ':' + m[2];
+      inp.value = norm;
+      guardaHora(inp.dataset.remt, norm, inp);
+    };
+    inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } };
+  });
+  root.querySelectorAll('[data-remc]').forEach(btn => btn.onclick = () => {
+    const pick = root.querySelector('[data-remh="' + btn.dataset.remc + '"]');
+    if (!pick) return;
+    try { pick.showPicker(); } catch (e) { pick.focus(); pick.click(); }
+  });
+  root.querySelectorAll('[data-remh]').forEach(inp => inp.onchange = () => {
+    if (inp.value) guardaHora(inp.dataset.remh, inp.value, null);
   });
   root.querySelector('#s-rem-on').onclick = async () => {
     if (remActivo) {

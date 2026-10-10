@@ -973,6 +973,22 @@ export async function pedirAmistad(usuario) {
   return { ok: true, usuario: p.usuario || nom };
 }
 
+/* Busca usuarios por nombre (sin pedir amistad) para mostrar su ficha
+   pública con el botón de añadir. Usa la migración v2.5. */
+export async function buscarUsuarios(q) {
+  const nom = String(q || '').trim().toLowerCase();
+  if (nom.length < 2) return [];
+  const r = await rest('/rpc/buscar_usuario', { method: 'POST', body: { q: nom } });
+  return r.d || [];
+}
+
+/* Ficha pública de un usuario por id (para abrir su perfil —y poder añadirlo—
+   desde una solicitud, antes de aceptar). Migración v2.5. */
+export async function verPerfil(id) {
+  const r = await rest('/rpc/ver_perfil', { method: 'POST', body: { quien: id } });
+  return (r.d && r.d[0]) || null;
+}
+
 /* Acepta o rechaza una solicitud (la ve el destino). */
 export async function responderAmistad(id, aceptar) {
   if (aceptar) {

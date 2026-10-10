@@ -56,7 +56,9 @@ APP_Nutri/
 │   ├── schema.sql             ← SQL para crear la base de la nube: tabla `registros` + vistas legibles
 │   ├── migracion_v2_1.sql     ← SQL para ordenar una base ya existente (renombra `datos` → `registros`)
 │   ├── migracion_v2_2_social.sql ← SQL para añadir el perfil social: `perfiles` (foto, bio, racha) y `amistades`
-│   └── migracion_v2_3_social.sql ← SQL para la privacidad: flags en `perfiles` + tabla `compartido` (comidas/historial de amigos)
+│   ├── migracion_v2_3_social.sql ← SQL para la privacidad: flags en `perfiles` + tabla `compartido` (comidas/historial de amigos)
+│   ├── migracion_v2_4_usuarios.sql ← SQL para el registro de cuentas en la nube (`usuarios_registrados`, unicidad global)
+│   └── migracion_v2_5_social_busqueda.sql ← SQL para buscar amigos y ver su ficha antes de añadirlos (`buscar_usuario` + `ver_perfil`)
 ├── icons/                     ← íconos PNG (192, 512 y maskable)
 ├── css/styles.css             ← diseño oscuro/claro, móvil primero, botones grandes
 └── js/
@@ -277,10 +279,14 @@ exportar ni importar nada:
    (déficit / mantenimiento / ganar músculo sin ganar grasa / superávit).
    Arriba tienes tu **perfil social**: tu **foto** y tu **bio** (se suben solas con la
    sincronización) y el acceso a la pestaña **Social**.
-   En la pestaña **Social** (👥 en la barra de abajo) está la tarjeta **Amigos**: busca a
-   alguien **por usuario**, acepta o rechaza solicitudes y mira el día de tus amigas/os —
-   **kcal de hoy contra su meta con barra de progreso, si la cumplieron y su racha** — sin ver
-   nada más de su información. Un **punto rojo** en el icono 👥 avisa de solicitudes nuevas.
+   En la pestaña **Social** (👥 en la barra de abajo) tienes tres cosas ordenadas:
+   **Buscar amigos** (escribes el usuario y ves su ficha pública con foto, bio y racha antes de
+   tocar **Añadir amigo**), **Solicitudes** (se ve de quién viene y para quién es —
+   *De: Carlos → Para: tú* — con botones de **Ver perfil**, **Aceptar** y **Rechazar**, y un
+   botón con el contador de pendientes que te lleva hasta ahí) y **Tus amigos** — el día de tus
+   amigas/os con **kcal de hoy contra su meta con barra de progreso, macros, comidas, si
+   cumplieron y su racha** — sin ver nada más de su información. Un **punto rojo** en el icono
+   👥 avisa de solicitudes nuevas, y si llega una mientras tienes la app abierta sale un aviso.
 2. Pulsa **“🧮 Calcular mis metas”**. Verás:
    - tu **gasto calórico (TDEE)** y la fórmula usada paso a paso (Mifflin-St Jeor × factor de
      actividad, luego el % del objetivo: −20% déficit, 0% mantenimiento y recomposición,
@@ -330,7 +336,7 @@ macro, la escala se mantiene. Puedes **quitar** ingredientes, **añadir** nuevos
 se actualizan solos. Eliges el tipo de comida (desayuno/almuerzo/cena/snack) y **Guardar**.
 
 - **⭐ Guardar favorito**: lo deja en Favoritos para reutilizarlo sin gastar IA.
-- **🥤 Arma tu batido** (botón arriba de las pestañas): una **licuadora gráfica** con **marcas de
+- **🥤 Arma tu batido** (fila con rayo, debajo de la caja de descripción): una **licuadora gráfica** con **marcas de
   ml en el vaso (200, 400, 600 y 700)** que se va llenando capa por capa, con **sonido de check**
   al agregar. Cada ingrediente trae su **unidad de medida real**: leche y agua en **medio vaso
   (125 ml)**, yogur y avena **por cucharada (20 g y 10 g)**, plátano **por unidad (120 g)**,
@@ -481,8 +487,9 @@ decirte que lo dejaste manual.
    (L M X J V S D): **encendida** cuando ese día hubo gym y **gris mientras siga apagada hoy**,
    con el avance **“k de N días”** de la semana.
 - **⏰ Recordatorios de comidas** (Ajustes → Recordatorios): activas el permiso una vez, marcas
-  las comidas que te sirven y les pones **la hora que quieras** (por defecto **desayuno 08:00,
-  almuerzo 13:00 y cena 20:00**, cada una con su reloj editable). El aviso se titula **NutriGym**
+  las comidas que te sirven y les pones **la hora que quieras** (la **escribes** con el teclado
+  o la eliges tocando el **reloj**; por defecto **desayuno 08:00,
+  almuerzo 13:00 y cena 20:00**, cada una con su hora editable). El aviso se titula **NutriGym**
   (solo el nombre de la app) y el cuerpo pregunta **“¿Ya anotaste…?”** con **cuántas kcal y
   proteína llevas hoy** y **cuántas kcal te quedan** por registrar (el botón **Probar aviso**
   muestra exactamente eso) y sale con **el logo de la app** (icono
@@ -614,7 +621,7 @@ bundler ni servidor propio.
   la descarga de los archivos nuevos en el celular.
 - **URL de la nube y configuración**: `js/config.js` (URL y clave pública de Supabase; la clave
   pública no es secreta, pero si prefieres no subirla, déjala vacía y pégala en el navegador).
-- **Sincronización**: `js/cloud.js`; estructura de la nube en `supabase/schema.sql` (usa `supabase/migracion_v2_1.sql` si tu base viene de una versión anterior, `supabase/migracion_v2_2_social.sql` para añadir el perfil social: `perfiles` y `amistades`, y `supabase/migracion_v2_3_social.sql` para la privacidad: flags de visibilidad en `perfiles` + tabla `compartido` con lo que cada uno publica a sus amigos).
+- **Sincronización**: `js/cloud.js`; estructura de la nube en `supabase/schema.sql` (usa `supabase/migracion_v2_1.sql` si tu base viene de una versión anterior, `supabase/migracion_v2_2_social.sql` para añadir el perfil social: `perfiles` y `amistades`, `supabase/migracion_v2_3_social.sql` para la privacidad: flags de visibilidad en `perfiles` + tabla `compartido` con lo que cada uno publica a sus amigos, `supabase/migracion_v2_4_usuarios.sql` para el registro de cuentas en la nube y `supabase/migracion_v2_5_social_busqueda.sql` para buscar amigos y ver su ficha antes de añadirlos).
 - **Servidor de IA**: `api/ai.js` (recibe la petición en Vercel —con la clave que envía el cliente
   en ese mismo request— y llama a Gemini). `vercel.json` solo ajusta el tiempo máximo (60 s).
 

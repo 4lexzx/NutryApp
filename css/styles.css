@@ -863,12 +863,18 @@ code.codeblock {
 .rem-rows { display: flex; flex-direction: column; gap: 8px; }
 .rem-row { display: flex; align-items: center; gap: 10px; }
 .rem-row .chip { flex: 1; justify-content: center; min-height: 44px; }
-.rem-row input[type="time"] {
-  flex: none; width: 120px; min-height: 44px; padding: 0 8px;
+.rem-txt {
+  flex: 1; min-width: 0; min-height: 44px; padding: 0 12px;
   background: var(--card-2); border: 1px solid var(--line); border-radius: 12px;
   color: var(--txt); font-size: .95rem; font-weight: 700; text-align: center;
+  font-variant-numeric: tabular-nums;
 }
-.rem-row input[type="time"]:focus { border-color: var(--brand); outline: none; }
+.rem-txt:focus { border-color: var(--brand); outline: none; }
+.rem-clock { flex: none; min-width: 44px; padding: 8px 10px; }
+.rem-picker {
+  position: absolute; width: 1px; height: 1px; padding: 0; border: 0;
+  opacity: 0; pointer-events: none;
+}
 .qtybox { display: flex; align-items: center; gap: 6px; }
 .qtybox b { min-width: 26px; text-align: center; font-variant-numeric: tabular-nums; font-size: .9rem; }
 .qtybox .btn { min-width: 36px; padding: 0 8px; }
@@ -1090,6 +1096,73 @@ code.codeblock {
   border-radius: 999px; padding: 3px 9px;
 }
 .am-macro b { color: var(--txt); font-weight: 600; }
+
+/* --- Social: buscar, solicitudes (con contador) y fichas --- */
+.soc-top { display: flex; gap: 10px; margin-bottom: 12px; }
+.soc-req {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: color-mix(in srgb, var(--warn) 14%, var(--card));
+  border: 1.5px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  color: var(--txt); font-weight: 700; border-radius: 999px;
+  padding: 9px 14px; min-height: 42px;
+}
+.soc-req[hidden] { display: none; }
+.soc-req .ic { width: 17px; height: 17px; color: var(--warn); }
+.soc-req-n {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px;
+  padding: 0 5px; border-radius: 999px; background: var(--warn); color: #fff;
+  font-size: .72rem; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.soc-sec-h {
+  font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--txt-3); margin: 14px 0 8px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--hairline);
+}
+.soc-sec.soc-flash { animation: socFlash 1.2s ease; }
+@keyframes socFlash {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  20% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn) 40%, transparent); }
+}
+.am-flow {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  font-size: .74rem; color: var(--txt-3); margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.am-flow b { color: var(--txt-2); font-weight: 700; }
+.am-flow .ic { width: 12px; height: 12px; color: var(--txt-3); }
+.soc-hit {
+  border: 1px solid var(--hairline); background: var(--card-2);
+  border-radius: 14px; padding: 12px; margin-top: 8px;
+}
+.soc-hit-top { display: flex; gap: 12px; align-items: flex-start; }
+.soc-hit-act { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 10px; }
+.soc-act { display: flex; gap: 10px; }
+.soc-act .btn { flex: 1; }
+.soc-hoy {
+  margin-top: 12px; padding: 12px; border-radius: 12px;
+  background: var(--card-2); border: 1px solid var(--hairline);
+}
+.soc-hoy-v { font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.soc-hoy-v span { font-size: .95rem; font-weight: 600; color: var(--txt-3); }
+
+/* --- Registrar: descripción redondeada + fila de batido --- */
+.ta-round {
+  width: 100%; min-height: 88px; resize: vertical; display: block;
+  margin-top: 12px; padding: 14px 16px;
+  border: 1px solid var(--hairline); border-radius: 18px;
+  background: var(--card-2); color: var(--txt);
+  font-size: 1rem; line-height: 1.45; font-family: inherit;
+}
+.ta-round:focus { border-color: var(--brand); outline: none; }
+.bat-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 12px; padding: 14px 16px; text-decoration: none;
+  border: 1.5px solid var(--hairline); border-radius: 16px;
+  background: var(--card-2); color: var(--txt); font-weight: 700;
+}
+.bat-row:active { background: var(--card); }
+.bat-row .ic { width: 20px; height: 20px; color: var(--brand); flex: none; }
+.bat-row .ic:last-child { margin-left: auto; width: 18px; height: 18px; color: var(--txt-3); }
 
 /* ============================================================
    Rediseño tipo mockup (solo estilos nuevos, no tocan la lógica)
