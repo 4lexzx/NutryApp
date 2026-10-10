@@ -7,11 +7,11 @@ import { testApiKey, modelOptions } from '../ai.js';
 import { esc, toast, confirmSheet, pickFile, downloadFile, todayISO, openSheet } from '../util.js';
 import { clearSession, currentUser } from '../auth.js';
 import { nubeConfigurada } from '../config.js';
-import { haySesion, emailSesion, emailNubeDe, crearCuenta, conectar, desconectar, pendientes, sincronizar, subirTodo, bajarTodo, subidasEnNube } from '../cloud.js';
+import { haySesion, emailSesion, emailNubeDe, pendientes } from '../cloud.js';
 import { setSonidos, clic } from '../sound.js';
 import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe } from '../notif.js';
 
-const VERSION = '2.1.3';
+const VERSION = '2.1.4';
 let hAct = null;   // oyente del evento "hay actualización" (uno solo, sin duplicar)
 
 export async function render(root) {
@@ -33,6 +33,7 @@ export async function render(root) {
     : 'Al activar, el navegador te pedirá permiso para mostrarte avisos.';
 const nubeOk = nubeConfigurada();
 const conNube = haySesion();
+const nubeLocal = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname);   // solo desarrollo
 const cuentaOtra = conNube && !!currentUser() &&
   (emailSesion() || '').toLowerCase() !== emailNubeDe(currentUser());
   const nubePend = conNube ? await pendientes().catch(() => 0) : 0;
@@ -157,35 +158,23 @@ const cuentaOtra = conNube && !!currentUser() &&
 
     <div class="card" id="s-nube">
       <div class="card-title"><h3>${icon('upload')} Nube (respaldo en internet)</h3>
-        <span class="badge ${!nubeOk ? 'warn' : conNube ? 'ok' : 'warn'}" id="nb-badge">${!nubeOk ? 'sin configurar' : conNube ? 'conectada' : 'desconectada'}</span></div>
-      <p class="small muted">Al iniciar sesión tus datos se guardan <b>solos</b> en tu cuenta (Supabase): los ves en
-        cualquier dispositivo y tienes respaldo en internet. El respaldo local (.json) sigue disponible como copia extra.</p>
+        <span class="badge ${!nubeOk ? 'warn' : conNube ? 'ok' : nubeLocal ? '' : 'warn'}" id="nb-badge">${!nubeOk ? 'sin configurar' : conNube ? 'conectada' : nubeLocal ? 'solo local' : 'conectando…'}</span></div>
+      <p class="small muted">Tus datos se guardan <b>solos</b> en tu cuenta cada vez que haces un cambio, y se bajan
+        en cualquier dispositivo donde entres. La nube entra <b>sola</b> al abrir la app y <b>nunca se cierra</b>:
+        aquí no hay nada que tocar ni que configurar.</p>
       ${!nubeOk ? `
         <div class="note">${icon('alert')} La nube de esta instalación todavía no está configurada
-          (falta la URL y la clave pública de Supabase en <b>js/config.js</b>).</div>` : (!conNube ? `
-        <label class="field"><span class="lbl">Correo</span>
-          <input id="nb-user" type="email" autocomplete="username" placeholder="tucorreo@ejemplo.com"></label>
-        <label class="field"><span class="lbl">Contraseña</span>
-          <input id="nb-pass" type="password" autocomplete="current-password" placeholder="mínimo 6 caracteres"></label>
-        <div class="row">
-          <button class="btn btn-primary" id="nb-go" type="button">Conectar</button>
-          <button class="btn" id="nb-new" type="button">Crear cuenta</button>
-        </div>` : `
-        <div class="spread" style="margin-bottom:12px">
+          (falta la URL y la clave pública de Supabase en <b>js/config.js</b>).</div>` : `
+        <div class="spread">
           <div>
-            <b class="small">${esc(emailSesion())}</b>
+            <b class="small" id="nb-email">${esc(emailSesion() || (nubeLocal ? 'desarrollo local' : 'conectando…'))}</b>
             ${cuentaOtra ? `<div class="tiny" style="color:var(--warn,#b45309);margin-top:3px">${icon('alert')}
-              Tu usuario usaría <b>${esc(emailNubeDe(currentUser()))}</b>. Cierra sesión y entra de nuevo para reajustarla.</div>` : ''}
-            <div class="tiny muted" id="nb-estado">${nubePend ? `${nubePend} cambio${nubePend === 1 ? '' : 's'} pendiente${nubePend === 1 ? '' : 's'} por subir` : 'Todo sincronizado'}</div>
+              Este dispositivo usaría <b>${esc(emailNubeDe(currentUser()))}</b>.</div>` : ''}
+            <div class="tiny muted" id="nb-estado">${conNube
+              ? (nubePend ? `${nubePend} cambio${nubePend === 1 ? '' : 's'} pendiente${nubePend === 1 ? '' : 's'} por subir` : 'Todo sincronizado')
+              : (nubeLocal ? 'En local (desarrollo) la nube se apaga para no tocar la real.' : 'Conectando la nube…')}</div>
           </div>
-          <button class="btn btn-sm btn-ghost" id="nb-out" type="button">Desconectar</button>
-        </div>
-        <div class="col">
-          <button class="btn btn-primary btn-block" id="nb-up" type="button">${icon('upload')} Subir mis datos ahora</button>
-          <button class="btn btn-block" id="nb-down" type="button">${icon('download')} Bajar los datos de la nube</button>
-          <button class="btn btn-block" id="nb-sync" type="button">${icon('refresh')} Sincronizar (subir + bajar)</button>
-        </div>`)}
-      <div class="hint" id="nb-res"></div>
+        </div>`}
       <div class="note" style="margin-top:10px">${icon('shield')} Si un día dejas de pagar Supabase (plan gratis se pausa
         tras 7 días sin uso), la app sigue funcionando en local; solo se apaga la sincronización.</div>
     </div>
@@ -199,7 +188,6 @@ const cuentaOtra = conNube && !!currentUser() &&
             <div class="tiny muted">Sesión activa en este dispositivo</div>
           </div>
         </div>
-        <span class="badge ${conNube ? 'ok' : 'warn'}">${conNube ? icon('upload') + ' nube' : icon('lock') + ' local'}</span>
       </div>
       <button class="btn btn-danger btn-block" id="s-logout" type="button">${icon('logout')} Cerrar sesión</button>
       <p class="tiny muted" style="margin-top:10px">Al cerrar sesión volverás a la pantalla de acceso.
@@ -387,86 +375,23 @@ const cuentaOtra = conNube && !!currentUser() &&
     res.innerHTML = r.ok ? `<span style="color:var(--brand)">${icon('checkCircle')} ${esc(r.msg)}</span>` : `<span style="color:#ff9a9a">${icon('alert')} ${esc(r.msg)}</span>`;
   };
 
-  /* nube (Supabase) */
+  /* nube (Supabase): SOLO lectura del estado — la nube se gestiona sola */
   window.__nutriNubeBadge = () => {
+    const badge = root.querySelector('#nb-badge');
     const el = root.querySelector('#nb-estado');
-    if (!el || !document.contains(el)) return;
-    pendientes().then(p => {
-      el.textContent = p ? `${p} cambio${p === 1 ? '' : 's'} pendiente${p === 1 ? '' : 's'} por subir` : 'Todo sincronizado';
-    }).catch(() => {});
-  };
-  const nbRes = root.querySelector('#nb-res');
-  const nbPaso = async (btn, txt, fn) => {
-    if (btn) { btn.disabled = true; }
-    if (nbRes) nbRes.textContent = txt;
-    try {
-      const r = await fn();
-      if (nbRes) nbRes.textContent = '';
-      return r;
-    } catch (e) {
-      if (nbRes) nbRes.innerHTML = `<span style="color:#ff9a9a">${icon('alert')} ${esc(e && e.message ? e.message : e)}</span>`;
-      return null;
-    } finally {
-      if (btn) btn.disabled = false;
+    if ((!badge || !document.contains(badge)) && (!el || !document.contains(el))) return;
+    if (!haySesion()) return;
+    if (badge && badge.textContent !== 'conectada') {
+      badge.textContent = 'conectada';
+      badge.className = 'badge ok';
+      const em = root.querySelector('#nb-email');
+      if (em && !em.textContent.trim()) em.textContent = emailSesion();
     }
-  };
-  const nbGo = root.querySelector('#nb-go');
-  if (nbGo) nbGo.onclick = async () => {
-    const u = (root.querySelector('#nb-user').value || '').trim();
-    const p = root.querySelector('#nb-pass').value;
-    if (!u || !p) { toast('Escribe tu correo y tu contraseña.', 'warn'); return; }
-    await nbPaso(nbGo, 'Conectando…', async () => {
-      await conectar(u, p);
-      render(root);
-    });
-  };
-  const nbNew = root.querySelector('#nb-new');
-  if (nbNew) nbNew.onclick = async () => {
-    const u = (root.querySelector('#nb-user').value || '').trim();
-    const p = root.querySelector('#nb-pass').value;
-    if (!u || p.length < 6) { toast('Correo válido y contraseña de 6 caracteres o más.', 'warn'); return; }
-    await nbPaso(nbNew, 'Creando cuenta…', async () => {
-      const r = await crearCuenta(u, p);
-      if (r.confirmada) { render(root); }
-      else toast('Cuenta creada. Revisa tu correo para confirmarla y luego pulsa Conectar.', 'ok');
-    });
-  };
-  const nbOut = root.querySelector('#nb-out');
-  if (nbOut) nbOut.onclick = async () => {
-    const ok = await confirmSheet({
-      title: '¿Desconectar la nube?',
-      msg: 'Los datos de este dispositivo quedan como estaban. Se volverá a conectar sola la próxima vez que entres, sin pasos extra.',
-      okText: 'Desconectar'
-    });
-    if (!ok) return;
-    await desconectar();
-    toast('Nube desconectada por ahora: se reconecta sola la próxima vez que entres.', 'ok');
-    render(root);
-  };
-  const nbUp = root.querySelector('#nb-up');
-  if (nbUp) nbUp.onclick = async () => {
-    const r = await nbPaso(nbUp, 'Subiendo todos tus datos a la nube…', () => subirTodo());
-    if (!r) return;
-    const linea = t => `${t}: ${r.antes[t] || 0} → ${r.despues ? (r.despues[t] || 0) : '?'} en la nube`;
-    toast(`Listo: subí ${r.subidas} registro${r.subidas === 1 ? '' : 's'}. Verificación: ${linea('meals')}, ${linea('weights')}, ${linea('favorites')}.`, 'ok');
-    if (nbRes) nbRes.textContent = ['meals', 'weights', 'favorites', 'platos', 'kv'].map(linea).join(' · ');
-    if (typeof window.__nutriNubeBadge === 'function') window.__nutriNubeBadge();
-  };
-  const nbDown = root.querySelector('#nb-down');
-  if (nbDown) nbDown.onclick = async () => {
-    const r = await nbPaso(nbDown, 'Bajando los datos de la nube…', () => bajarTodo());
-    if (r === null) return;
-    toast(r ? `Bajé ${r} cambio${r === 1 ? '' : 's'} a este dispositivo.` : 'La nube no tiene cambios nuevos.', 'ok');
-    if (typeof window.__nutriNubeBadge === 'function') window.__nutriNubeBadge();
-  };
-  const nbSync = root.querySelector('#nb-sync');
-  if (nbSync) nbSync.onclick = async () => {
-    await nbPaso(nbSync, 'Sincronizando…', async () => {
-      const r = await sincronizar();
-      if (r.ok) render(root);
-      else if (r.error) throw r.error;
-      return r;
-    });
+    pendientes().then(p => {
+      if (el && document.contains(el)) {
+        el.textContent = p ? `${p} cambio${p === 1 ? '' : 's'} pendiente${p === 1 ? '' : 's'} por subir` : 'Todo sincronizado';
+      }
+    }).catch(() => {});
   };
 
   /* agua */

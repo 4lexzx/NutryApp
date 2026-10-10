@@ -4,7 +4,7 @@ import { getSettings, DB } from './db.js';
 import { toast } from './util.js';
 import { initSonidos, setSonidos } from './sound.js';
 import { initRecordatorios } from './notif.js';
-import { seedUsers, isAuthed } from './auth.js';
+import { seedUsers, isAuthed, clearSession } from './auth.js';
 import { iniciarSelects } from './selects.js';
 import { icon } from './icons.js';
 import * as today from './views/today.js';
@@ -288,14 +288,21 @@ function setupResume() {
 /* ---------- Nube (Supabase, opcional) ---------- */
 function setupNube() {
   import('./cloud.js').then(c => {
-    // la nube se reconecta sola al abrir la app: nunca hay que hacer nada a mano
-    if (c.haySesion() && typeof c.reconectar === 'function') c.reconectar().catch(() => {});
-    // siempre (aunque la sesión llegue después de entrar): al volver a la
-    // pestaña o cada 10 min, bajamos lo que otros dispositivos hayan subido
+    // La nube se reconecta sola y siempre: si falta la sesión (o el token
+    // dejó de servir) vuelve a entrar con la cuenta guardada en el
+    // dispositivo. No hace falta ningún paso manual.
     const syncSiHay = () => {
       if (c.haySesion() && navigator.onLine) c.sincronizarInicial().catch(() => {});
     };
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) syncSiHay(); });
+    const reconectar = () => {
+      Promise.resolve(c.reconectar())
+        .then(ok => { if (ok) syncSiHay(); })
+        .catch(() => {});
+    };
+    reconectar();
+    window.addEventListener('online', reconectar);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) reconectar(); });
+    // al volver a la pestaña o cada 10 min, bajamos lo que otros dispositivos hayan subido
     setInterval(syncSiHay, 10 * 60 * 1000);
     if (c.haySesion()) {
       // primera vez con sesión en esta visita: subida/bajada COMPLETA a la BD
@@ -308,11 +315,43 @@ function setupNube() {
   }).catch(() => {});
 }
 
+/* La nube es OBLIGATORIA y va sola: entrar a la app es entrar a tu cuenta.
+   Si este dispositivo quedó sin sesión y sin la cuenta guardada (navegador
+   que borró los tokens, por ejemplo), hay que escribir el candado UNA vez
+   para poder conectar; a partir de ahí la nube entra sola cada vez que se
+   abre la app y nunca se cierra. Solo con internet y en producción. */
+async function exigirCuentaNube() {
+  try {
+    if (!navigator.onLine) return;                       // sin internet no se pide nada
+    const h = location.hostname;
+    if (!h || h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0' || h === '[::1]') return;
+    if (!isAuthed()) return;
+    const c = await import('./cloud.js');
+    if (typeof c.listoParaAuto !== 'function') return;
+    if (c.listoParaAuto()) return;                       // cuenta guardada: se reconecta sola
+    if (c.haySesion()) return;                           // la sesión sigue viva
+    clearSession();
+    toast('Conectando tu nube: escribe tu usuario y contraseña una sola vez. Después se conecta sola cada vez que abras la app y ya no se cierra nunca.', 'warn');
+  } catch (e) { /* nada */ }
+}
+
 /* La nube avisa a la UI: badge de Ajustes + refresco de la pantalla actual
    cuando llegan datos de otros dispositivos. */
 function prepararNubeUI() {
   window.__nutriNubeAct = (err, info) => {
     try { if (typeof window.__nutriNubeBadge === 'function') window.__nutriNubeBadge(); } catch (e) { /* nada */ }
+    // la nube acaba de (re)conectar: si Ajustes la muestra "desconectada",
+    // se repinta sola para que nunca se quede un estado viejo
+    if (info && info.conectada) {
+      const badge = document.getElementById('nb-badge');
+      const ruta0 = parseHash().path[0] || 'hoy';
+      const a = document.activeElement;
+      const escribiendo = a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable);
+      if (badge && /desconectada/i.test(badge.textContent || '') && ruta0 === 'ajustes' && !escribiendo) {
+        route({ scroll: false }).catch(() => {});
+      }
+      return;
+    }
     if (err || !info || !(info.bajadas > 0)) return;
     if (document.querySelector('.sheet-back, .cam-back')) return;   // hoja o cámara abierta
     const ruta = parseHash().path[0] || 'hoy';
@@ -343,6 +382,7 @@ async function init() {
   iniciarSelects();
   prepararNubeUI();
   setupNube();
+  await exigirCuentaNube();
 
   document.getElementById('btn-theme').onclick = async () => {
     const cur = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';

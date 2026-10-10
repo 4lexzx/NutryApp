@@ -632,20 +632,35 @@ python -m http.server 8080
 ## 12. La nube (Supabase): sincronizar tus datos
 
 La app **siempre** guarda primero en tu celular y, **en cuanto entras con tu usuario, la nube se
-conecta sola** (mismo usuario y contraseña del candado): tus datos quedan en **tu cuenta**, en
-cualquier dispositivo donde entres. Usas **tu propia cuenta de Supabase** (gratis para empezar):
-nadie más ve tus datos gracias a las políticas de seguridad (RLS) de la tabla. La tarjeta
-**Nube** de Ajustes te deja desconectar, sincronizar a mano o crear otra cuenta si quieres.
+conecta sola y es obligatoria** (mismo usuario y contraseña del candado): tus datos quedan en
+**tu cuenta**, en cualquier dispositivo donde entres. Usas **tu propia cuenta de Supabase** (gratis
+para empezar): nadie más ve tus datos gracias a las políticas de seguridad (RLS) de la tabla. La
+tarjeta **Nube** de Ajustes **solo muestra el estado** (lectura): no hay botones de conectar,
+desconectar ni sincronizar — la nube es un servicio aislado que se gestiona solo.
 
 En la versión publicada (producción) el acceso es **solo con la nube**: al entrar se valida el
 usuario y la contraseña contra Supabase **antes** de abrir la app y se bajan tus datos, así que
-en cualquier PC o celular ves lo mismo con **la misma cuenta y la misma contraseña**. En local
-(desarrollo y pruebas) sigue pudiendo entrar con el candado del navegador.
+en cualquier PC o celular ves lo mismo con **la misma cuenta y la misma contraseña**. Si esa
+cuenta todavía no existe en la nube (un celular de antes), **se crea sola** al entrar, con el
+mismo usuario y contraseña, y la app sube sus datos. En local (desarrollo y pruebas) sigue
+pudiendo entrar con el candado del navegador.
 
 Además, la tabla `usuarios_registrados` de la BD guarda cada cuenta con su **usuario y correo**
 (y una comprobación de unicidad global: **el nombre de usuario no se puede repetir** en toda la
 app). Esa tabla se llena sola cada vez que se crea una cuenta; para activarla hay que aplicar la
 migración `supabase/migracion_v2_4_usuarios.sql` en Supabase SQL Editor.
+
+**La nube se reconecta sola y jamás se cierra.** Cada vez que la app valida tu cuenta en la nube,
+guarda en ese dispositivo la credencial (`ng.nube.cred` en el almacenamiento del navegador): con
+ella vuelve a entrar **sola** aunque se pierda la sesión (token caducado, nube reiniciada, dos
+pestañas a la vez, navegador que borra cookies a medias…). Además, mientras la app está abierta
+renueva el token antes de que venza y bloquea el refresco entre pestañas para que la nube no
+invalide la sesión. **Cerrar sesión** de la app solo cierra el candado local: la sesión de la nube
+sigue viva. Si un dispositivo llega a quedar **sin sesión y sin credencial guardada**, la app
+vuelve a la pantalla de entrada **una sola vez** (con internet) para que el usuario escriba su
+candado; a partir de ahí nunca más hace falta ningún paso. Esa credencial es la misma contraseña
+del candado, guardada en claro en ese dispositivo: es el precio para poder reconectar sola, y solo
+sirve en tu cuenta de Supabase.
 
 ### 12.1 Crear la base de datos (una sola vez)
 
@@ -669,12 +684,13 @@ migración `supabase/migracion_v2_4_usuarios.sql` en Supabase SQL Editor.
 
 1. **Entra con tu usuario del candado** y la nube se conecta sola: usa ese mismo usuario y
    contraseña para generar la cuenta de Supabase (el correo queda como
-   `tuusuario@nutrigym.app`; nunca escribes ni ves esas credenciales).
+   `tuusuario@nutrigym.app`; nunca escribes ni ves esas credenciales). Si la cuenta no existía,
+   **se crea en ese momento**.
 2. La app **sube todo lo que tengas** y te muestra el conteo (*"Subí tus datos: N registros"*);
    si la nube ya tenía datos de otro dispositivo, **baja** esos también.
-3. El badge de la tarjeta **Nube** (Ajustes) te dice el estado: **conectada**, **desconectada**,
-   **N cambios pendientes** o **Todo sincronizado**. También hay botones **Subir todo**,
-   **Bajar todo** y **Sincronizar**, y puedes crear/conectar **otra cuenta a mano** si quieres.
+3. En Ajustes → **Nube** solo se **ve** el estado (lectura): **conectada**, **conectando…**,
+   **N cambios pendientes** o **Todo sincronizado**. No hay nada que tocar: sin botones de
+   conectar, desconectar ni sincronizar.
 
 ### Cómo se comporta
 
@@ -685,8 +701,8 @@ migración `supabase/migracion_v2_4_usuarios.sql` en Supabase SQL Editor.
 
 - **Si tienes la app abierta en otro dispositivo o pestaña, se actualiza sola**: cada vez que vuelves
   a la pestaña (y cada 10 minutos) la app baja lo nuevo de la nube y **refresca la pantalla donde
-  estés** (Hoy, Historial, Social…) sin que tengas que navegar. En Ajustes → Nube te muestra el
-  correo conectado; si no coincide con el de tu usuario, cierra sesión y vuelve a entrar.
+  estés** (Hoy, Historial, Social…) sin que tengas que navegar. En Ajustes → Nube ves el correo
+  conectado (solo lectura).
 
 - Cada vez que registras algo (comida, peso, gym, agua, favoritos…), la app lo **encola y lo sube
   solo** en unos segundos; si estás sin internet, queda en una **cola pendiente** y se sube al

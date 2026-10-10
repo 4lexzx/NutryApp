@@ -14,6 +14,7 @@ import { calcTargets } from './nutrition.js';
 import { cargarGym, calcRacha } from './views/gym.js';
 
 const SES = 'ng.nube';        // localStorage: sesión Supabase
+const CRED = 'ng.nube.cred';  // localStorage: cuenta guardada (para reconectar sola)
 const COLA = 'syncq';         // kv: pendientes por subir {clave: op}
 const ULT = 'cloudUlt';       // kv: corte de la última bajada (fecha del servidor)
 const KV_NO_SUBIR = new Set([COLA, ULT, 'users']);
@@ -27,8 +28,28 @@ function passNubeDe(p) {
   return s.length >= 6 ? s : s + '0'.repeat(6 - s.length);   // Supabase exige mínimo 6
 }
 
+/* Cuenta guardada en el dispositivo: con ella la nube se vuelve a entrar sola
+   aunque se pierda la sesión (token caducado, nube reiniciada, datos del
+   navegador a medias…). La nube no tiene botón de desconectar: la credencial
+   solo se borra al cambiar de cuenta. */
+function guardaCred(email, pass) {
+  try {
+    if (email && pass) localStorage.setItem(CRED, JSON.stringify({ email: String(email).toLowerCase(), pass: String(pass) }));
+  } catch (e) { /* sin localStorage no hay reconexión automática */ }
+}
+function leeCred() {
+  try { return JSON.parse(localStorage.getItem(CRED) || 'null'); } catch (e) { return null; }
+}
+function borraCred() {
+  try { localStorage.removeItem(CRED); } catch (e) { /* nada */ }
+}
+/* ¿Hay una cuenta guardada con la que la nube pueda reconectar sola? */
+export function listoParaAuto() { return !!leeCred(); }
+
 /* Entrar a la cuenta (producción): valida usuario/contraseña CONTRA la nube.
-   No crea cuentas ni acepta el candado local: la cuenta manda. */
+   Si la cuenta todavía no existe (dispositivo de antes de la nube), se crea
+   SOLA con ese mismo usuario y contraseña: entrar a la app siempre conecta,
+   sin pasos manuales. */
 export async function entrarConNube(usuario, pass) {
   if (!nubeConfigurada()) throw new Error('La nube no está configurada en esta app.');
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
@@ -37,16 +58,34 @@ export async function entrarConNube(usuario, pass) {
   const email = emailNubeDe(usuario);
   const passN = passNubeDe(pass);
   let d;
+  let creada = false;
   try {
     d = await postAuth('/auth/v1/token?grant_type=password', { email, password: passN });
   } catch (e) {
     const m = String(e && e.message ? e.message : e);
-    if (/Invalid login credentials|user_already_exists|not confirmed|Bad Request/i.test(m)) {
-      throw new Error('Usuario o contraseña no coinciden con tu cuenta en la nube. Usa el mismo usuario y la MISMA contraseña que en tu otro dispositivo.');
+    if (!/Invalid login credentials|user_already_exists|not confirmed|Bad Request/i.test(m)) {
+      throw new Error('No pude conectar con la nube. Revisa tu internet e inténtalo de nuevo.');
     }
-    throw new Error('No pude conectar con la nube. Revisa tu internet e inténtalo de nuevo.');
+    // ¿será que esa cuenta nunca se llegó a crear en la nube? La creamos aquí
+    // mismo con el mismo usuario y contraseña (sin que nadie toque nada).
+    try {
+      const s = await postAuth('/auth/v1/signup', { email, password: passN });
+      if (!s || !s.access_token) {
+        throw new Error('Tu cuenta se está creando en la nube. Confirma el correo si te lo piden y vuelve a entrar.');
+      }
+      d = s;
+      creada = true;
+    } catch (e2) {
+      const m2 = String(e2 && e2.message ? e2.message : e2);
+      if (/already|registrad|existe/i.test(m2)) {
+        throw new Error('Usuario o contraseña no coinciden con tu cuenta en la nube. Usa el mismo usuario y la MISMA contraseña que en tu otro dispositivo.');
+      }
+      throw new Error(/correo/i.test(m2) ? m2 : 'No pude conectar con la nube. Revisa tu internet e inténtalo de nuevo.');
+    }
   }
   guardaTokens(d, email);
+  guardaCred(email, passN);
+  if (creada) await registrarUsuarioLocal(email, usuario).catch(() => {});
   return email;
 }
 
@@ -128,6 +167,7 @@ function guardaTokens(d, email) {
     expires_at: Date.now() + (Number(d.expires_in) || 3600) * 1000
   });
   _uid = '';
+  programaVida();
 }
 
 export async function crearCuenta(email, pass, usuario) {
@@ -135,6 +175,7 @@ export async function crearCuenta(email, pass, usuario) {
   const d = await postAuth('/auth/v1/signup', { email, password: pass });
   // registra el nombre de usuario en la tabla de usuarios (unicidad global)
   if (usuario) await registrarUsuarioLocal(email, usuario).catch(() => {});
+  guardaCred(email, pass);
   if (d && d.access_token) {
     guardaTokens(d, email);
     await primerSincronizado();
@@ -178,6 +219,7 @@ export async function conectar(email, pass) {
   if (!nubeConfigurada()) throw new Error('La nube todavía no está configurada en la app.');
   const d = await postAuth('/auth/v1/token?grant_type=password', { email, password: pass });
   guardaTokens(d, email);
+  guardaCred(email, pass);
   await primerSincronizado();
   return emailSesion();
 }
@@ -198,11 +240,12 @@ export async function conectarAutomatica(usuario, passLocal) {
   try {
     const d = await postAuth('/auth/v1/token?grant_type=password', { email, password: pass });
     guardaTokens(d, email);
+    guardaCred(email, pass);
   } catch (e) {
     let creado = false;
     try {
       const s = await postAuth('/auth/v1/signup', { email, password: pass });
-      if (s && s.access_token) { guardaTokens(s, email); creado = true; }
+      if (s && s.access_token) { guardaTokens(s, email); guardaCred(email, pass); creado = true; }
     } catch (e2) {
       // la cuenta ya existe en la nube con OTRA contraseña: no seguir en silencio
       if (/already|registrad|existe/i.test(String(e2 && e2.message))) return 'existe';
@@ -211,6 +254,7 @@ export async function conectarAutomatica(usuario, passLocal) {
       try {
         const d2 = await postAuth('/auth/v1/token?grant_type=password', { email, password: pass });
         guardaTokens(d2, email);
+        guardaCred(email, pass);
       } catch (e3) { return false; }
     }
   }
@@ -219,7 +263,10 @@ export async function conectarAutomatica(usuario, passLocal) {
   return true;
 }
 
-export async function desconectar() {
+/* Cerrar la sesión de la nube: uso INTERNO solamente (cambiar de cuenta).
+   La nube no tiene botón de desconectar en la app: quien entra con su
+   candado queda conectado para siempre. */
+async function desconectar() {
   const s = sesion();
   if (s && s.access_token && SUPABASE_URL) {
     fetch(SUPABASE_URL + '/auth/v1/logout', {
@@ -227,13 +274,16 @@ export async function desconectar() {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + s.access_token }
     }).catch(() => {});
   }
-  guardaSesion(null);   // solo a mano desde Ajustes: la nube nunca se cae sola
+  guardaSesion(null);   // solo a mano: la nube nunca se cae sola
+  borraCred();          // sin cuenta guardada no hay reconexión automática
   _uid = '';
 }
 
 /* Refresco de la sesión: UNA sola petición a la vez. Si dos llamadas usan el
    mismo refresh_token en paralelo, el servidor rechaza a la segunda y eso
-   borraba la sesión entera (la app se quedaba 'solo local' sin motivo). */
+   invalida la sesión entera (la app se quedaba 'solo local' sin motivo).
+   Además se usa un candado del navegador para que DOS PESTAÑAS tampoco
+   refresquen a la vez (el servidor invalida la familia entera de tokens). */
 let refrescando = null;
 function refrescarSesion(s) {
   if (!refrescando) {
@@ -253,6 +303,7 @@ function refrescarSesion(s) {
           refresh_token: d.refresh_token || s.refresh_token,
           expires_at: Date.now() + (Number(d.expires_in) || 3600) * 1000
         });
+        programaVida();
         return sesion().access_token;
       } catch (e) {
         const a = vigente();
@@ -264,6 +315,17 @@ function refrescarSesion(s) {
     refrescando.then(limpiar, limpiar);
   }
   return refrescando;
+}
+
+/* Refresco con candado entre pestañas (evita que dos pestañas usen el mismo
+   refresh_token a la vez y la nube invalide la sesión completa). */
+function refrescarBloqueado(s) {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.locks && navigator.locks.request) {
+      return navigator.locks.request('nutri-nube-refresh', () => refrescarSesion(s));
+    }
+  } catch (e) { /* sin API de candados */ }
+  return refrescarSesion(s);
 }
 
 /* La nube NUNCA se desconecta sola: si el refresco falla (red caída, tope de
@@ -279,8 +341,10 @@ function programaReintento() {
   esperaReintento = Math.min(ms * 2, 5 * 60 * 1000);
   tReintento = setTimeout(() => {
     tReintento = null;
-    if (haySesion() && typeof navigator !== 'undefined' && navigator.onLine) {
-      sincronizar({ silencioso: true }).catch(() => {});
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      reconectar()
+        .then(ok => { if (ok) return sincronizar({ silencioso: true }); })
+        .catch(() => {});
     }
   }, ms);
 }
@@ -290,18 +354,70 @@ function reintentoOk() {
   esperaReintento = 5000;
 }
 
-/* Deja la sesión otra vez válida sin tocar nada del usuario. */
+/* Vida de la sesión: mientras la app esté abierta se renueva el token unos
+   minutos antes de que venza, para que el refresh_token nunca envejezca. */
+let tVida = null;
+function programaVida() {
+  try { if (tVida) clearTimeout(tVida); } catch (e) { /* nada */ }
+  const s = sesion();
+  if (!s || !s.expires_at) return;
+  const falta = s.expires_at - Date.now() - 4 * 60 * 1000;
+  const ms = Math.max(20000, Math.min(falta, 10 * 60 * 1000));
+  tVida = setTimeout(() => { reconectar().catch(() => {}); }, ms);
+}
+
+/* Re-entra a la cuenta GUARDADA en este dispositivo sin tocar nada del
+   usuario. Es la red de seguridad: si la sesión se pierde por cualquier
+   motivo (token invalidado, nube reiniciada, datos del navegador a medias),
+   la app vuelve a entrar sola. Una sola petición a la vez. */
+let reentrando = null;
+function reconectarCuenta() {
+  if (!nubeConfigurada()) return Promise.resolve(false);
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return Promise.resolve(false);
+  const c = leeCred();
+  if (!c || !c.email || !c.pass) return Promise.resolve(false);
+  // si la sesión abierta es de OTRA cuenta, no la secuestramos
+  const actual = (emailSesion() || '').toLowerCase();
+  if (haySesion() && actual && actual !== c.email) return Promise.resolve(false);
+  if (!reentrando) {
+    reentrando = (async () => {
+      try {
+        const d = await postAuth('/auth/v1/token?grant_type=password', { email: c.email, password: c.pass });
+        guardaTokens(d, c.email);
+        try { avisarUI(null, { conectada: true }); } catch (e) { /* nada */ }
+        return true;
+      } catch (e) {
+        return false;   // cuenta borrada u otra contraseña: no tocar nada
+      }
+    })();
+    const limpiar = () => { reentrando = null; };
+    reentrando.then(limpiar, limpiar);
+  }
+  return reentrando;
+}
+
+/* Deja la sesión otra vez válida sin tocar nada del usuario. Si no hay
+   sesión (o el refresco ya no sirve), entra otra vez con la cuenta guardada.
+   La nube NUNCA se desconecta sola. */
 export async function reconectar() {
-  if (!haySesion()) return false;
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return haySesion();
+  if (!haySesion()) {
+    const ok = await reconectarCuenta();
+    if (ok) { try { await primerSincronizado(); } catch (e) { /* sin red u otro fallo */ } }
+    return ok;
+  }
   const s = sesion();
   const vencida = s.expires_at && Date.now() > s.expires_at - 4 * 60 * 1000;
   if (!vencida && !pendiente) { reintentoOk(); return true; }   // la sesión está bien
   try {
-    await refrescarSesion(s);
+    await refrescarBloqueado(s);
     reintentoOk();
     return true;
   } catch (e) {
+    // el refresh_token dejó de servir: en vez de quedarse "desconectada",
+    // la app entra otra vez con la cuenta guardada
+    const ok = await reconectarCuenta();
+    if (ok) { reintentoOk(); return true; }
     programaReintento();
     return false;
   }
@@ -309,16 +425,30 @@ export async function reconectar() {
 
 async function token({ forzar = false } = {}) {
   const s = sesion();
-  if (!s) return null;
+  if (!s) {
+    // sin sesión: intentamos volver a entrar con la cuenta guardada
+    const ok = await reconectarCuenta();
+    const a = sesion();
+    if (ok && a) return a.access_token;
+    return null;
+  }
   const vencida = s.expires_at && Date.now() > s.expires_at - 4 * 60 * 1000;
   if (!vencida && !forzar) { reintentoOk(); return s.access_token; }
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return s.access_token;   // sin red: seguimos con la guardada
   try {
-    const tk = await refrescarSesion(s);
+    const tk = await refrescarBloqueado(s);
     reintentoOk();
     return tk;
   } catch (e) {
-    // la sesión NUNCA se borra: los cambios siguen encolados y se reintenta sola
+    // el token de refresco ya no sirve: entramos otra vez con la cuenta
+    // guardada. La sesión NUNCA se borra: si eso falla, los cambios siguen
+    // encolados y se reintenta sola.
+    const ok = await reconectarCuenta();
+    if (ok) {
+      reintentoOk();
+      const a = sesion();
+      if (a && a.access_token) return a.access_token;
+    }
     programaReintento();
     throw new Error('La nube no responde ahora. Tus datos siguen guardados aquí y se suben solos cuando vuelva.');
   }
@@ -478,6 +608,7 @@ function programarSinc(ms = 1500) {
 }
 window.addEventListener('online', () => {
   if (haySesion()) sincronizarInicial().catch(() => {});
+  else reconectar().catch(() => {});   // sin sesión: volvemos a entrar solas
 });
 
 export async function sincronizar({ silencioso = false } = {}) {
