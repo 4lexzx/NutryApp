@@ -45,6 +45,8 @@ export async function render(root, path) {
   const ok = c.cumplio !== undefined ? !!c.cumplio : !!pf.cumplio;
   const racha = Number(c.racha) || Number(pf.racha) || 0;
   const pct = meta ? Math.max(0, Math.min(100, Math.round(kcal / meta * 100))) : 0;
+  const M = c.macros || {};
+  const MT = c.metas || {};
   const nombre = pf.usuario || 'amigo';
   const foto = pub('pub_perfil') && pf.foto ? `<img src="${pf.foto}" alt="">` : icon('user');
   const bio = pub('pub_perfil') && pf.bio ? `<p class="small" style="margin:8px 0 0">${esc(pf.bio)}</p>` : '';
@@ -64,6 +66,12 @@ export async function render(root, path) {
         <div class="big">${num(kcal)}</div><div class="lbl">kcal de ${num(meta || 0)} · ${esc(fmtLongDate(todayISO()))}</div>
       </div>
       ${meta ? `<div class="am-prog ${ok ? 'ok' : ''}" style="margin:10px 0 4px"><i style="width:${pct}%"></i></div>` : ''}
+      ${(M.p != null || M.c != null || M.f != null) ? `
+      <div class="am-macros" style="margin:10px 0 2px">
+        ${macroTag('Proteína', M.p, MT.protein)}
+        ${macroTag('Carbos', M.c, MT.carbs)}
+        ${macroTag('Grasas', M.f, MT.fat)}
+      </div>` : ''}
       ${comidas.length ? `<ul class="am-meals big">${comidas.map(m => `
         <li><span class="am-meal-h">${esc(m.h || '')}</span> <span class="am-meal-n">${esc(m.n || '')}</span> <b>${num(m.k || 0)} kcal</b></li>`).join('')}</ul>`
       : `<p class="tiny muted" style="margin-top:10px">Todavía no anotó comidas hoy.</p>`}
@@ -131,7 +139,7 @@ export async function render(root, path) {
   if (del) del.onclick = async () => {
     const ok2 = await confirmSheet({
       title: `¿Dejar de ser amigos con ${nombre}?`,
-      msg: 'Dejarán de ver el día del otro. Cualquiera puede volver a pedir amistad.',
+      msg: 'Dejarán de ver el día del otro. Cualquiere puede volver a pedir amistad.',
       okText: 'Eliminar', danger: true
     });
     if (!ok2) return;
@@ -141,4 +149,11 @@ export async function render(root, path) {
       location.hash = '#/social';
     } catch (e) { toast('No pude eliminar. Revisa la nube.', 'warn'); }
   };
+}
+
+/* Chip compacto de un macro: Proteína 80 / 120 g */
+function macroTag(label, val, goal) {
+  if (val == null) return '';
+  const g = goal ? ` / ${num(goal)} g` : ' g';
+  return `<span class="am-macro">${label} <b>${num(val)}${g}</b></span>`;
 }

@@ -1,13 +1,18 @@
 /* Social (pestaña): amigos — solicitudes, buscar por usuario y el día de
-   tus amigos (si lo publican): comidas de hoy, kcal, agua, gym y rachas. */
+   tus amigos (si lo publican): comidas de hoy, kcal, macros, agua, gym y
+   rachas. Se actualiza solo, sin spinner ni parpadeo. */
 
 import { icon } from '../icons.js';
 import { esc, num, toast, todayISO, toISODate } from '../util.js';
 import { haySesion, uidNube, pedirAmistad, misAmistades, responderAmistad, quitarAmistad, bajarPerfiles, bajarCompartido } from '../cloud.js';
 import { currentUser } from '../auth.js';
 
+let _hash = '';
+let _vista = null;
+
 export async function render(root) {
   const conNube = haySesion();
+  _vista = root;
   root.innerHTML = `
     <h1>Social</h1>
 
@@ -36,7 +41,7 @@ export async function render(root) {
       <p class="tiny muted" id="am-empty" style="display:none"></p>
       <div class="divider"></div>
       <div class="spread">
-        <span class="tiny muted">Se actualiza solo mientras la nube esté conectada.</span>
+        <span class="tiny muted">Actualiza para ver cambios al momento.</span>
         <button class="btn btn-sm btn-outline" id="am-refresh" type="button" style="flex:none">${icon('refresh')} Actualizar</button>
       </div>
     </div>`}
@@ -45,9 +50,17 @@ export async function render(root) {
   actualizarBadgeNav();
   if (!conNube) return;
 
-  cargarAmigos();
+  // refresco silencioso cuando la nube trae cambios (sin spinner ni parpadeo)
+  const onNube = () => { if (root.isConnected) cargarAmigos(true); };
+  document.addEventListener('nutri-nube-actualizada', onNube);
+  if (_vista) _vista.addEventListener('DOMNodeRemoved', () => {
+    document.removeEventListener('nutri-nube-actualizada', onNube);
+  });
 
-  async function cargarAmigos() {
+  cargarAmigos(false);
+
+  /* Pinta solo si cambió el contenido (evita el parpadeo de repintar igual). */
+  async function cargarAmigos(silencioso) {
     const badge = root.querySelector('#am-badge');
     if (!badge) return;
     const reqBox = root.querySelector('#am-req');
@@ -63,8 +76,10 @@ export async function render(root) {
       try {
         [amis, perfs] = await Promise.all([misAmistades(), bajarPerfiles()]);
       } catch (e2) {
-        empty.style.display = '';
-        empty.textContent = 'No pude cargar amigos. Revisa tu conexión con la nube.';
+        if (!silencioso) {
+          empty.style.display = '';
+          empty.textContent = 'No pude cargar amigos. Revisa tu conexión con la nube.';
+        }
         return;
       }
     }
@@ -76,6 +91,17 @@ export async function render(root) {
     const entrantes = amis.filter(a => a.estado === 'pendiente' && a.dos === me);
     const salientes = amis.filter(a => a.estado === 'pendiente' && a.uno === me);
     const aceptadas = amis.filter(a => a.estado === 'aceptada');
+
+    // hash del contenido: si no cambió, no repintamos (sin parpadeo)
+    const hash = JSON.stringify([
+      entrantes.map(a => [a.id, a.uno]),
+      salientes.map(a => [a.id, a.dos]),
+      aceptadas.map(a => [a.id, a.uno, a.dos]),
+      perfs.map(p => [p.user_id, p.usuario, p.foto, p.bio, p.meta_kcal, p.kcal_hoy, p.racha, p.pub_perfil, p.pub_comidas, p.pub_agua, p.pub_gym, p.actualizado]),
+      comps.map(c => [c.user_id, c.contenido && c.contenido.kcal, c.contenido && c.contenido.racha, c.contenido && JSON.stringify(c.contenido.macros)])
+    ]);
+    if (silencioso && hash === _hash) return;
+    _hash = hash;
 
     badge.style.display = aceptadas.length ? '' : 'none';
     badge.className = 'badge ok';
@@ -108,7 +134,9 @@ export async function render(root) {
       const c = compDe(fid) || {};
       const pub = k => pf[k] !== false;   // por defecto todo público (perfiles viejos)
       const privado = !pub('pub_perfil') && !pub('pub_comidas') && !pub('pub_agua') && !pub('pub_gym');
-      // datos nuevos (`compartido`) o los básicos de siempre (perfiles)
+      // macros y metas de hoy (nuevo payload `macros`/`metas`)
+      const M = c.macros || {};
+      const MT = c.metas || {};
       const meta = Number(c.meta) || Number(pf.meta_kcal) || 0;
       const kcal = Number(c.kcal) || Number(pf.kcal_hoy) || 0;
       const ok = c.cumplio !== undefined ? !!c.cumplio : !!pf.cumplio;
@@ -126,7 +154,14 @@ export async function render(root) {
         agua ? `<span class="am-chip">${icon('droplet')} ${agua}</span>` : ''}${
         gym ? `<span class="am-chip">${icon('dumbbell')} ${gym}</span>` : ''}</div>` : '';
       const comidaLista = comidas.length ? `<ul class="am-meals">${comidas.slice(0, 3).map(m => `
-        <li><span class="am-meal-h">${esc(m.h || '')}</span> ${esc(m.n || '')} <b>${num(m.k || 0)}</b></li>`).join('')}${comidas.length > 3 ? `<li class="am-meals-more">+ ${comidas.length - 3} más…</li>` : ''}</ul>` : '';
+        <li><span class="am-meal-h">${esc(m.h || '')}</span> ${esc(m.n || '')} <b>${num(m.k || 0)} kcal</b></li>`).join('')}${comidas.length > 3 ? `<li class="am-meals-more">+ ${comidas.length - 3} más…</li>` : ''}</ul>` : '';
+      // macros de hoy (solo si los trae el payload)
+      const macrosHtml = (pub('pub_comidas') && !viejo && M && (M.p != null || M.c != null || M.f != null)) ? `
+        <div class="am-macros">
+          ${macroLinea('Proteína', M.p, MT.protein)}
+          ${macroLinea('Carbos', M.c, MT.carbs)}
+          ${macroLinea('Grasas', M.f, MT.fat)}
+        </div>` : '';
       return `
       <div class="list-item am-item am-friend" data-friend="${esc(fid)}" role="button" tabindex="0" style="cursor:pointer">
         <div class="avatar sm">${avatar(fid)}</div>
@@ -137,7 +172,7 @@ export async function render(root) {
             ? `<div class="li-s">${icon('lock')} perfil privado</div>`
             : `${pub('pub_comidas') && !viejo ? `<div class="li-s">${detalle}</div>` : `<div class="li-s">aún sin datos de hoy</div>`}
                ${!viejo && meta ? `<div class="am-prog ${ok ? 'ok' : ''}"><i style="width:${pct}%"></i></div>` : ''}
-               ${comidaLista}${rachas}`}
+               ${macrosHtml}${comidaLista}${rachas}`}
         </div>
         <div class="li-end">${!privado && pub('pub_comidas') && !viejo ? `<span class="badge ${ok ? 'ok' : 'warn'}">${estado}</span>` : ''}</div>
       </div>`;
@@ -152,21 +187,21 @@ export async function render(root) {
         await responderAmistad(Number(b.dataset.amOk), true);
         toast('Amistad aceptada.', 'ok');
       } catch (e) { toast('No pude aceptar. Revisa la nube.', 'warn'); }
-      cargarAmigos();
+      cargarAmigos(false);
     });
     root.querySelectorAll('[data-am-no]').forEach(b => b.onclick = async () => {
       try {
         await responderAmistad(Number(b.dataset.amNo), false);
         toast('Solicitud rechazada.', 'ok');
       } catch (e) { toast('No pude rechazar. Revisa la nube.', 'warn'); }
-      cargarAmigos();
+      cargarAmigos(false);
     });
     root.querySelectorAll('[data-am-x]').forEach(b => b.onclick = async () => {
       try {
         await quitarAmistad(Number(b.dataset.amX));
         toast('Solicitud cancelada.', 'ok');
       } catch (e) { toast('No pude cancelar. Revisa la nube.', 'warn'); }
-      cargarAmigos();
+      cargarAmigos(false);
     });
     const irAmigo = el => {
       const fid = el.dataset.friend;
@@ -176,6 +211,14 @@ export async function render(root) {
       b.onclick = e => { if (e.target.closest('button')) return; irAmigo(b); };
       b.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); irAmigo(b); } };
     });
+  }
+
+  /* Línea compacta de un macro: Proteína 80 / 120 g */
+  function macroLinea(label, val, goal) {
+    if (val == null) return '';
+    const v = num(val);
+    const g = goal ? ` / ${num(goal)} g` : ' g';
+    return `<span class="am-macro">${label} <b>${v}${g}</b></span>`;
   }
 
   async function buscarAmigo() {
@@ -188,7 +231,7 @@ export async function render(root) {
     if (r.ok) {
       root.querySelector('#am-in').value = '';
       toast(`Solicitud enviada a ${r.usuario}.`, 'ok');
-      cargarAmigos();
+      cargarAmigos(false);
     } else {
       toast(r.msg, 'warn');
     }
@@ -198,7 +241,7 @@ export async function render(root) {
   const amIn = root.querySelector('#am-in');
   if (amIn) amIn.onkeydown = e => { if (e.key === 'Enter') buscarAmigo(); };
   const amRe = root.querySelector('#am-refresh');
-  if (amRe) amRe.onclick = () => cargarAmigos();
+  if (amRe) amRe.onclick = () => cargarAmigos(false);
 }
 
 /* Aviso (punto rojo) de solicitudes pendientes en la barra de navegación. */

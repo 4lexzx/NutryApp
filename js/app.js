@@ -314,6 +314,11 @@ function prepararNubeUI() {
     if (err || !info || !(info.bajadas > 0)) return;
     if (document.querySelector('.sheet-back, .cam-back')) return;   // hoja o cámara abierta
     const ruta = parseHash().path[0] || 'hoy';
+    // social/amigo se refrescan solos (sin spinner) para no parpadear
+    if (ruta === 'social' || ruta === 'amigo') {
+      document.dispatchEvent(new CustomEvent('nutri-nube-actualizada'));
+      return;
+    }
     // solo las pantallas de lectura; nunca formularios ni editores en curso
     if (['ajustes', 'registrar', 'nuevo', 'editar', 'ia'].indexOf(ruta) >= 0) return;
     const a = document.activeElement;

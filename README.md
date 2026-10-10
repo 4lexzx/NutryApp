@@ -642,6 +642,11 @@ usuario y la contraseña contra Supabase **antes** de abrir la app y se bajan tu
 en cualquier PC o celular ves lo mismo con **la misma cuenta y la misma contraseña**. En local
 (desarrollo y pruebas) sigue pudiendo entrar con el candado del navegador.
 
+Además, la tabla `usuarios_registrados` de la BD guarda cada cuenta con su **usuario y correo**
+(y una comprobación de unicidad global: **el nombre de usuario no se puede repetir** en toda la
+app). Esa tabla se llena sola cada vez que se crea una cuenta; para activarla hay que aplicar la
+migración `supabase/migracion_v2_4_usuarios.sql` en Supabase SQL Editor.
+
 ### 12.1 Crear la base de datos (una sola vez)
 
 1. Entra a <https://supabase.com> → **New project** (elige nombre, región y contraseña de admin).

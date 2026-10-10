@@ -3,7 +3,7 @@
 
 import { icon } from '../icons.js';
 import { verify, createUser, removeUser, setSession, setLocalPassword } from '../auth.js';
-import { conectarAutomatica, entrarConNube, sincronizarInicial } from '../cloud.js';
+import { conectarAutomatica, entrarConNube, sincronizarInicial, usuarioYaRegistrado } from '../cloud.js';
 import { toast } from '../util.js';
 
 export async function render(root, onOk) {
@@ -207,10 +207,33 @@ export async function render(root, onOk) {
     regGoBtn.disabled = true;
     regGoBtn.innerHTML = '<span class="spinner"></span><span class="lbl">Creando…</span>';
     try {
+      // 1) ¿ya está registrado en la nube? (la manda la tabla de usuarios)
+      regGoBtn.innerHTML = '<span class="spinner"></span><span class="lbl">Comprobando si ya existe…</span>';
+      const chk = await usuarioYaRegistrado(u);
+      if (chk.ok && chk.existe) {
+        // el usuario existe: si la contraseña es la de su cuenta, solo entra;
+        // si no, avisamos que ya está registrado (no se repite el nombre)
+        try {
+          await entrarConNube(u, p);
+          await setLocalPassword(u, p);
+          setSession(u);
+          regGoBtn.innerHTML = '<span class="spinner"></span><span class="lbl">Descargando tus datos…</span>';
+          try { await sincronizarInicial(); } catch (s) { /* sigue */ }
+          enter(u);
+          return;
+        } catch (err2) {
+          await removeUser(u).catch(() => {});
+          userInput.value = u;
+          passInput.value = '';
+          setMode('login');
+          showError(errBox, form, userInput, `El usuario "${u}" ya está registrado en la nube${chk.email ? ' (' + chk.email + ')' : ''}. Ese nombre no se puede repetir: inicia sesión con tu contraseña, o usa otro usuario.`);
+          return;
+        }
+      }
+
+      // 2) no existe: lo creamos (local + nube)
       const r = await createUser(u, p);
       if (!r.ok) { showError(regErrBox, regForm, regUser, r.msg); return; }
-      // comprobamos la nube ANTES de entrar: si el usuario ya existe allá con
-      // otra contraseña, no creamos una cuenta duplicada.
       regGoBtn.innerHTML = '<span class="spinner"></span><span class="lbl">Conectando…</span>';
       const nube = await conNube(r.user, p);
       if (nube === 'existe') {

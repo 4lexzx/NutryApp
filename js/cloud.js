@@ -44,7 +44,7 @@ export async function entrarConNube(usuario, pass) {
     d = await postAuth('/auth/v1/token?grant_type=password', { email, password: passN });
   } catch (e) {
     const m = String(e && e.message ? e.message : e);
-    if (/Invalid login credentials|invalid|not confirmed|Bad Request/i.test(m)) {
+    if (/Invalid login credentials|user_already_exists|not confirmed|Bad Request/i.test(m)) {
       throw new Error('Usuario o contraseña no coinciden con tu cuenta en la nube. Usa el mismo usuario y la MISMA contraseña que en tu otro dispositivo.');
     }
     throw new Error('No pude conectar con la nube. Revisa tu internet e inténtalo de nuevo.');
@@ -52,6 +52,38 @@ export async function entrarConNube(usuario, pass) {
   guardaTokens(d, email);
   autoOn();
   return email;
+}
+
+/* ¿Ese usuario ya está registrado en la nube? Mira la tabla de la BD
+   (usuarios_registrados). Devuelve {ok, existe, usuario, email}. Si la
+   migración v2.4 no está aplicada, avisa sin bloquear. */
+export async function usuarioYaRegistrado(usuario) {
+  const nom = String(usuario || '').trim().toLowerCase();
+  if (!nom) return { ok: false, existe: false };
+  if (!nubeConfigurada()) return { ok: false, existe: false };
+  const tk = await tokenAnonima().catch(() => null);
+  if (!tk) return { ok: false, existe: false };
+  try {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/usuario_existe', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: nom })
+    });
+    if (r.status === 404) return { ok: false, existe: false };   // sin la migración v2.4
+    if (!r.ok) return { ok: false, existe: false };
+    const d = await r.json();
+    const fila = (Array.isArray(d) ? d[0] : null) || null;
+    return { ok: true, existe: !!fila, usuario: fila ? fila.usuario : '', email: fila ? fila.email : '' };
+  } catch (e) {
+    return { ok: false, existe: false };
+  }
+}
+
+/* Token anónimo (anon key) para las llamadas públicas como usuario_existe. */
+async function tokenAnonima() {
+  const s = sesion();
+  if (s && s.access_token) return s.access_token;
+  return SUPABASE_ANON_KEY;
 }
 
 /* ---------------- sesión ---------------- */
@@ -102,9 +134,11 @@ function guardaTokens(d, email) {
   _uid = '';
 }
 
-export async function crearCuenta(email, pass) {
+export async function crearCuenta(email, pass, usuario) {
   if (!nubeConfigurada()) throw new Error('La nube todavía no está configurada en la app.');
   const d = await postAuth('/auth/v1/signup', { email, password: pass });
+  // registra el nombre de usuario en la tabla de usuarios (unicidad global)
+  if (usuario) await registrarUsuarioLocal(email, usuario).catch(() => {});
   if (d && d.access_token) {
     guardaTokens(d, email);
     autoOn();
@@ -112,6 +146,20 @@ export async function crearCuenta(email, pass) {
     return { confirmada: true };
   }
   return { confirmada: false };
+}
+
+/* Sube tu nombre de usuario a la tabla usuarios_registrados (unicidad). */
+async function registrarUsuarioLocal(email, usuario) {
+  const nom = String(usuario || '').trim().toLowerCase();
+  if (!nom) return false;
+  const me = uidSesion();
+  if (!me) return false;
+  await rest('/usuarios_registrados?on_conflict=user_id', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: [{ user_id: me, usuario: nom, email: String(email || '').toLowerCase(), actualizado: new Date().toISOString() }]
+  });
+  return true;
 }
 
 async function primerSincronizado() {
@@ -147,9 +195,10 @@ export async function conectarAutomatica(usuario, passLocal) {
   if (!nubeConfigurada() || !nubeAutomaticaOk()) return false;
   const email = emailNubeDe(usuario);
   const pass = passNubeDe(passLocal);
-  if (haySesion()) {
-    // misma cuenta: ya está; otra cuenta (otro usuario o correo): se reajusta sola
-    if ((emailSesion() || '').toLowerCase() === email) return true;
+  // La sesión NO se acepta sin validar la contraseña: si es de otra cuenta,
+  // se cierra y se vuelve a entrar bien (así nunca quedan cuentas distintas
+  // con el mismo usuario).
+  if (haySesion() && (emailSesion() || '').toLowerCase() !== email) {
     try { desconectar(); } catch (e) { /* seguimos */ }
     autoOn();
   }
@@ -311,7 +360,8 @@ async function aplicar(filas) {
       if (q[clave]) continue;                    // cambio local pendiente: manda lo local
       const id = idLocal(f.coleccion, f.clave);
       if (f.eliminado || f.contenido == null) {
-        await DB.del(f.coleccion, id);
+        const ya = await DB.get(f.coleccion, id).catch(() => null);
+        if (ya) { await DB.del(f.coleccion, id); n++; }
       } else if (f.coleccion === 'kv') {
         const nuevo = Object.assign({}, f.contenido, { k: f.clave });
         if (f.clave === 'settings') {
@@ -321,11 +371,12 @@ async function aplicar(filas) {
             nuevo.apiKey = loc.apiKey;
           }
         }
-        await DB.kvSet(nuevo);
+        const loc = await DB.kvGet(f.clave).catch(() => null);
+        if (JSON.stringify(loc) !== JSON.stringify(nuevo)) { await DB.kvSet(nuevo); n++; }
       } else {
-        await DB.put(f.coleccion, f.contenido);
+        const loc = await DB.get(f.coleccion, id).catch(() => null);
+        if (JSON.stringify(loc) !== JSON.stringify(f.contenido)) { await DB.put(f.coleccion, f.contenido); n++; }
       }
-      n++;
     }
   });
   return n;
@@ -543,21 +594,37 @@ async function calcularCompartido() {
   const meals = await DB.all('meals').catch(() => []);
   const hoy = isoHoy();
 
-  let kcal = 0;
+  // metas diarias del usuario (kcal + macros) — mismo patrón que Hoy
+  const tgt = calcTargets(prof);
+  const metaK = (prof.targets && prof.targets.kcal) ? Number(prof.targets.kcal) : (tgt.kcal || 0);
+  const metaP = (prof.targets && prof.targets.protein) ? Number(prof.targets.protein) : (tgt.protein || 0);
+  const metaC = (prof.targets && prof.targets.carbs) ? Number(prof.targets.carbs) : (tgt.carbs || 0);
+  const metaF = (prof.targets && prof.targets.fat) ? Number(prof.targets.fat) : (tgt.fat || 0);
+
+  let kcal = 0, p = 0, c = 0, f = 0, fi = 0;
   const comidas = [];
   const porFecha = {};
   for (const m of meals) {
     if (!m || !m.date) continue;
     const k = Math.round(Number((m.totals && m.totals.kcal) || 0));
-    porFecha[m.date] = porFecha[m.date] || { k: 0, n: 0 };
+    const mp = Math.round(Number((m.totals && m.totals.protein) || 0));
+    const mc = Math.round(Number((m.totals && m.totals.carbs) || 0));
+    const mf = Math.round(Number((m.totals && m.totals.fat) || 0));
+    const mfi = Math.round(Number((m.totals && m.totals.fiber) || 0));
+    porFecha[m.date] = porFecha[m.date] || { k: 0, p: 0, c: 0, f: 0, fi: 0, n: 0 };
     porFecha[m.date].k += k;
+    porFecha[m.date].p += mp;
+    porFecha[m.date].c += mc;
+    porFecha[m.date].f += mf;
+    porFecha[m.date].fi += mfi;
     porFecha[m.date].n++;
     if (m.date === hoy) {
-      kcal += k;
+      kcal += k; p += mp; c += mc; f += mf; fi += mfi;
       comidas.push({
         t: m.type || '',
         n: String(m.name || '').slice(0, 80),
         k,
+        p: mp, c: mc, f: mf,
         h: m.createdAt ? new Date(m.createdAt).toTimeString().slice(0, 5) : ''
       });
     }
@@ -569,7 +636,7 @@ async function calcularCompartido() {
   for (let i = 0; i < 14; i++) {
     const f = toISODate(d);
     const e = porFecha[f];
-    historial.push({ f, k: e ? Math.round(e.k) : 0, n: e ? e.n : 0 });
+    historial.push({ f, k: e ? Math.round(e.k) : 0, p: e ? Math.round(e.p) : 0, c: e ? Math.round(e.c) : 0, f: e ? Math.round(e.f) : 0, n: e ? e.n : 0 });
     d.setDate(d.getDate() - 1);
   }
 
@@ -617,8 +684,11 @@ async function calcularCompartido() {
     agua: { v: aguaHoy, meta: aguaMeta, r: rachaAgua },
     gym: { ido: gymHoy, r: gymRacha, dias: gymPlan },
     kcal: Math.round(kcal),
-    meta: Math.round(meta) || 0,
-    cumplio: !!(meta && kcal >= meta),
+    meta: Math.round(metaK) || 0,
+    // macros de hoy + metas diarias (lo que ven tus amigos)
+    macros: { k: Math.round(kcal), p: Math.round(p), c: Math.round(c), f: Math.round(f), fi: Math.round(fi) },
+    metas: { kcal: Math.round(metaK) || 0, protein: Math.round(metaP) || 0, carbs: Math.round(metaC) || 0, fat: Math.round(metaF) || 0 },
+    cumplio: !!(metaK && kcal >= metaK),
     racha: rachaComidas(meals),
     peso
   };
@@ -636,6 +706,8 @@ export async function subirPerfilSocial() {
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: [Object.assign({ user_id: me }, datos)]
   });
+  // deja tu usuario en la tabla de la nube (unicidad global + comprobación)
+  await registrarUsuarioLocal(emailSesion(), datos.usuario).catch(() => {});
   try {
     const contenido = await calcularCompartido();
     await rest('/compartido?on_conflict=user_id', {
