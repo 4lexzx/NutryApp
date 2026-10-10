@@ -547,6 +547,15 @@ function idLocal(tienda, filaId) {
   }
   return filaId;
 }
+/* Comparación estable: JSONB de PostgREST puede reordenar las claves,
+   y JSON.stringify da falsos "cambios" → bajadas inventadas → re-render
+   con spinner y parpadeo (tarjeta de Gym). Ordenamos las claves. */
+function stableStr(v) {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) return '[' + v.map(stableStr).join(',') + ']';
+  const keys = Object.keys(v).sort();
+  return '{' + keys.map(k => JSON.stringify(k) + ':' + stableStr(v[k])).join(',') + '}';
+}
 async function aplicar(filas) {
   let n = 0;
   await conAplicacionNube(async () => {
@@ -569,10 +578,10 @@ async function aplicar(filas) {
           }
         }
         const loc = await DB.kvGet(f.clave).catch(() => null);
-        if (JSON.stringify(loc) !== JSON.stringify(nuevo)) { await DB.kvSet(nuevo); n++; }
+        if (stableStr(loc) !== stableStr(nuevo)) { await DB.kvSet(nuevo); n++; }
       } else {
         const loc = await DB.get(f.coleccion, id).catch(() => null);
-        if (JSON.stringify(loc) !== JSON.stringify(f.contenido)) { await DB.put(f.coleccion, f.contenido); n++; }
+        if (stableStr(loc) !== stableStr(f.contenido)) { await DB.put(f.coleccion, f.contenido); n++; }
       }
     }
   });

@@ -36,6 +36,32 @@ function parseHash() {
 
 const NAV_OF = { hoy: 'hoy', registrar: 'registrar', nuevo: 'registrar', editar: 'registrar', historial: 'historial', social: 'social', amigo: 'social', perfil: 'perfil', ajustes: 'ajustes', ia: 'ajustes', gym: 'hoy', batido: 'registrar' };
 
+/* Refresco de la vista ACTUAL sin spinner y sin borrar la pantalla.
+   Se usa cuando la nube baja datos o al volver de segundo plano: si no,
+   route() entero ponía el loading y se veía un parpadeo (sobre todo la
+   tarjeta de Gym, que tiene la llama y las lámparas animadas). */
+async function refrescarEnSilencio() {
+  const { path, query } = parseHash();
+  const name = path[0] || 'hoy';
+  const root = view();
+  if (!isAuthed()) return;
+  // solo pantallas de lectura; nunca formularios ni editores en curso
+  if (['ajustes', 'registrar', 'nuevo', 'editar', 'ia'].indexOf(name) >= 0) return;
+  const a = document.activeElement;
+  if (a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) return;
+  const y = window.scrollY;
+  try {
+    switch (name) {
+      case 'hoy': await today.render(root, path.slice(1)); break;
+      case 'historial': await history.render(root, path.slice(1), query); break;
+      case 'gym': await gym.render(root, path.slice(1), query); break;
+      // social/amigo se refrescan solos (sin spinner) por su propio evento
+      default: return;
+    }
+    window.scrollTo(0, y);
+  } catch (e) { /* nada */ }
+}
+
 async function route(opts = {}) {
   const { path, query } = parseHash();
   const name = path[0] || 'hoy';
@@ -273,8 +299,8 @@ function setupResume() {
     if (document.querySelector('.sheet-back, .cam-back')) return;   // hoja o cámara abierta
     const ruta = parseHash().path[0] || 'hoy';
     if (RUTAS_REFRESH.indexOf(ruta) === -1) return;             // no pisar lo que estaba escribiendo
-    const y = window.scrollY;
-    route().then(() => window.scrollTo(0, y)).catch(() => {});
+    // refresco silencioso: sin spinner ni borrar la pantalla (evita el parpadeo)
+    refrescarEnSilencio();
   };
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { ocultoEn = Date.now(); return; }
@@ -360,11 +386,9 @@ function prepararNubeUI() {
       document.dispatchEvent(new CustomEvent('nutri-nube-actualizada'));
       return;
     }
-    // solo las pantallas de lectura; nunca formularios ni editores en curso
-    if (['ajustes', 'registrar', 'nuevo', 'editar', 'ia'].indexOf(ruta) >= 0) return;
-    const a = document.activeElement;
-    if (a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) return;
-    route({ scroll: false }).catch(() => {});
+    // refresco silencioso: sin spinner ni borrar la pantalla (evita el parpadeo
+    // de la tarjeta de Gym y demás al sincronizar en segundo plano)
+    refrescarEnSilencio();
   };
 }
 
