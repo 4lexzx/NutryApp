@@ -1,13 +1,13 @@
 /* Perfil, cálculo de metas y evolución de peso. */
 
-import { DB, getProfile, saveProfile } from '../db.js';
+import { DB, getProfile, saveProfile, getSettings } from '../db.js';
 import { icon } from '../icons.js';
 import { calcTargets, bmr, tdee, ACTIVIDADES, OBJETIVOS, SEXOS } from '../nutrition.js';
 import { lineChart } from '../charts.js';
 import { todayISO, esc, num, toast, confirmSheet, openSheet, fmtShortDate, fromISODate, uid, DIAS, pickFile, fileToDataURL, resizeImage } from '../util.js';
 import { currentUser } from '../auth.js';
 import { haySesion } from '../cloud.js';
-import { PLAN_RANGOS, PLAN_RANGO_DEF, rangoLabel } from './gym.js';
+import { PLAN_RANGOS, PLAN_RANGO_DEF, rangoLabel, cargarGym, calcRacha } from './gym.js';
 
 export async function render(root) {
   const p = (await getProfile()) || {
@@ -21,17 +21,53 @@ export async function render(root) {
   const manual = !!(p.targets && p.targets.kcal);
   const goal = manual ? p.targets : t;
   const pp = k => p[k] !== false;   // por defecto todo público
+  const user = currentUser() || '';
+  const inicial = (user || 'N').charAt(0).toUpperCase();
+
+  // datos livianos para las insignias (solo lectura, misma lógica de siempre)
+  const hoy = todayISO();
+  const [settings, water, gym] = await Promise.all([
+    getSettings(), DB.kvGet('water:' + hoy, null), cargarGym()
+  ]);
+  const aguaMeta = Number(settings && settings.waterGoal) || 8;
+  const aguaHoy = (water && water.glasses) || 0;
+  const racha = calcRacha(gym.regs, gym.plan, hoy);
+  const mealsAll = await DB.all('meals');
+  const setDias = new Set(mealsAll.map(m => m.date));
+  let constancia = 0;
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const iso = d.toISOString().slice(0, 10);
+    if (setDias.has(iso)) constancia++;
+    else if (i > 0) break;
+  }
 
   root.innerHTML = `
-    <h1>Mi perfil</h1>
+    <h1>Perfil</h1>
+    <p class="small muted" style="margin:-8px 0 14px">${esc(user)}</p>
 
     <div class="card">
-      <div class="card-title"><h3>${icon('user')} Perfil social</h3>
+      <div class="profile-hero">
+        ${p.foto
+          ? `<img class="profile-avatar" src="${p.foto}" alt="Foto de perfil" style="object-fit:cover">`
+          : `<div class="profile-avatar">${esc(inicial)}</div>`}
+        <div class="profile-name">${esc(user)}</div>
+        <div class="profile-sub">${conNube ? 'Sincronizado' : 'Solo local'}</div>
+      </div>
+      <div class="profile-stats">
+        <div class="ps"><div class="ps-v">${p.weight ? num(p.weight, 1) + ' kg' : '—'}</div><div class="ps-k">Peso</div></div>
+        <div class="ps"><div class="ps-v">${p.height ? num(p.height) + ' cm' : '—'}</div><div class="ps-k">Altura</div></div>
+        <div class="ps"><div class="ps-v">${p.age || '—'}</div><div class="ps-k">Edad</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><h3>${icon('user')} Tu usuario</h3>
         <span class="badge ${conNube ? 'ok' : 'warn'}">${conNube ? 'en la nube' : 'solo local'}</span></div>
       <div class="soc-head">
         <div class="avatar">${p.foto ? `<img src="${p.foto}" alt="Foto de perfil">` : icon('user')}</div>
         <div style="flex:1;min-width:0">
-          <b>${esc(currentUser() || '')}</b>
+          <b>${esc(user)}</b>
           <div class="hint" style="margin:3px 0 0">Este es tu usuario: así te encuentran tus amigos.</div>
           <div class="row" style="margin-top:8px;gap:8px">
             <button class="btn btn-sm btn-outline" id="p-photo" type="button">${icon('camera')} ${p.foto ? 'Cambiar foto' : 'Poner foto'}</button>
@@ -47,17 +83,48 @@ export async function render(root) {
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>${icon('lock')} Privacidad</h3></div>
-      <p class="small muted">Elige qué ven tus amigos. Si apagas todo, tu perfil queda privado y no ven nada
-        (tú siempre te ves a ti mismo). Se aplica la próxima vez que se sincronice.</p>
-      <div class="row" style="flex-wrap:wrap;gap:8px">
-        <button type="button" class="chip ${pp('pub_perfil') ? 'active' : ''}" data-pub="pub_perfil">Foto y bio</button>
-        <button type="button" class="chip ${pp('pub_comidas') ? 'active' : ''}" data-pub="pub_comidas">Comidas de hoy</button>
-        <button type="button" class="chip ${pp('pub_historial') ? 'active' : ''}" data-pub="pub_historial">Historial</button>
-        <button type="button" class="chip ${pp('pub_agua') ? 'active' : ''}" data-pub="pub_agua">Agua y racha</button>
-        <button type="button" class="chip ${pp('pub_gym') ? 'active' : ''}" data-pub="pub_gym">Gimnasio y racha</button>
+      <div class="card-title"><h3>${icon('star')} Insignias</h3></div>
+      <div class="badges-row">
+        <div class="badge-tile">
+          <div class="bt-ic" style="color:${racha.dias ? 'var(--brand)' : 'var(--txt-2)'}">${icon('flame')}</div>
+          <div class="bt-k">Racha</div>
+          <div class="ps-v" style="font-size:.95rem">${racha.dias} ${racha.dias === 1 ? 'día' : 'días'}</div>
+        </div>
+        <div class="badge-tile">
+          <div class="bt-ic" style="color:${aguaHoy >= aguaMeta ? 'var(--brand)' : 'var(--txt-2)'}">${icon('droplet')}</div>
+          <div class="bt-k">Hidratado</div>
+          <div class="ps-v" style="font-size:.95rem">${aguaHoy}/${aguaMeta}</div>
+        </div>
+        <div class="badge-tile">
+          <div class="bt-ic" style="color:${constancia >= 3 ? 'var(--brand)' : 'var(--txt-2)'}">${icon('zap')}</div>
+          <div class="bt-k">Constancia</div>
+          <div class="ps-v" style="font-size:.95rem">${constancia} ${constancia === 1 ? 'día' : 'días'}</div>
+        </div>
+        <div class="badge-tile">
+          <div class="bt-ic">${icon('target')}</div>
+          <div class="bt-k">Meta</div>
+          <div class="ps-v" style="font-size:.95rem">${goal && goal.kcal ? num(goal.kcal) : '—'}</div>
+        </div>
       </div>
-      <div class="hint" style="margin-top:10px">Con “Comidas de hoy” tus amigos ven qué comiste (nombre y kcal), no fotos.</div>
+      <div class="hint" style="margin-top:10px">Se calculan con tu actividad real: gym, agua, comidas y meta diaria.</div>
+    </div>
+
+    <div class="group-title upper">Privacidad</div>
+    <div class="card">
+      <p class="small muted" style="margin-top:0">Elige qué ven tus amigos. Si apagas todo, tu perfil queda privado y no ven nada
+        (tú siempre te ves a ti mismo). Se aplica la próxima vez que se sincronice.</p>
+      ${[
+        ['pub_perfil', 'Foto y bio'],
+        ['pub_comidas', 'Comidas de hoy'],
+        ['pub_historial', 'Historial'],
+        ['pub_agua', 'Agua y racha'],
+        ['pub_gym', 'Gimnasio y racha']
+      ].map(([k, label]) => `
+      <div class="switch-row">
+        <span class="sr-t">${label}</span>
+        <label class="switch"><input type="checkbox" data-pub="${k}" ${pp(k) ? 'checked' : ''}><span class="slider"></span></label>
+      </div>`).join('')}
+      <div class="hint">Con “Comidas de hoy” tus amigos ven qué comiste (nombre y kcal), no fotos.</div>
       <button class="btn btn-primary btn-block" id="p-priv" type="button" style="margin-top:12px">${icon('check')} Guardar privacidad</button>
     </div>
 
@@ -175,14 +242,13 @@ export async function render(root) {
     render(root);
   };
 
-  // ---- privacidad: qué ve cada amigo ----
+  // ---- privacidad: qué ve cada amigo (toggles) ----
   const privBtn = root.querySelector('#p-priv');
   if (privBtn) {
-    root.querySelectorAll('[data-pub]').forEach(b => b.onclick = () => b.classList.toggle('active'));
     privBtn.onclick = async () => {
       const cambios = {};
       root.querySelectorAll('[data-pub]').forEach(b => {
-        cambios[b.dataset.pub] = b.classList.contains('active');
+        cambios[b.dataset.pub] = !!b.checked;
       });
       await guardarSocial(cambios);
       const todoOff = !cambios.pub_perfil && !cambios.pub_comidas && !cambios.pub_historial && !cambios.pub_agua && !cambios.pub_gym;

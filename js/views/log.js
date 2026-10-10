@@ -92,7 +92,7 @@ function renderFoto(body, date, hasKey) {
       : `<div class="empty" style="padding:22px 12px"><span class="ico">${icon('utensils')}</span><span class="small">Sube una o más fotos, o escribe el plato abajo</span></div>`}
       <label class="field" style="margin-top:12px"><span class="lbl">Descripción opcional (mejora la precisión)</span>
         <textarea id="f-desc" rows="2" placeholder="Ej. almuerzo de gimnasio, con poco arroz y doble presa de pollo">${esc(state.desc)}</textarea></label>
-      <button class="btn btn-accent btn-lg btn-block" id="f-go" type="button">${icon('sparkles')} Analizar con la IA${n > 1 ? ` (${n} fotos)` : ''}</button>
+      <button class="btn btn-analyze btn-lg btn-block" id="f-go" type="button">${icon('sparkles')} Analizar con la IA${n > 1 ? ` (${n} fotos)` : ''}</button>
       ${!hasKey ? `<div class="hint">Falta tu API key: pégala en <a href="#/ajustes">Ajustes</a>.</div>` : ''}
       ${n > 1 ? `<div class="hint">Se analizará foto por foto y todo se junta en un solo plato (nombres, ingredientes y totales).</div>` : ''}
     </div>
@@ -117,7 +117,7 @@ function renderTexto(body, date, hasKey) {
       <div class="card-title"><h3>${icon('note')} Describe tu plato</h3></div>
       <label class="field"><span class="lbl">¿Qué comiste?</span>
         <textarea id="t-desc" rows="4" placeholder="Ej. 1 lomo saltado con arroz (poco), 1 vaso de chicha morada, 1 presa de pollo a la brasa">${esc(state.desc)}</textarea></label>
-      <button class="btn btn-accent btn-lg btn-block" id="t-go" type="button">${icon('sparkles')} Analizar con la IA</button>
+      <button class="btn btn-analyze btn-lg btn-block" id="t-go" type="button">${icon('sparkles')} Analizar con la IA</button>
       ${!hasKey ? `<div class="hint">Falta tu API key: pégala en <a href="#/ajustes">Ajustes</a>.</div>` : ''}
       <div class="hint">También puedes guardar sin analizar desde la pestaña “Manual”.</div>
     </div>`;

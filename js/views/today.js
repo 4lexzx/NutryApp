@@ -43,6 +43,8 @@ export async function render(root, params) {
   let waterG = (water && water.glasses) || 0;
   const waterGoal = Number(settings.waterGoal) || 8;
 
+  const pctKcal = goalKcal > 0 ? Math.min(100, (total.kcal / goalKcal) * 100) : 0;
+
   root.innerHTML = `
     <div class="daynav">
       <button class="btn btn-ghost btn-sm" id="d-prev" type="button" aria-label="Día anterior">‹</button>
@@ -62,52 +64,43 @@ export async function render(root, params) {
       </div>` : ''}
 
     <div class="card">
-      <div class="macro-hero">
-        <div class="big">${num(total.kcal)}<span style="font-size:1.1rem;font-weight:700"> ${goalKcal ? '/ ' + num(goalKcal) : ''}</span></div>
-        <div class="lbl">kcal consumidas${goalKcal ? ' de tu meta' : ''}${gymBonus ? ` ${icon('dumbbell')} +${num(gymBonus)} por gym` : ''}</div>
-        <div class="rest">${goalKcal
-      ? (total.kcal <= goalKcal ? `Te faltan <b>${num(goalKcal - total.kcal)} kcal</b>` : `Superaste la meta en <b>${num(total.kcal - goalKcal)} kcal</b>`)
-      : 'Configura tu perfil para ver metas'}</div>
+      <div class="spread" style="margin-bottom:2px">
+        <span class="small muted">Calorías${gymBonus ? ` · +${num(gymBonus)} por gym` : ''}</span>
+        <span class="small" style="color:var(--brand);font-weight:600">${goalKcal
+      ? (total.kcal <= goalKcal ? `Faltan ${num(goalKcal - total.kcal)} kcal` : `Superaste en ${num(total.kcal - goalKcal)} kcal`)
+      : 'Configura tu perfil'}</span>
       </div>
+      <div class="macro-hero">
+        <div class="big">${num(total.kcal)}<span style="font-size:1.05rem;font-weight:700;color:var(--txt-3)"> / ${goalKcal ? num(goalKcal) : '—'} kcal</span></div>
+      </div>
+      <div class="hero-track"><div class="hero-fill" style="width:${pctKcal}%"></div></div>
       <div class="bars">
-        ${bar('kcal', 'Calorías', total.kcal, goalKcal, 'kcal', 0)}
         ${bar('prot', 'Proteína', total.p, goalP, 'g', 1)}
-        ${bar('carb', 'Carbohidratos', total.c, goalC, 'g', 1)}
+        ${bar('carb', 'Carbos', total.c, goalC, 'g', 1)}
         ${bar('gras', 'Grasas', total.f, goalF, 'g', 1)}
       </div>
-      <div class="statgrid" style="margin-top:14px">
-        <div class="stat kcal"><div class="v">${num(total.kcal)}</div><div class="k">kcal</div></div>
-        <div class="stat prot"><div class="v">${num(total.p, 1)}</div><div class="k">prot (g)</div></div>
-        <div class="stat carb"><div class="v">${num(total.c, 1)}</div><div class="k">carb (g)</div></div>
-        <div class="stat gras"><div class="v">${num(total.f, 1)}</div><div class="k">gras (g)</div></div>
-      </div>
+    </div>
+
+    <div class="duo">
+      ${duoRacha(gym, date, gy)}
+      ${duoAgua(waterG, waterGoal)}
     </div>
 
     ${gymCard(gym, date, gymBonus, gy)}
 
-    <div class="card">
-      <div class="card-title"><h3>${icon('droplet')} Agua</h3><span class="badge" id="w-badge">${waterG}/${waterGoal} vasos</span></div>
-      <div class="water">
-        <div class="water-glasses" id="glasses"></div>
-      </div>
-      <div class="water-ctrl">
-        <button class="wbtn" id="w-less" type="button" aria-label="Quitar un vaso" ${waterG > 0 ? '' : 'disabled'}>−</button>
-        <span class="wcount" id="wcount">${waterG} <small>/ ${waterGoal} vasos</small></span>
-        <button class="wbtn wbtn-more" id="w-more" type="button" aria-label="Añadir un vaso">＋</button>
-      </div>
-      <div class="tiny muted" style="margin-top:8px">${waterGoal} vasos = ${num(250 * waterGoal / 1000, 2)} L al día (1 vaso = 250 ml · ajustable en Ajustes).</div>
-    </div>
-
     ${ordered.length ? ordered.map(g => `
       <div class="group-title">${icon(ICONO_TIPO[g.type])} ${g.type}</div>
       ${g.rows.map(mealCard).join('')}
-    `).join('') : `
-      <div class="empty">
-        <span class="ico">${icon('utensils')}</span>
-        <b>${meals.length ? '' : 'Aún no registras comidas este día'}</b>
-        <p class="small muted">Toma una foto de tu plato, describe el menú o ingrésalo a mano.</p>
-        <a class="btn btn-outline" href="#/registrar?d=${date}" style="display:inline-flex">Registrar ahora</a>
-      </div>`}
+    `).join('') : ''}
+
+    <a class="add-meal" href="#/registrar?d=${date}">
+      <span class="plus">${icon('plus')}</span>
+      <span>
+        <span class="am-t">Agregar comida</span><br>
+        <span class="am-s">Registra tu próximo plato</span>
+      </span>
+      <span class="ic chev">${icon('chevronRight')}</span>
+    </a>
 
     <div class="card tight">
       <div class="spread">
@@ -124,17 +117,9 @@ export async function render(root, params) {
   // agua
   const gl = root.querySelector('#glasses');
   const drawGlasses = () => {
-    const CILINDRO = 'M7.1 4.4h9.8l-1.2 15.3a1.8 1.8 0 0 1-1.8 1.7H10.1a1.8 1.8 0 0 1-1.8-1.7z';
-    gl.innerHTML = Array.from({ length: waterGoal }, (_, i) => {
-      const full = i < waterG;
-      const just = i === aguaAnimIdx && full;
-      return `<svg class="glass${full ? ' full' : ''}${just ? ' anim' : ''}" data-g="${i}" viewBox="0 0 24 24" role="img" aria-label="Vaso ${i + 1}${full ? ' (lleno)' : ''}">
-        <defs><clipPath id="gc${i}"><path d="${CILINDRO}"/></clipPath></defs>
-        ${full ? `<rect class="liq" x="6.5" y="5.6" width="11" height="14.8" clip-path="url(#gc${i})"/>` : ''}
-        <path class="rim" d="${CILINDRO}"/>
-        <path class="lip" d="M6.5 4.4h11"/>
-      </svg>`;
-    }).join('');
+    gl.innerHTML = Array.from({ length: waterGoal }, (_, i) =>
+      `<button class="gpill${i < waterG ? ' full' : ''}" data-g="${i}" type="button" aria-label="Vaso ${i + 1}${i < waterG ? ' (lleno)' : ''}"></button>`
+    ).join('');
     aguaAnimIdx = -1;
   };
   drawGlasses();
@@ -148,16 +133,10 @@ export async function render(root, params) {
     waterG = v;
     /* actualizar SOLO la tarjeta de agua: redibujar toda la vista hace parpadear
        las demás tarjetas (gym, macros, comidas). */
-    const badge = root.querySelector('#w-badge');
-    if (badge) badge.textContent = `${waterG}/${waterGoal} vasos`;
-    const wc = root.querySelector('#wcount');
-    if (wc) wc.innerHTML = `${waterG} <small>/ ${waterGoal} vasos</small>`;
-    const less = root.querySelector('#w-less');
-    if (less) less.disabled = waterG === 0;
+    const duoNum = root.querySelector('#water-duo-num');
+    if (duoNum) duoNum.innerHTML = `${waterG} <small>/ ${waterGoal} vasos</small>`;
     drawGlasses();
   };
-  root.querySelector('#w-more').onclick = () => setWater(waterG + 1);
-  root.querySelector('#w-less').onclick = () => setWater(waterG - 1);
   gl.onclick = e => {
     const g = e.target && e.target.closest ? e.target.closest('[data-g]') : null;
     if (!g) return;
@@ -229,13 +208,51 @@ function gymCard(gym, date, bonus, gy) {
 function bar(key, label, val, goal, unit, dec) {
   const pct = goal > 0 ? Math.min(100, (val / goal) * 100) : 0;
   const over = goal > 0 && val > goal;
-  const rest = goal > 0 ? (over ? `+${num(val - goal, dec)} ${unit} sobre la meta` : `faltan ${num(goal - val, dec)} ${unit}`) : 'sin meta';
+  const rest = goal > 0 ? (over ? `+${num(val - goal, dec)} ${unit}` : `faltan ${num(goal - val, dec)} ${unit}`) : 'sin meta';
   return `
     <div class="bar-item">
-      <div class="bar-top"><b>${label}</b><span class="${over ? '' : 'rest'}" style="${over ? 'color:#ff9a9a' : ''}">${num(val, dec)} / ${goal ? num(goal, dec) + ' ' + unit : '—'}</span></div>
+      <div class="bar-top"><b><span class="dot ${key}"></span>${label}</b><span class="${over ? '' : 'rest'}" style="${over ? 'color:#ff9a9a' : ''}">${num(val, dec)} / ${goal ? num(goal, dec) + ' ' + unit : '—'}</span></div>
       <div class="track ${over ? 'over' : ''}"><div class="fill ${key}" style="width:${pct}%"></div></div>
-      <div class="tiny muted" style="margin-top:3px">${rest}</div>
     </div>`;
+}
+
+/* Tarjeta racha (izquierda del mockup) */
+function duoRacha(gym, date, gy) {
+  const hoy = todayISO();
+  const racha = calcRacha(gy.regs, gy.plan, hoy);
+  const dias = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+  const onDays = new Set(Object.keys(gy.regs || {}));
+  const lamps = dias.map((d, i) => {
+    const iso = isoDeSemana(hoy, i);
+    return `<span class="lamp${onDays.has(iso) ? ' on' : ''}"></span>`;
+  }).join('');
+  return `
+    <div class="card duo-card">
+      <div class="card-title"><h3>${icon('flame')} Racha</h3></div>
+      <div class="big-num">${racha.dias} <small>${racha.dias === 1 ? 'día' : 'días'}</small></div>
+      <div class="lamps">${lamps}</div>
+      <div class="lampdays">${dias.map(d => `<span>${d}</span>`).join('')}</div>
+    </div>`;
+}
+
+/* Tarjeta agua (derecha del mockup): pildoras clicables */
+function duoAgua(waterG, waterGoal) {
+  const pills = Array.from({ length: waterGoal }, (_, i) =>
+    `<button class="gpill${i < waterG ? ' full' : ''}" data-g="${i}" type="button" aria-label="Vaso ${i + 1}"></button>`).join('');
+  return `
+    <div class="card duo-card">
+      <div class="card-title"><h3>${icon('droplet')} Agua</h3></div>
+      <div class="big-num"><span id="water-duo-num">${waterG} <small>/ ${waterGoal} vasos</small></span></div>
+      <div class="glasses-pills" id="glasses">${pills}</div>
+    </div>`;
+}
+
+/* ISO de los 7 días de la semana (lunes primero) de una semana dada */
+function isoDeSemana(iso, idxLunes) {
+  const d = fromISODate(iso);
+  const dow = (d.getDay() + 6) % 7;          // 0 = lunes
+  d.setDate(d.getDate() - dow + idxLunes);
+  return d.toISOString().slice(0, 10);
 }
 
 function mealCard(m) {

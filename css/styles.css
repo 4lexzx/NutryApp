@@ -22,10 +22,11 @@
   --accent: #0a84ff;
   --warn: #ff9f0a;
   --danger: #ff453a;
-  --kcal: #ff9f0a;
-  --prot: #64d2ff;
-  --carb: #bf5af2;
-  --grasa: #ff6482;
+  /* Paleta de macros del mockup: kcal verde, prot blanco, carb verde, grasas gris */
+  --kcal: #34c759;
+  --prot: #ffffff;
+  --carb: #34c759;
+  --grasa: #8e8e93;
   --agua: #64d2ff;
   --seg-bg: rgba(120, 120, 128, .36);
   --seg-thumb: #636366;
@@ -57,9 +58,10 @@
   --accent: #007aff;
   --warn: #ff9500;
   --danger: #ff3b30;
-  --prot: #0a84ff;
-  --carb: #af52de;
-  --grasa: #ff2d55;
+  --kcal: #34c759;
+  --prot: #1c1c1e;
+  --carb: #34c759;
+  --grasa: #8e8e93;
   --agua: #0a84ff;
   --seg-bg: rgba(120, 120, 128, .12);
   --seg-thumb: #ffffff;
@@ -1088,3 +1090,164 @@ code.codeblock {
   border-radius: 999px; padding: 3px 9px;
 }
 .am-macro b { color: var(--txt); font-weight: 600; }
+
+/* ============================================================
+   Rediseño tipo mockup (solo estilos nuevos, no tocan la lógica)
+   ============================================================ */
+
+/* --- Hero de calorias alineado a la izquierda + barra verde --- */
+.macro-hero { text-align: left; }
+.macro-hero .big { color: var(--txt); }
+.macro-hero .rest { color: var(--txt-2); }
+.macro-hero .rest b { color: var(--brand); }
+
+/* Barra de calorias (track del hero) mas alta y verde uniforme */
+.hero-track { height: 12px; border-radius: 999px; background: var(--seg-bg); overflow: hidden; margin: 14px 0 4px; }
+.hero-fill { height: 100%; border-radius: 999px; background: var(--brand); transition: width .45s cubic-bezier(.2, .8, .2, 1); }
+
+/* --- Barras de macros del hero: sin etiqueta extra, mas limpias --- */
+.bars .bar-item .bar-top .rest { color: var(--txt-2); }
+.bars .track { height: 10px; }
+
+/* --- Punto de color al lado de cada macro (estilo mockup) --- */
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; vertical-align: 0; margin-right: 7px; }
+.dot.kcal { background: var(--kcal); }
+.dot.prot { background: var(--prot); border: 1px solid var(--hairline); }
+.dot.carb { background: var(--carb); }
+.dot.gras { background: var(--grasa); }
+
+/* --- Fila de dos tarjetas (racha + agua) lado a lado --- */
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.duo > .card { margin-bottom: 0; }
+.duo-card .card-title { margin-bottom: 6px; }
+.duo-card .card-title h3 { font-size: .82rem; font-weight: 500; color: var(--txt-2); }
+.duo-card .big-num { font-size: 1.5rem; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.duo-card .big-num small { font-size: .9rem; font-weight: 600; color: var(--txt-2); }
+
+/* Lamps (dias L M X J V S D) del mockup */
+.lamps { display: flex; gap: 6px; margin-top: 10px; }
+.lamps .lamp { flex: 1; height: 30px; border-radius: 8px; background: var(--seg-bg); }
+.lamps .lamp.on { background: var(--brand); }
+.lampdays { display: flex; gap: 6px; margin-top: 5px; }
+.lampdays span { flex: 1; text-align: center; font-size: .62rem; color: var(--txt-3); }
+
+/* Vasos de agua (pildoras) del mockup */
+.glasses-pills { display: flex; gap: 7px; margin-top: 14px; flex-wrap: wrap; }
+.glasses-pills .gpill {
+  width: 22px; height: 30px; border-radius: 9px;
+  background: var(--seg-bg); border: none; cursor: pointer; padding: 0;
+  transition: background .15s;
+}
+.glasses-pills .gpill.full { background: var(--txt); }
+
+/* --- Tarjeta de comida del mockup: icono cuadrado, kcal a la derecha --- */
+.meal-thumb { border-radius: 14px; }
+.meal-kcal { font-size: 1.15rem; }
+
+/* --- Boton "Agregar cena/ comida" punteado --- */
+.add-meal {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  background: transparent; border: 1.5px dashed var(--line); border-radius: var(--radius);
+  padding: 16px; margin-bottom: 12px; color: var(--txt); cursor: pointer; min-height: 62px;
+}
+.add-meal:active { background: var(--card-2); }
+.add-meal .plus {
+  width: 40px; height: 40px; border-radius: 50%; border: 1.5px dashed var(--line);
+  display: grid; place-items: center; color: var(--txt-2); flex: none;
+}
+.add-meal .am-t { font-weight: 600; }
+.add-meal .am-s { font-size: .8rem; color: var(--txt-3); }
+.add-meal .ic.chev { margin-left: auto; color: var(--txt-3); }
+
+/* --- Toggle estilo mockup (perfil) --- */
+.switch { position: relative; display: inline-block; width: 51px; height: 31px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .slider {
+  position: absolute; cursor: pointer; inset: 0; border-radius: 999px;
+  background: var(--seg-bg); transition: .2s;
+}
+.switch .slider::before {
+  content: ""; position: absolute; height: 27px; width: 27px; left: 2px; bottom: 2px;
+  background: #fff; border-radius: 50%; transition: .2s;
+}
+.switch input:checked + .slider { background: var(--brand); }
+.switch input:checked + .slider::before { transform: translateX(20px); }
+
+/* --- Titulos de grupo en versalitas (mockup: RANKING, PRIVACIDAD) --- */
+.group-title.upper { text-transform: uppercase; letter-spacing: .04em; }
+
+/* --- Social: fila de ranking con posicion y racha --- */
+.rank-row { display: flex; align-items: center; gap: 12px; }
+.rank-pos { font-weight: 700; color: var(--txt-2); width: 18px; text-align: center; }
+
+/* --- Barra de navegacion inferior tipo pill (mockup) --- */
+.bottomnav {
+  left: 12px; right: 12px; bottom: 12px;
+  width: auto; max-width: calc(var(--maxw) - 24px); margin: 0 auto;
+  height: 60px; border-radius: 30px;
+  background: var(--card); border: .5px solid var(--hairline);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .35);
+  display: flex; align-items: center; justify-content: space-around; gap: 0;
+  padding: 0 6px;
+}
+.navitem { flex: 1; height: 100%; gap: 2px; padding-top: 2px; }
+.navitem .navico .ic { width: 21px; height: 21px; }
+.navitem-main { flex: 1; }
+.navitem-main .navico {
+  width: 48px; height: 48px; margin-top: -1px;
+  box-shadow: 0 6px 18px rgba(52, 199, 89, .4);
+}
+.navitem-main .navico .ic { width: 24px; height: 24px; }
+body.locked .bottomnav { display: none; }
+
+/* --- Boton analizar con IA (mockup: verde grande, texto oscuro) --- */
+.btn-analyze {
+  background: var(--brand); color: #05240f; font-weight: 700;
+  border-radius: 16px; min-height: 56px; font-size: 1.02rem;
+}
+
+/* --- Tabs segmentados tipo mockup (Registrar) --- */
+.tabs.segment { background: var(--card); border-radius: 14px; padding: 4px; gap: 4px; }
+.tabs.segment .tab { border-radius: 11px; font-size: .88rem; min-height: 42px; }
+.tabs.segment .tab.active { background: var(--card-2); box-shadow: none; color: var(--txt); }
+
+/* --- Zona de foto punteada (Registrar) --- */
+.dropzone {
+  border: 1.5px dashed var(--line); border-radius: 18px;
+  background: var(--card); padding: 30px 16px; text-align: center;
+}
+.dropzone .dz-ic { color: var(--txt-2); }
+.dropzone .dz-ic .ic { width: 30px; height: 30px; }
+.dropzone .dz-t { font-weight: 700; margin-top: 10px; }
+.dropzone .dz-s { font-size: .82rem; color: var(--txt-3); margin-top: 3px; }
+
+/* --- Perfil: avatar grande con anillo verde, stats e insignias --- */
+.profile-hero { text-align: center; padding: 6px 0 4px; }
+.profile-avatar {
+  width: 96px; height: 96px; border-radius: 26px; margin: 0 auto;
+  display: grid; place-items: center; font-size: 2.1rem; font-weight: 700;
+  background: var(--card-2); color: var(--txt);
+  border: 2px solid var(--brand);
+}
+.profile-name { font-size: 1.3rem; font-weight: 700; margin-top: 12px; }
+.profile-sub { font-size: .82rem; color: var(--txt-2); margin-top: 2px; }
+.profile-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
+.profile-stats .ps { text-align: center; }
+.profile-stats .ps-v { font-size: 1.15rem; font-weight: 700; }
+.profile-stats .ps-k { font-size: .72rem; color: var(--txt-3); margin-top: 1px; }
+.badges-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.badge-tile { text-align: center; }
+.badge-tile .bt-ic {
+  width: 52px; height: 52px; border-radius: 16px; margin: 0 auto 6px;
+  background: var(--card-2); display: grid; place-items: center; color: var(--txt-2);
+}
+.badge-tile .bt-ic .ic { width: 22px; height: 22px; }
+.badge-tile .bt-k { font-size: .72rem; color: var(--txt-2); }
+
+/* --- Filas de toggles (privacidad del perfil, mockup) --- */
+.switch-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 13px 0; border-bottom: .5px solid var(--hairline);
+}
+.switch-row:last-of-type { border-bottom: 0; }
+.switch-row .sr-t { font-weight: 600; font-size: .95rem; }
