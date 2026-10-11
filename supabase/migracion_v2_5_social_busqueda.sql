@@ -10,6 +10,9 @@
 
    Pegar en Supabase → SQL Editor → New query → Run. */
 
+drop function if exists public.buscar_usuario(text);
+drop function if exists public.ver_perfil(uuid);
+
 create or replace function public.buscar_usuario(q text)
 returns table (user_id uuid, usuario text, foto text, bio text,
                meta_kcal int, kcal_hoy int, racha int, cumplio boolean,
