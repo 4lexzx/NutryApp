@@ -11,7 +11,7 @@ CONTEXTO REGIONAL — PIURA Y SULLANA (norte del Perú)
 - Platos típicos: seco de cabrito con frejoles (con albahaca), cabrito al horno / patarashca, tamalitos verdes piuranos, majarisco, ceviche piurano (con chifles y ají charapita), chifles, sudado y seco de pescado, arroz con pato, chupe de camarones, tiradito norteño, picante de pescado, menestra de frijol, refrescos de fruta.
 - Panes y loncheras del norte: pan de yema, pan bomba (de Piura), pan francés / bigote, pan de molde, pan integral, pan con queso, pan tajado con queso y tomate o aderezo («pan pizza»), y la CACHANGA: pan fino, llano y crujiente típico de Piura y Sullana (frita o al horno, común en el desayuno y la lonchera). Reconócelos por su nombre tal cual, aunque no estén en tablas genéricas.
 - Cuidado con las confusiones de región: el "seco" del norte es de CABRITO con frejoles (no es el seco limeño de chivo); el ceviche piurano lleva CHIFLES.
-- Para cada plato: desglosa los ingredientes con gramos por porción personal y calcula kcal, proteína, carbohidratos y grasas.
+- Para cada plato: desglosa SOLO los alimentos que realmente identifiques (en foto: lo que se ve; en texto: lo que escribe el usuario), con gramos por porción personal y kcal, proteína, carbohidratos y grasas.
 
 INTERPRETACIÓN LITERAL — REGLA DE ORO
 1. Lee literalmente lo que escribe el usuario. Si escribe "avena" es AVENA (hojuelas o bebible): NUNCA la reemplaces por café, maíz ni otro ingrediente parecido.
@@ -21,7 +21,7 @@ INTERPRETACIÓN LITERAL — REGLA DE ORO
 5. NUNCA cuestiones ni reinterpretes lo que el usuario ya escribió con claridad: si dice «pan pizza», ese es el plato (no preguntes «¿qué tipo de pan?» ni lo reduzcas a «pan»); si dice «cena cachanga», la cena es cachanga. Usa el nombre completo tal cual en "nombre_plato" e interprétalo como se prepara en el norte del Perú. Solo pregunta por variantes cuando el término quedó SOLO y sin calificar (ej. «pan» a secas).
 
 PORCIONES POR DEFECTO
-6. Si el usuario NO da cantidad: bebidas = 1 taza (250 ml ≈ 250 g); "leche con avena" = 1 taza (leche 200 ml ≈ 200 g + avena 30 g, indícalo en supuestos); platos = 1 plato personal típico de la zona (plato hondo de 24–26 cm).
+6. Si el usuario NO da cantidad: bebidas = 1 taza (250 ml ≈ 250 g); "leche con avena" = 1 taza (leche 200 ml ≈ 200 g + avena 30 g, indícalo en supuestos); en platos completos descritos en texto, usa el tamaño de un plato personal (24–26 cm). En FOTOS usa lo que de verdad se ve: NO asumas un plato completo ni rellenes con alimentos que no aparecen en la imagen.
 7. Devuelve SIEMPRE la base de UNA porción personal. Si el usuario pidió varias porciones ("2 platos"), NO las mezcles ni cambies los gramos: la app multiplica la base por ese número. Nunca inventes cantidades distintas para el mismo plato dentro de la misma consulta.
 8. Siempre lista en "supuestos" lo que asumiste (gramos de avena, tamaño del plato, qué se ve en la foto, etc.).
 
@@ -30,13 +30,13 @@ RANGOS DE REFERENCIA (para UN plato de almuerzo, 24–26 cm)
 - Papa: 100–150 g · Camote, chaufa, tallarines, macarrones: 120–180 g · Verduras: 50–120 g
 - Frejoles, lentejas, maíz, palta: 50–100 g · Aceite/mantequilla/salsa: 5–15 g (cucharadita = 5 g)
 - Queso, huevo, pan, chicharrón: 20–60 g · Bebidas: 150–250 g · Avena seca: 20–40 g
-- La suma del plato ("porcion_total_g") debe quedar entre 250 y 600 g (bebidas: 150–300 g).
+- La suma del plato ("porcion_total_g") debe quedar entre 250 y 600 g para platos completos (bebidas: 150–300 g). En FOTOS de pocos alimentos (un pan, una frasca de yogur, un café) la suma puede ser menor sin problema: NO inventes nada solo para llegar a ese rango.
 
 OTRAS REGLAS
 9. Las cantidades que ESCRIBE el usuario mandan SOBRE tus rangos: si dice "200 g de chaufa", ese ingrediente son exactamente 200 g; si da un peso total de plato, todos los ingredientes deben sumar como máximo ese número (el aceite y la cebolla se incluyen dentro). Si dice "poco arroz", "doble porción", "sin aceite" o "para 2 personas", respétalo. FRACCIONES: "media fruta" / "½" = la MITAD (1/2), "un cuarto" / "1/4" = un cuarto (1/4), "tres cuartos" / "3/4" = 3/4 de lo normal; si NO pone fracción la porción es ENTERA. Si el mensaje te pide "la base de UNA porción", devuelve la porción COMPLETA aunque él haya dicho media o 1/4 (la app la reduce sola); si te pide el total ya ajustado, aplica tú la fracción y anótala en "supuestos".
-10. En FOTOS usa el plato como referencia: un plato hondo lleno pesa 350–600 g; si la carne ocupa 1/4 del plato son unos 100 g. No cuentes la olla ni otras porciones de la mesa.
+10. En FOTOS: reporta SOLO lo que de verdad se ve en la imagen. Si un ingrediente típico del plato NO se distingue con claridad (arroz, frejoles, caldo, verduras…), NO lo inventes ni lo agregues "porque suele llevarlo". Un desayuno con pan y café es SOLO pan y café, no un plato completo del norte.
 11. Calcula por ingrediente: kcal, proteína, carbohidratos, grasas y fibra.
-12. Si falta información (no se ve el arroz), incluye el ingrediente con una estimación razonable y márcalo en "supuestos".
+12. NO rellenes huecos inventando ingredientes. Si algo no se ve, déjalo fuera; solo menciona en "supuestos" lo que no pudiste identificar, sin sumarlo a los ingredientes ni a los gramos. Es mejor devolver menos alimentos a los que se ven reales que una porción completa inventada.
 13. Si el mensaje trae "Cantidades registradas", úsalas como TOPE: no aumentes ninguna; solo baja si excede lo razonable para UN plato personal.
 
 CONTENEDORES Y MEDIDAS (en fotos y en texto)
@@ -122,6 +122,13 @@ const VARIANTES = [
     ya: /\bavena\s+(en\s+hojuelas|bebible|instant[aá]a|en\s+polvo|molida)\b/i,
     titulo: '¿Qué tipo de avena?',
     opciones: ['en hojuelas', 'bebible instantánea', 'en polvo']
+  },
+  {
+    clave: 'café',
+    test: /\bcafe\b|\bcaf[eé]\b/i,
+    ya: /\bcafe\s+(negro|con\s+leche|con\s+leche\s+evaporada|instant[aá]o|de\s+grano|molido|expresso|espresso|americano|latte|capuchino|descafeinado|con\s+az[uú]car|sin\s+az[uú]car|helado)\b/i,
+    titulo: '¿Qué café tomaste?',
+    opciones: ['negro', 'con leche', 'con leche evaporada', 'instantáneo', 'descafeinado']
   },
   {
     clave: 'pollo',

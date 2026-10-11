@@ -460,8 +460,14 @@ function fusionarFotos(rs) {
     for (const it of (r.items || [])) {
       const k = claveConsulta(it.nombre);
       const dup = k && items.find(x => x.__k === k);
+      const g = Number(it.gramos) || 0;
       if (dup) {
-        dup.gramos = (Number(dup.gramos) || 0) + (Number(it.gramos) || 0);   // macros: per100 × gramos
+        // Varios ángulos del MISMO plato muestran el mismo alimento: no se suma
+        // (eso triplicaría el desayuno), se toma la estimación MÁS alta de ese alimento.
+        if (g > (Number(dup.gramos) || 0)) {
+          dup.gramos = g;
+          dup.kcal = it.kcal; dup.proteina = it.proteina; dup.carbohidratos = it.carbohidratos; dup.grasas = it.grasas; dup.fibra = it.fibra;
+        }
         if (it.nota && !dup.nota) dup.nota = it.nota;
       } else {
         items.push({ ...it, __k: k || items.length });
