@@ -13,6 +13,12 @@ export async function listarNotifs() {
   return (r && Array.isArray(r.items)) ? r.items : [];
 }
 
+/** Notificaciones visibles (las quitadas quedan guardadas para que no
+    se generen solas de nuevo ese día, pero no se muestran). */
+export async function notifsVisibles() {
+  return (await listarNotifs()).filter(i => !i.quitada);
+}
+
 async function guardar(items) {
   items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
   const cortos = items.slice(0, 50);
@@ -21,7 +27,7 @@ async function guardar(items) {
 }
 
 export async function noLeidas() {
-  const items = await listarNotifs();
+  const items = await notifsVisibles();
   return items.filter(i => !i.leida).length;
 }
 
@@ -45,8 +51,26 @@ export async function agregarNotif(notif) {
   await actualizarBadge();
 }
 
-export async function marcarTodasLeidas() {
+/** Quita una notificación de la lista (queda marcada para no regenerarse). */
+export async function borrarNotif(id) {
   const items = await listarNotifs();
+  const i = items.findIndex(x => x.id === id);
+  if (i < 0) return;
+  items[i].quitada = true;
+  await guardar(items);
+  await actualizarBadge();
+}
+
+/** Quita todas las notificaciones de la lista. */
+export async function limpiarTodas() {
+  const items = await listarNotifs();
+  items.forEach(i => { i.quitada = true; });
+  await guardar(items);
+  await actualizarBadge();
+}
+
+export async function marcarTodasLeidas() {
+  const items = await notifsVisibles();
   items.forEach(i => { i.leida = true; });
   await guardar(items);
   await actualizarBadge();
@@ -109,7 +133,7 @@ export async function revisarExcesos(date) {
 
 async function pedirRecomendacionesIA(date) {
   const items = await listarNotifs();
-  const pendientes = items.filter(i => i.pendiente && i.fecha === date && i.tipo === 'exceso');
+  const pendientes = items.filter(i => i.pendiente && !i.quitada && i.fecha === date && i.tipo === 'exceso');
   if (!pendientes.length) return;
   const settings = await getSettings();
   if (!settings.apiKey) return;
@@ -148,17 +172,18 @@ async function pedirRecomendacionesIA(date) {
 }
 
 /* ---------- Panel de notificaciones (sheet) ---------- */
-export async function abrirPanel() {
-  const items = await listarNotifs();
-  const html = items.length ? items.map(n => `
+function htmlNotifs(items) {
+  if (!items.length) return '';
+  return items.map(n => `
     <div class="notif-item ${n.leida ? '' : 'nueva'}">
       <div class="notif-head">
         <span class="notif-ico">${icon(n.macro === 'kcal' ? 'flame' : n.macro === 'protein' ? 'dumbbell' : n.macro === 'carbs' ? 'leaf' : 'alert')}</span>
-        <div>
+        <div class="notif-txt">
           <b>${esc(n.titulo)}</b>
           <div class="small muted">${esc(n.cuerpo)}</div>
           <div class="tiny muted">${esc(n.fecha)}</div>
         </div>
+        <button class="notif-x" data-del="${n.id}" type="button" aria-label="Quitar notificación">${icon('x')}</button>
       </div>
       ${n.platos && n.platos.length ? `
         <div class="notif-platos">
@@ -172,22 +197,71 @@ export async function abrirPanel() {
         </div>
       ` : (n.pendiente ? `<div class="tiny muted" style="margin-top:6px">Generando recomendaciones…</div>` : (n.errorIA ? `<div class="tiny muted" style="margin-top:6px">${esc(n.errorIA)}</div>` : ''))}
     </div>
-  `).join('') : `
-    <div class="empty">
-      <span class="ico">${icon('bell')}</span>
-      <b>Sin notificaciones</b>
-      <p class="small muted">Cuando superes alguna de tus metas (grasas, carbohidratos, etc.) te avisaré aquí con platos que te convienen.</p>
-    </div>
-  `;
+  `).join('');
+}
+
+const VACIO = `
+  <div class="empty">
+    <span class="ico">${icon('bell')}</span>
+    <b>Sin notificaciones</b>
+    <p class="small muted">Cuando superes alguna de tus metas (grasas, carbohidratos, etc.) te avisaré aquí con platos que te convienen.</p>
+  </div>`;
+
+export async function abrirPanel() {
+  let items = await notifsVisibles();
   const s = openSheet(`
     <h2>${icon('bell')} Notificaciones</h2>
-    <div class="notif-lista">${html}</div>
-    ${items.length ? `<button class="btn btn-ghost btn-block" id="notif-leidas" style="margin-top:12px">Marcar todas como leídas</button>` : ''}
-  `);
-  const btnLeidas = s.root.querySelector('#notif-leidas');
-  if (btnLeidas) btnLeidas.onclick = async () => {
+    <div class="notif-lista">${items.length ? htmlNotifs(items) : VACIO}</div>
+    <div class="notif-acciones" ${items.length ? '' : 'hidden'}>
+      <button class="btn btn-ghost" id="notif-leidas" type="button">Marcar todas como leídas</button>
+      <button class="btn btn-ghost btn-danger" id="notif-limpiar" type="button">Limpiar todas</button>
+    </div>`);
+  const lista = s.root.querySelector('.notif-lista');
+  const acciones = s.root.querySelector('.notif-acciones');
+
+  const refrescar = async () => {
+    items = await notifsVisibles();
+    lista.innerHTML = items.length ? htmlNotifs(items) : VACIO;
+    acciones.hidden = !items.length;
+    enganchar();
+  };
+
+  const enganchar = () => {
+    lista.querySelectorAll('[data-del]').forEach(b => {
+      b.onclick = async () => {
+        b.disabled = true;
+        await borrarNotif(Number(b.dataset.del));
+        await refrescar();
+      };
+    });
+  };
+  enganchar();
+
+  s.root.querySelector('#notif-leidas').onclick = async () => {
     await marcarTodasLeidas();
-    s.close();
+    await refrescar();
     toast('Notificaciones marcadas como leídas.', 'ok');
+  };
+
+  /* "Limpiar todas": se confirma tocando dos veces en el mismo botón
+     (sin abrir otra hoja encima, para no chocar con el gesto de cierre). */
+  const btnLimpiar = s.root.querySelector('#notif-limpiar');
+  let armado = 0;
+  btnLimpiar.onclick = async () => {
+    if (!armado) {
+      armado = 1;
+      btnLimpiar.textContent = '¿Seguro? Toca otra vez';
+      setTimeout(() => {
+        if (!armado) return;
+        armado = 0;
+        btnLimpiar.textContent = 'Limpiar todas';
+      }, 3000);
+      return;
+    }
+    armado = 0;
+    btnLimpiar.textContent = 'Limpiar todas';
+    await limpiarTodas();
+    await refrescar();
+    toast('Notificaciones limpiadas.', 'ok');
   };
 }

@@ -1,7 +1,7 @@
 /* Punto de entrada: router, tema, instalación PWA y service worker. */
 
 import { getSettings, DB } from './db.js';
-import { toast } from './util.js';
+import { toast, openSheet } from './util.js';
 import { initSonidos, setSonidos } from './sound.js';
 import { initRecordatorios } from './notif.js';
 import { seedUsers, isAuthed, clearSession } from './auth.js';
@@ -394,6 +394,33 @@ function prepararNubeUI() {
   };
 }
 
+/* ---------- Menú "+" (Agregar) ---------- */
+function abrirMenuAgregar() {
+  const items = [
+    { href: '#/registrar', icon: 'utensils', label: 'Comida', sub: 'Foto, texto o manual' },
+    { href: '#/gym', icon: 'dumbbell', label: 'Gimnasio', sub: 'Horas, músculos y cardio' },
+    { href: '#/batido', icon: 'zap', label: 'Batido', sub: 'Arma tu batido con licuadora' },
+    { href: '#/simulador', icon: 'calculator', label: 'Simular comida', sub: 'Estima sin registrar' }
+  ];
+  const html = `
+    <h3 style="margin:4px 0 12px">¿Qué quieres agregar?</h3>
+    <div class="add-menu">
+      ${items.map(it => `
+        <a class="add-item" href="${it.href}">
+          <span class="add-ico">${icon(it.icon)}</span>
+          <span class="add-txt"><b>${it.label}</b><span class="small muted">${it.sub}</span></span>
+          <span class="add-chev">${icon('chevronRight')}</span>
+        </a>`).join('')}
+    </div>`;
+  const sheet = openSheet(html);
+  sheet.querySelectorAll('.add-item').forEach(a => {
+    a.addEventListener('click', () => {
+      // cierra la hoja al navegar (el sheet back se quita solo al cambiar hash)
+      setTimeout(() => { const b = document.querySelector('.sheet-back'); if (b) b.remove(); }, 0);
+    });
+  });
+}
+
 /* ---------- Init ---------- */
 async function init() {
   await DB.open();
@@ -424,6 +451,10 @@ async function init() {
     applyTheme();
     toast(next === 'dark' ? 'Tema oscuro' : 'Tema claro', 'ok');
   };
+
+  /* Botón "+" del bottom nav: abre menú con las opciones de registro */
+  const btnAdd = document.getElementById('btn-add');
+  if (btnAdd) btnAdd.onclick = () => abrirMenuAgregar();
 
   window.addEventListener('hashchange', route);
   if (!location.hash) location.hash = '#/hoy';

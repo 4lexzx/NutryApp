@@ -164,37 +164,31 @@ export function openSheet(html, opts = {}) {
     window.addEventListener('popstate', onPop);
   }
 
-  /* Arrastrar hacia abajo para cerrar: toda la cabecera es zona de agarre */
+  /* Arrastrar hacia abajo para cerrar: desde la cabecera (barra de agarre) o
+     desde cualquier punto de la hoja mientras el contenido esté al tope del
+     scroll (igual que las hojas nativas de iOS/Android). */
   if (!opts.sticky) {
     let startY = 0, dragging = false, started = false;
     const threshold = 70;
-    dragZone.addEventListener('pointerdown', e => {
-      // no robar el gesto si tocan un botón/enlace dentro de la cabecera
-      if (e.target.closest('button, a, input, select, textarea')) return;
-      dragging = true; started = false;
-      startY = e.clientY;
-    });
-    dragZone.addEventListener('pointermove', e => {
-      if (!dragging) return;
-      const dy = e.clientY - startY;
-      if (!started) {
-        // solo empezar a arrastrar si el movimiento es claramente hacia abajo
-        if (dy < 6) { dragging = false; return; }
-        started = true;
-        sheet.style.transition = 'none';
-        try { dragZone.setPointerCapture(e.pointerId); } catch (_) {}
-      }
-      const d = Math.max(0, dy);
+    const esInteractivo = t => !!(t && t.closest && t.closest('button, a, input, select, textarea'));
+    const puedeIniciar = (t, clientX) => {
+      if (esInteractivo(t)) return false;
+      // no arrastrar si empiezan sobre la barra de scroll del propio sheet
+      const r = sheet.getBoundingClientRect();
+      if (clientX != null && t === sheet && clientX > r.right - 16) return false;
+      if (dragZone.contains(t)) return true;   // la barra de agarre, siempre
+      return sheet.scrollTop <= 0;             // el contenido, solo al tope
+    };
+    const pintar = y => {
+      const d = Math.max(0, y - startY);
       sheet.style.transform = `translateY(${d}px)`;
       back.style.opacity = String(Math.max(0.25, 1 - d / 320));
-    });
-    const endDrag = e => {
-      if (!dragging) { return; }
-      dragging = false;
-      if (!started) return;
-      const dy = Math.max(0, (e.clientY != null ? e.clientY : startY) - startY);
+    };
+    const empezar = () => { started = true; sheet.style.transition = 'none'; };
+    const soltar = y => {
+      const d = Math.max(0, (y != null ? y : startY) - startY);
       sheet.style.transition = 'transform .25s ease, opacity .25s ease';
-      if (dy > threshold) {
+      if (d > threshold) {
         sheet.style.transform = 'translateY(100%)';
         back.style.opacity = '0';
         setTimeout(close, 200);
@@ -203,14 +197,69 @@ export function openSheet(html, opts = {}) {
         back.style.opacity = '1';
       }
     };
-    dragZone.addEventListener('pointerup', endDrag);
-    dragZone.addEventListener('pointercancel', () => {
-      if (!dragging) return;
-      dragging = false;
-      if (!started) return;
+    const cancelar = y => {
+      startY = y != null ? y : startY;
       sheet.style.transition = 'transform .25s ease';
       sheet.style.transform = 'translateY(0)';
       back.style.opacity = '1';
+    };
+
+    /* Ratón / lápiz */
+    sheet.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'touch') return;    // lo manejan los eventos touch
+      if (!puedeIniciar(e.target, e.clientX)) return;
+      dragging = true; started = false; startY = e.clientY;
+    });
+    sheet.addEventListener('pointermove', e => {
+      if (!dragging || e.pointerType === 'touch') return;
+      const dy = e.clientY - startY;
+      if (!started) {
+        if (dy < 6) return;
+        empezar();
+        try { sheet.setPointerCapture(e.pointerId); } catch (_) {}
+      }
+      pintar(e.clientY);
+    });
+    const finRaton = e => {
+      if (!dragging || e.pointerType === 'touch') return;
+      dragging = false;
+      if (!started) return;
+      started = false;
+      soltar(e.clientY);
+    };
+    sheet.addEventListener('pointerup', finRaton);
+    sheet.addEventListener('pointercancel', e => {
+      if (!dragging || e.pointerType === 'touch') return;
+      dragging = false;
+      if (started) { started = false; cancelar(); }
+    });
+
+    /* Táctil: con touchmove evitamos que el navegador se quede el gesto
+       como scroll una vez que el movimiento es claramente hacia abajo. */
+    sheet.addEventListener('touchstart', e => {
+      if (e.touches.length !== 1) return;
+      if (!puedeIniciar(e.target, e.touches[0].clientX)) return;
+      dragging = true; started = false; startY = e.touches[0].clientY;
+    }, { passive: true });
+    sheet.addEventListener('touchmove', e => {
+      if (!dragging || e.touches.length !== 1) return;
+      const y = e.touches[0].clientY;
+      if (y - startY < 6) return;      // aún no: puede ser scroll normal
+      e.preventDefault();              // reclamamos el gesto para la hoja
+      if (!started) empezar();
+      pintar(y);
+    }, { passive: false });
+    sheet.addEventListener('touchend', e => {
+      if (!dragging) return;
+      dragging = false;
+      if (!started) return;
+      started = false;
+      soltar(e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientY : null);
+    });
+    sheet.addEventListener('touchcancel', () => {
+      if (!dragging) return;
+      dragging = false;
+      if (started) { started = false; cancelar(); }
     });
   }
 
