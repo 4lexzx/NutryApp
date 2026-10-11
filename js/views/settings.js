@@ -11,7 +11,7 @@ import { haySesion, emailSesion, emailNubeDe, pendientes } from '../cloud.js';
 import { setSonidos, clic } from '../sound.js';
 import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe } from '../notif.js';
 
-const VERSION = '2.2.4';
+const VERSION = '2.2.5';
 let hAct = null;   // oyente del evento "hay actualización" (uno solo, sin duplicar)
 
 export async function render(root) {
@@ -43,8 +43,9 @@ const cuentaOtra = conNube && !!currentUser() &&
     ${instalada ? '' : `
     <div class="card">
       <div class="card-title"><h3>${icon('smartphone')} Instalar en tu celular</h3></div>
-      <p class="small muted">Esta es una PWA: se instala como una app normal, con ícono propio y pantalla completa,
-        pero sin pasar por la Play Store.</p>
+      <p class="small muted">Se instala como una app normal, con ícono propio y pantalla completa, sin pasar por
+        la Play Store. <b>Con la app instalada el ícono se actualiza solo</b> cuando cambia; si solo la usas como
+        acceso de pantalla de inicio, Android no lo renueva nunca.</p>
       <div class="col">
         <button class="btn btn-primary btn-block" id="s-install" type="button">${icon('download')} Instalar Nutri Gym</button>
         <div class="tiny muted" id="s-install-hint">Si no está disponible, abre esta página con <b>Chrome</b> → menú ⋮ →

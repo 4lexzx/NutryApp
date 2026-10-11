@@ -148,12 +148,29 @@ function setupInstall() {
     window.__nutriInstall = { canInstall: true, prompt: () => e.prompt(), userChoice: e.userChoice };
     const b = document.getElementById('btn-install');
     if (b) b.classList.remove('hidden');
+
+    /* Android NO repinta el ícono de un acceso de pantalla de inicio: eso solo
+       pasa cuando la app está instalada como app de verdad (WebAPK). Así que si
+       el navegador ofrece instalar, lo pedimos SOLA una vez (una sola
+       confirmación del sistema; no se puede evitar) en lugar de esperar a que
+       el usuario busque el menú de Chrome. Se recuerda en localStorage para no
+       volver a molestar. */
+    const yaInstalada = (navigator.standalone === true) ||
+      window.matchMedia('(display-mode: standalone)').matches;
+    const local = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname);
+    if (!yaInstalada && !local && localStorage.getItem('ng.autoInst') !== '1') {
+      setTimeout(() => {
+        if (!window.__nutriInstall) return;
+        localStorage.setItem('ng.autoInst', '1');
+        try { e.prompt(); } catch (err) { /* Chrome puede ignorarlo: ya queda el botón */ }
+      }, 3500);
+    }
   });
   window.addEventListener('appinstalled', () => {
     window.__nutriInstall = null;
     const b = document.getElementById('btn-install');
     if (b) b.classList.add('hidden');
-    toast('Nutri Gym instalada en tu dispositivo.', 'ok');
+    toast('¡Nutri Gym instalada! Su ícono se actualizará solo en el futuro.', 'ok');
   });
   const b = document.getElementById('btn-install');
   if (b) b.onclick = async () => {
