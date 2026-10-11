@@ -140,10 +140,52 @@ export function openSheet(html, opts = {}) {
   back.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`;
   root.appendChild(back);
   const sheet = back.querySelector('.sheet');
+  const grab = sheet.querySelector('.grab');
   const close = () => { back.remove(); document.removeEventListener('keydown', onKey); };
   const onKey = e => { if (e.key === 'Escape') close(); };
   document.addEventListener('keydown', onKey);
   back.addEventListener('click', e => { if (e.target === back && !opts.sticky) close(); });
+
+  /* Arrastrar el .grab hacia abajo para cerrar (patrón iOS/Android) */
+  if (!opts.sticky) {
+    let startY = 0, dragging = false;
+    const threshold = 80;
+    grab.addEventListener('pointerdown', e => {
+      dragging = true;
+      startY = e.clientY;
+      sheet.style.transition = 'none';
+      try { grab.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    grab.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      const dy = Math.max(0, e.clientY - startY);
+      sheet.style.transform = `translateY(${dy}px)`;
+      back.style.opacity = String(Math.max(0.25, 1 - dy / 320));
+    });
+    const endDrag = e => {
+      if (!dragging) return;
+      dragging = false;
+      const dy = Math.max(0, (e.clientY != null ? e.clientY : startY) - startY);
+      sheet.style.transition = 'transform .25s ease, opacity .25s ease';
+      if (dy > threshold) {
+        sheet.style.transform = 'translateY(100%)';
+        back.style.opacity = '0';
+        setTimeout(close, 200);
+      } else {
+        sheet.style.transform = 'translateY(0)';
+        back.style.opacity = '1';
+      }
+    };
+    grab.addEventListener('pointerup', endDrag);
+    grab.addEventListener('pointercancel', () => {
+      if (!dragging) return;
+      dragging = false;
+      sheet.style.transition = 'transform .25s ease';
+      sheet.style.transform = 'translateY(0)';
+      back.style.opacity = '1';
+    });
+  }
+
   return { close, sheet, root: back };
 }
 
