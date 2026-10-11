@@ -613,3 +613,62 @@ export async function recomendarPlatos({ apiKey, model, perfil, metas, consumido
     porque: String(p.porque || '').slice(0, 160)
   }));
 }
+
+/* ---------- Simulador de comida: estimar macros de una comida sin registrarla ---------- */
+const SIMULAR_PROMPT = `Eres un nutricionista del norte del Perú (Piura y Sullana).
+Dada la descripción de una comida que el usuario quiere SIMULAR (no registrar), estima sus macros totales de forma realista para una porción típica de la zona.
+Devuelve SOLO un JSON: { "nombre": "string", "kcal": number, "protein": number, "carbs": number, "fat": number, "comentario": "string" }
+"protein", "carbs" y "fat" son en GRAMOS, "kcal" son calorías totales, y "comentario" es 1 frase breve sobre el plato (ej: "Buena fuente de proteína; cuidado con el aceite si ya pasaste de grasas").`;
+
+export async function simularComida({ apiKey, model, descripcion }) {
+  const parts = [{ text: SIMULAR_PROMPT + '\n\nComida a simular: ' + descripcion }];
+  const raw = await callGemini({ parts, apiKey, model });
+  const data = extractJSON(raw);
+  if (!data) throw new AIError('La IA no devolvió una estimación válida.', 'json');
+  return {
+    nombre: String(data.nombre || 'Comida simulada').slice(0, 60),
+    kcal: Math.max(0, Math.round(Number(data.kcal) || 0)),
+    protein: Math.max(0, Math.round(Number(data.protein) || 0)),
+    carbs: Math.max(0, Math.round(Number(data.carbs) || 0)),
+    fat: Math.max(0, Math.round(Number(data.fat) || 0)),
+    comentario: String(data.comentario || '').slice(0, 160)
+  };
+}
+
+/* ---------- Sugerencias de comida para el simulador: prioriza proteína y lo que falta ---------- */
+const SUGERIR_COMIDA_PROMPT = `Eres un nutricionista y chef del NORTE DEL PERÚ (Piura y Sullana).
+Dado lo que le falta al usuario hoy y el tipo de comida que va a simular, sugiere 3 platos que:
+1. Sean ALTOS en PROTEÍNA (la prioridad absoluta).
+2. Sean bajos en lo que el usuario ya pasó o está cerca de pasar (sobre todo grasas si ya excedió).
+3. Quepan en las calorías que le quedan.
+4. Sean platos típicos del norte del Perú o comunes de gimnasio.
+5. Sean realistas para el tipo de comida indicado (desayuno, almuerzo, cena o snack).
+Devuelve SOLO un JSON: { "platos": [ { "nombre": "string", "porcion": "string", "kcal": number, "protein": number, "carbs": number, "fat": number, "porque": "string" } ] }
+"protein", "carbs" y "fat" son en GRAMOS. "porque" explica por qué encaja (1 frase, ej: "Alta en proteína y baja en grasas; te faltan 40 g de proteína").`;
+
+export async function sugerirComidasSimulador({ apiKey, model, perfil, metas, consumido, excedidos, faltantes, tipo }) {
+  const nom = { kcal: 'calorías', protein: 'proteína', carbs: 'carbohidratos', fat: 'grasas' };
+  const g = v => Math.round(v) + ' g';
+  const contexto = [
+    `Tipo de comida a simular: ${tipo}.`,
+    `Consumido hoy: kcal ${Math.round(consumido.kcal)}, proteína ${g(consumido.protein)}, carbos ${g(consumido.carbs)}, grasas ${g(consumido.fat)}.`,
+    `Metas: kcal ${Math.round(metas.kcal)}, proteína ${g(metas.protein)}, carbos ${g(metas.carbs)}, grasas ${g(metas.fat)}.`,
+    `Excedido: ${['kcal', 'protein', 'carbs', 'fat'].filter(k => excedidos[k] > 0).map(k => `${nom[k]} ${g(excedidos[k])}`).join(', ') || 'nada'}.`,
+    `Falta: ${['kcal', 'protein', 'carbs', 'fat'].filter(k => faltantes[k] > 0).map(k => `${nom[k]} ${g(faltantes[k])}`).join(', ') || 'nada'}.`,
+    `Peso: ${perfil && perfil.weight ? perfil.weight + ' kg' : 'no indicado'}. Objetivo: ${perfil && perfil.objective ? perfil.objective : 'no indicado'}.`
+  ].join('\n');
+
+  const parts = [{ text: SUGERIR_COMIDA_PROMPT + '\n\n' + contexto }];
+  const raw = await callGemini({ parts, apiKey, model });
+  const data = extractJSON(raw);
+  if (!data || !Array.isArray(data.platos)) throw new AIError('La IA no devolvió la lista de platos.', 'json');
+  return data.platos.slice(0, 3).map(p => ({
+    nombre: String(p.nombre || 'Plato').slice(0, 60),
+    porcion: String(p.porcion || '').slice(0, 40),
+    kcal: Math.max(0, Math.round(Number(p.kcal) || 0)),
+    protein: Math.max(0, Math.round(Number(p.protein) || 0)),
+    carbs: Math.max(0, Math.round(Number(p.carbs) || 0)),
+    fat: Math.max(0, Math.round(Number(p.fat) || 0)),
+    porque: String(p.porque || '').slice(0, 160)
+  }));
+}

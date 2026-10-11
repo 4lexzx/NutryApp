@@ -87,6 +87,7 @@ function renderFoto(body, date, hasKey) {
           <button class="ph-x" data-ph-del="${i}" type="button" aria-label="Quitar foto ${i + 1}">✕</button></div>`).join('')}</div>`
       : `<div class="empty" style="padding:22px 12px"><span class="ico">${icon('utensils')}</span><span class="small">Sube una o más fotos, o escribe el plato abajo</span></div>`}
       <textarea id="f-desc" class="ta-round" rows="3" placeholder="Describe tu plato (opcional)">${esc(state.desc)}</textarea>
+      <a class="bat-row" href="#/simulador?d=${date}">${icon('calculator')} Simular comida ${icon('chevronRight')}</a>
       <a class="bat-row" href="#/batido?d=${date}">${icon('zap')} Arma tu batido ${icon('chevronRight')}</a>
       <button class="btn btn-analyze btn-lg btn-block" style="margin-top:12px" id="f-go" type="button">${icon('sparkles')} Analizar con la IA${n > 1 ? ` (${n} fotos)` : ''}</button>
       ${!hasKey ? `<div class="hint">Falta tu API key: pégala en <a href="#/ajustes">Ajustes</a>.</div>` : ''}
@@ -112,6 +113,7 @@ function renderTexto(body, date, hasKey) {
     <div class="card">
       <div class="card-title"><h3>${icon('note')} Describe tu plato</h3></div>
       <textarea id="t-desc" class="ta-round" rows="4" placeholder="Ej. 1 lomo saltado con arroz (poco), 1 vaso de chicha morada, 1 presa de pollo a la brasa">${esc(state.desc)}</textarea>
+      <a class="bat-row" href="#/simulador?d=${date}">${icon('calculator')} Simular comida ${icon('chevronRight')}</a>
       <a class="bat-row" href="#/batido?d=${date}">${icon('zap')} Arma tu batido ${icon('chevronRight')}</a>
       <button class="btn btn-analyze btn-lg btn-block" style="margin-top:12px" id="t-go" type="button">${icon('sparkles')} Analizar con la IA</button>
       ${!hasKey ? `<div class="hint">Falta tu API key: pégala en <a href="#/ajustes">Ajustes</a>.</div>` : ''}

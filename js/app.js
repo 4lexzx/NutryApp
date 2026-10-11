@@ -16,6 +16,7 @@ import * as ia from './views/ia.js';
 import * as login from './views/login.js';
 import * as gym from './views/gym.js';
 import * as batido from './views/batido.js';
+import * as simulador from './views/simulador.js';
 import * as social from './views/social.js';
 import * as amigo from './views/amigo.js';
 
@@ -34,7 +35,7 @@ function parseHash() {
   return { path, query };
 }
 
-const NAV_OF = { hoy: 'hoy', registrar: 'registrar', nuevo: 'registrar', editar: 'registrar', historial: 'historial', social: 'social', amigo: 'social', perfil: 'perfil', ajustes: 'ajustes', ia: 'ajustes', gym: 'hoy', batido: 'registrar' };
+const NAV_OF = { hoy: 'hoy', registrar: 'registrar', nuevo: 'registrar', editar: 'registrar', historial: 'historial', social: 'social', amigo: 'social', perfil: 'perfil', ajustes: 'ajustes', ia: 'ajustes', gym: 'hoy', batido: 'registrar', simulador: 'registrar' };
 
 /* Refresco de la vista ACTUAL sin spinner y sin borrar la pantalla.
    Se usa cuando la nube baja datos o al volver de segundo plano: si no,
@@ -104,6 +105,7 @@ async function route(opts = {}) {
       case 'ia': await ia.render(root, path.slice(1), query); break;
       case 'gym': await gym.render(root, path.slice(1), query); break;
       case 'batido': await batido.render(root, path.slice(1), query); break;
+      case 'simulador': await simulador.render(root, path.slice(1), query); break;
       default:
         location.hash = '#/hoy';
     }
