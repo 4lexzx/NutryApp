@@ -331,3 +331,131 @@ export function parseCantidad(txt) {
   if (!isFinite(v) || v <= 0 || v > 20) return null;
   return Math.round(v * 100) / 100;
 }
+
+/* ---------- Recorte de imagen (foto de perfil) ----------
+   Muestra un recuadro circular: se arrastra para encuadrar y se usa la
+   rueda/pellizco para zoom. Devuelve un dataURL cuadrado recortado. */
+export function cropImage(dataUrl, { size = 320, quality = 0.82, out = 'image/jpeg' } = {}) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const root = document.getElementById('modal-root');
+      const back = document.createElement('div');
+      back.className = 'crop-back';
+      back.innerHTML = `
+        <div class="crop-stage">
+          <div class="crop-circle"><img class="crop-img" src="${dataUrl}" alt="" draggable="false"></div>
+        </div>
+        <div class="crop-bar">
+          <button class="btn btn-ghost" id="crop-cancel" type="button">Cancelar</button>
+          <div class="crop-hint">Arrastra para encuadrar · pellizca o rueda para zoom</div>
+          <button class="btn btn-primary" id="crop-ok" type="button">Usar foto</button>
+        </div>`;
+      root.appendChild(back);
+
+      const stage = back.querySelector('.crop-stage');
+      const circle = back.querySelector('.crop-circle');
+      const el = back.querySelector('.crop-img');
+
+      // tamaño del recuadro circular (en px de pantalla)
+      const F = Math.min(stage.clientWidth, stage.clientHeight) * 0.82;
+      circle.style.width = circle.style.height = F + 'px';
+
+      const nw = img.naturalWidth, nh = img.naturalHeight;
+      let s = Math.max(F / nw, F / nh);        // escala mínima: que tape el círculo
+      let tx = 0, ty = 0;                       // traslación de la imagen
+      let minS = s, maxS = s * 4;
+
+      const centrar = () => {
+        tx = (F - nw * s) / 2;
+        ty = (F - nh * s) / 2;
+      };
+      const clamp = () => {
+        // la imagen siempre debe cubrir el círculo (0..F)
+        const w = nw * s, h = nh * s;
+        tx = Math.min(0, Math.max(F - w, tx));
+        ty = Math.min(0, Math.max(F - h, ty));
+      };
+      const apply = () => { el.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`; };
+      centrar(); clamp(); apply();
+
+      // zoom con rueda del mouse
+      const zoomAt = (px, py, factor) => {
+        const ns = Math.min(maxS, Math.max(minS, s * factor));
+        const k = ns / s;
+        tx = px - (px - tx) * k;
+        ty = py - (py - ty) * k;
+        s = ns;
+        clamp(); apply();
+      };
+
+      // arrastre + pellizco con pointer events
+      const puntos = new Map();
+      let arrastrando = false, last = null, pinchDist = 0;
+      const posRel = e => {
+        const r = circle.getBoundingClientRect();
+        return { x: e.clientX - r.left, y: e.clientY - r.top };
+      };
+      circle.addEventListener('pointerdown', e => {
+        circle.setPointerCapture(e.pointerId);
+        puntos.set(e.pointerId, posRel(e));
+        if (puntos.size === 1) { arrastrando = true; last = posRel(e); }
+        else if (puntos.size === 2) {
+          arrastrando = false;
+          const [a, b] = [...puntos.values()];
+          pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+        }
+      });
+      circle.addEventListener('pointermove', e => {
+        if (!puntos.has(e.pointerId)) return;
+        const p = posRel(e);
+        puntos.set(e.pointerId, p);
+        if (puntos.size === 2) {
+          const [a, b] = [...puntos.values()];
+          const d = Math.hypot(a.x - b.x, a.y - b.y);
+          if (pinchDist > 0) {
+            const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+            zoomAt(cx, cy, d / pinchDist);
+          }
+          pinchDist = d;
+        } else if (arrastrando && last) {
+          tx += p.x - last.x;
+          ty += p.y - last.y;
+          last = p;
+          clamp(); apply();
+        }
+      });
+      const soltar = e => {
+        puntos.delete(e.pointerId);
+        if (puntos.size < 2) pinchDist = 0;
+        if (puntos.size === 1) { arrastrando = true; last = [...puntos.values()][0]; }
+        if (puntos.size === 0) arrastrando = false;
+      };
+      circle.addEventListener('pointerup', soltar);
+      circle.addEventListener('pointercancel', soltar);
+      circle.addEventListener('wheel', e => {
+        e.preventDefault();
+        const p = posRel(e);
+        zoomAt(p.x, p.y, e.deltaY < 0 ? 1.1 : 1 / 1.1);
+      }, { passive: false });
+
+      const cerrar = () => back.remove();
+      back.querySelector('#crop-cancel').onclick = () => { cerrar(); resolve(null); };
+      back.addEventListener('click', e => { if (e.target === back) { cerrar(); resolve(null); } });
+      back.querySelector('#crop-ok').onclick = () => {
+        // región visible del círculo → cuadrado de salida
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const srcSize = F / s;                 // lado del cuadrado en coordenadas de imagen
+        const sx = -tx / s, sy = -ty / s;
+        ctx.drawImage(img, sx, sy, srcSize, srcSize, 0, 0, size, size);
+        const outUrl = canvas.toDataURL(out, quality);
+        cerrar();
+        resolve(outUrl);
+      };
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}

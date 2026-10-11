@@ -35,10 +35,12 @@ const nubeLocal = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.
 const cuentaOtra = conNube && !!currentUser() &&
   (emailSesion() || '').toLowerCase() !== emailNubeDe(currentUser());
   const nubePend = conNube ? await pendientes().catch(() => 0) : 0;
+  const instalada = (navigator.standalone === true) || window.matchMedia('(display-mode: standalone)').matches;
 
   root.innerHTML = `
     <h1>Ajustes</h1>
 
+    ${instalada ? '' : `
     <div class="card">
       <div class="card-title"><h3>${icon('smartphone')} Instalar en tu celular</h3></div>
       <p class="small muted">Esta es una PWA: se instala como una app normal, con ícono propio y pantalla completa,
@@ -48,7 +50,7 @@ const cuentaOtra = conNube && !!currentUser() &&
         <div class="tiny muted" id="s-install-hint">Si no está disponible, abre esta página con <b>Chrome</b> → menú ⋮ →
           <b>“Instalar aplicación” / “Añadir a pantalla de inicio”</b>.</div>
       </div>
-    </div>
+    </div>`}
 
     <div class="card">
       <div class="card-title"><h3>${icon('sliders')} Apariencia</h3></div>
@@ -202,34 +204,36 @@ const cuentaOtra = conNube && !!currentUser() &&
     }, 3500);
   };
 
-  /* instalación */
+  /* instalación (solo si la tarjeta está visible, es decir, app no instalada) */
   const instBtn = root.querySelector('#s-install');
   const instHint = root.querySelector('#s-install-hint');
-  const refreshInstall = () => {
-    const ip = window.__nutriInstall;
-    if (ip && ip.canInstall) {
-      instBtn.disabled = false;
-      instHint.textContent = 'Toca el botón y confirma “Instalar”. La app quedará en tu pantalla de inicio.';
-    } else if (window.matchMedia('(display-mode: standalone)').matches) {
-      instBtn.disabled = true;
-      instBtn.innerHTML = icon('check') + ' Ya está instalada';
-    } else {
-      instBtn.disabled = false;
-    }
-  };
-  refreshInstall();
-  instBtn.onclick = async () => {
-    const ip = window.__nutriInstall;
-    if (ip && ip.prompt) {
-      ip.prompt();
-      const choice = await ip.userChoice;
-      if (choice && choice.outcome === 'accepted') toast('¡App instalada! Ya está en tu pantalla de inicio.', 'ok');
-      window.__nutriInstall = null;
-      refreshInstall();
-    } else {
-      toast('Abre esta página en Chrome y usa el menú ⋮ → “Instalar aplicación”.', 'warn');
-    }
-  };
+  if (instBtn && instHint) {
+    const refreshInstall = () => {
+      const ip = window.__nutriInstall;
+      if (ip && ip.canInstall) {
+        instBtn.disabled = false;
+        instHint.textContent = 'Toca el botón y confirma “Instalar”. La app quedará en tu pantalla de inicio.';
+      } else if (window.matchMedia('(display-mode: standalone)').matches) {
+        instBtn.disabled = true;
+        instBtn.innerHTML = icon('check') + ' Ya está instalada';
+      } else {
+        instBtn.disabled = false;
+      }
+    };
+    refreshInstall();
+    instBtn.onclick = async () => {
+      const ip = window.__nutriInstall;
+      if (ip && ip.prompt) {
+        ip.prompt();
+        const choice = await ip.userChoice;
+        if (choice && choice.outcome === 'accepted') toast('¡App instalada! Ya está en tu pantalla de inicio.', 'ok');
+        window.__nutriInstall = null;
+        refreshInstall();
+      } else {
+        toast('Abre esta página en Chrome y usa el menú ⋮ → “Instalar aplicación”.', 'warn');
+      }
+    };
+  }
 
   /* tema */
   root.querySelectorAll('[data-theme]').forEach(b => b.onclick = async () => {

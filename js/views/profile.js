@@ -4,7 +4,7 @@ import { DB, getProfile, saveProfile, getSettings } from '../db.js';
 import { icon } from '../icons.js';
 import { calcTargets, bmr, tdee, ACTIVIDADES, OBJETIVOS, SEXOS } from '../nutrition.js';
 import { lineChart } from '../charts.js';
-import { todayISO, esc, num, toast, confirmSheet, openSheet, fmtShortDate, fromISODate, uid, DIAS, pickFile, fileToDataURL, resizeImage } from '../util.js';
+import { todayISO, esc, num, toast, confirmSheet, openSheet, fmtShortDate, fromISODate, uid, DIAS, pickFile, fileToDataURL, cropImage } from '../util.js';
 import { currentUser } from '../auth.js';
 import { haySesion } from '../cloud.js';
 import { PLAN_RANGOS, PLAN_RANGO_DEF, rangoLabel, cargarGym, calcRacha } from './gym.js';
@@ -205,8 +205,10 @@ export async function render(root) {
     const f = await pickFile('image/*');
     if (!f) return;
     try {
-      const dUrl = await resizeImage(await fileToDataURL(f), 320, 0.82);
-      await guardarSocial({ foto: dUrl });
+      const dataUrl = await fileToDataURL(f);
+      const recortada = await cropImage(dataUrl, { size: 320, quality: 0.82 });
+      if (!recortada) return;   // cancelado
+      await guardarSocial({ foto: recortada });
       toast('Foto de perfil guardada.', 'ok');
       render(root);
     } catch (e) { toast('No pude cargar esa imagen.', 'warn'); }

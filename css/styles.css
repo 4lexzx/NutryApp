@@ -1330,3 +1330,30 @@ body.locked .bottomnav { display: none; }
 .sim-plato-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 2px; }
 .sim-plato-why { margin-top: 6px; color: var(--brand); font-weight: 600; }
 .sim-use { margin-top: 8px; width: 100%; }
+
+/* ---------- Recorte de foto de perfil ---------- */
+.crop-back {
+  position: fixed; inset: 0; z-index: 90; background: #000;
+  display: flex; flex-direction: column; animation: fadeIn .2s ease;
+}
+.crop-stage {
+  flex: 1; min-height: 0; display: grid; place-items: center;
+  position: relative; overflow: hidden; touch-action: none;
+}
+.crop-circle {
+  border-radius: 50%; overflow: hidden; position: relative;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, .62);
+  cursor: grab; touch-action: none;
+}
+.crop-circle:active { cursor: grabbing; }
+.crop-img {
+  position: absolute; top: 0; left: 0; transform-origin: 0 0;
+  max-width: none; user-select: none; -webkit-user-drag: none; pointer-events: none;
+  will-change: transform;
+}
+.crop-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 18px calc(16px + env(safe-area-inset-bottom));
+  background: #000;
+}
+.crop-hint { flex: 1; text-align: center; font-size: .72rem; color: #8e8e93; }
