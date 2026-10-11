@@ -1,7 +1,7 @@
 /* Service worker: la app abre y funciona SIN internet (los datos están en IndexedDB).
    Solo las consultas a la IA necesitan red. */
 
-const CACHE = 'nutri-gym-v2.2.3';
+const CACHE = 'nutri-gym-v2.2.4';
 
 const PRECACHE = [
   './',
@@ -41,10 +41,11 @@ const PRECACHE = [
   './js/views/simulador.js',
   './js/views/social.js',
   './js/views/amigo.js',
-  './icons/icon-192-v3.png',
-  './icons/icon-512-v3.png',
-  './icons/icon-maskable-512-v3.png',
-  './icons/notif-badge-v3.png'
+  './icons/icon-192-v4.png',
+  './icons/icon-512-v4.png',
+  './icons/icon-maskable-512-v4.png',
+  './icons/logo-mark-256.png',
+  './icons/notif-badge-v4.png'
 ];
 
 self.addEventListener('install', event => {

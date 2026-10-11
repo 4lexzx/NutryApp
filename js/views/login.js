@@ -9,7 +9,7 @@ import { toast } from '../util.js';
 export async function render(root, onOk) {
   root.innerHTML = `
     <div class="auth">
-      <div class="auth-badge" aria-hidden="true"><img class="auth-badge-img" src="icons/icon-192-v3.png" alt=""></div>
+      <div class="auth-badge" aria-hidden="true"><img class="auth-badge-img" src="icons/logo-mark-256.png" alt=""></div>
       <h1 class="auth-title">Nutri Gym</h1>
       <p class="auth-sub" id="au-sub">Inicia sesión para ver tus comidas del día</p>
 

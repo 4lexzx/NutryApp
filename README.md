@@ -59,7 +59,7 @@ APP_Nutri/
 │   ├── migracion_v2_3_social.sql ← SQL para la privacidad: flags en `perfiles` + tabla `compartido` (comidas/historial de amigos)
 │   ├── migracion_v2_4_usuarios.sql ← SQL para el registro de cuentas en la nube (`usuarios_registrados`, unicidad global)
 │   └── migracion_v2_5_social_busqueda.sql ← SQL para buscar amigos y ver su ficha antes de añadirlos (`buscar_usuario` + `ver_perfil`)
-├── icons/                     ← íconos PNG (192, 512 y maskable)
+├── icons/                     ← íconos PNG (192, 512, maskable, monograma y badge)
 ├── css/styles.css             ← diseño oscuro/claro, móvil primero, botones grandes
 └── js/
     ├── app.js                 ← arranque, rutas (#/hoy, #/registrar, …), tema, instalación
@@ -610,7 +610,15 @@ bundler ni servidor propio.
 - **Prompt por defecto de la IA**: `js/ai.js` (constante `DEFAULT_PROMPT`).
 - **Fórmulas de metas**: `js/nutrition.js` (`calcTargets`).
 - **Colores/diseño**: `css/styles.css` (variables en `:root` y `[data-theme="light"]`).
-- **Nombre y colores del ícono**: `icons/` (PNG) y `manifest.webmanifest`.
+- **Nombre y colores del ícono**: `icons/` (PNG) y `manifest.webmanifest`. Los PNG salen del logo
+  oficial (`logo-oficial.png`): ejecuta `python tools/make-icons.py` (requiere Pillow) para
+  regenerarlos —icono de app, maskable, `logo-mark-256.png` (monograma para la barra superior,
+  el login y “Acerca de”) y `notif-badge-v4.png` (silueta blanca para la barra de notificaciones).
+  **Para que el ícono cambie en el celular ya instalado (sin desinstalar)**: renómbralos con un
+  sufijo nuevo (`icon-192-v4.png` → `icon-192-v5.png`) y actualiza esas rutas en
+  `manifest.webmanifest`, `index.html`, `sw.js` (PRECACHE) y `js/notif.js`; una URL nueva hace
+  que Chrome descargue el PNG de nuevo en cuanto relee el manifest. Sube también el `?v=` de
+  `manifest.webmanifest`/`index.html` y la versión en `settings.js` + `CACHE` en `sw.js`.
 - **Sonidos**: archivos `.wav` en `sfx/` (tocar, check, licuar, fogata y agua). El del agua es una
   **grabación real** (“Pouring Water” de Universfield vía **Pixabay**, Pixabay Content License:
   uso libre, incluso comercial, sin atribución).

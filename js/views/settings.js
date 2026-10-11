@@ -11,7 +11,7 @@ import { haySesion, emailSesion, emailNubeDe, pendientes } from '../cloud.js';
 import { setSonidos, clic } from '../sound.js';
 import { RECORDS_DEF, pedirPermiso, notificar, guardarRecordatorio, guardarHoraRecordatorio, encenderRecordatorios, cuerpoMacros, horaDe } from '../notif.js';
 
-const VERSION = '2.2.3';
+const VERSION = '2.2.4';
 let hAct = null;   // oyente del evento "hay actualización" (uno solo, sin duplicar)
 
 export async function render(root) {
@@ -168,7 +168,7 @@ const cuentaOtra = conNube && !!currentUser() &&
     </div>
 
     <div class="card">
-      <div class="card-title"><h3><img class="acerca-logo" src="icons/icon-192-v3.png" alt=""> ${icon('info')} Acerca de</h3>
+      <div class="card-title"><h3><img class="acerca-logo" src="icons/logo-mark-256.png" alt=""> ${icon('info')} Acerca de</h3>
         <span class="badge" id="s-update-badge">v${VERSION}</span></div>
       <p class="small muted">Nutri Gym es una app para llevar el control de tu nutrición y tus entrenamientos:
       registra tus comidas con fotos o texto, simula platos antes de comerlos, arma tus batidos, sigue tus macros,
