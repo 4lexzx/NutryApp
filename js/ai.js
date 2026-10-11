@@ -555,3 +555,61 @@ export function promptHelpHTML() {
       si la IA devuelve gramos exagerados, ajústalos tú en la tabla antes de guardar.</p>
     <p class="tiny muted" style="margin-top:6px">Escapado de HTML: ${esc('utiliza texto libre, sin código HTML dentro del prompt.')}</p>`;
 }
+
+/* ---------- Recomendación de platos cuando el usuario se pasa de la meta ----------
+   Devuelve 1–3 platos que completen lo que FALTA y sean bajos en lo que YA PASÓ. */
+const RECOMENDAR_PROMPT = `Eres un nutricionista y chef del NORTE DEL PERÚ (Piura y Sullana).
+Dado el resumen del día de un usuario, recomienda 1 a 3 platos (o porciones pequeñas) que:
+1. Sean BAJO en el/los macro(s) que ya EXCEDIÓ.
+2. Ayuden a COMPLETAR el/los macro(s) que aún FALTAN.
+3. Sean realistas para el resto del día (respetando las calorías que aún quedan).
+4. Sean platos típicos del norte del Perú o platos comunes de gimnasio (pollo, pescado, huevos, etc.).
+Devuelve SOLO un JSON con este formato exacto, sin texto adicional:
+{ "platos": [ { "nombre": "string", "porcion": "string", "kcal": number, "protein": number, "carbs": number, "fat": number, "porque": "string" } ] }
+Donde "porque" explica en 1 frase por qué este plato encaja (ej: "bajo en grasa, alta en proteína para completar lo que falta").
+"protein", "carbs" y "fat" son en GRAMOS. "kcal" son calorías totales del plato.`;
+
+/**
+ * Pide a Gemini 1–3 platos que completen lo que falta y minimicen lo excedido.
+ * @param {object} opts
+ * @param {string} opts.apiKey      – clave del usuario
+ * @param {string} opts.model       – modelo Gemini
+ * @param {object} opts.perfil      – perfil del usuario (para contexto)
+ * @param {object} opts.metas       – { kcal, protein, carbs, fat }
+ * @param {object} opts.consumido   – { kcal, protein, carbs, fat }
+ * @param {object} opts.excedidos   – { kcal?, protein?, carbs?, fat? } (solo > 0)
+ * @param {object} opts.faltantes   – { kcal?, protein?, carbs?, fat? } (solo > 0)
+ * @param {string} opts.macroExcedido – nombre del macro principal excedido
+ * @returns {Promise<Array<{nombre,porcion,kcal,protein,carbs,fat,porque}>>}
+ */
+export async function recomendarPlatos({ apiKey, model, perfil, metas, consumido, excedidos, faltantes, macroExcedido }) {
+  const L = ['kcal', 'protein', 'carbs', 'fat'];
+  const nom = { kcal: 'calorías', protein: 'proteína', carbs: 'carbohidratos', fat: 'grasas' };
+  const g = v => (Number(v) || 0).toFixed(0);
+  const lin = obj => L.map(k => `${nom[k]}: ${g(obj[k])}`).join(', ');
+
+  const contexto = [
+    `Resumen del día:`,
+    `  Consumido: ${lin(consumido)}`,
+    `  Meta: ${lin(metas)}`,
+    `  Excedido: ${L.filter(k => excedidos[k] > 0).map(k => `${nom[k]} +${g(excedidos[k])}`).join(', ') || 'nada'}`,
+    `  Falta: ${L.filter(k => faltantes[k] > 0).map(k => `${nom[k]} ${g(faltantes[k])}`).join(', ') || 'nada'}`,
+    `Macro principal excedido: ${nom[macroExcedido] || macroExcedido}.`,
+    `Peso: ${perfil && perfil.weight ? perfil.weight + ' kg' : 'no indicado'}. Objetivo: ${perfil && perfil.objective ? perfil.objective : 'no indicado'}.`
+  ].join('\n');
+
+  const parts = [{ text: RECOMENDAR_PROMPT + '\n\n' + contexto }];
+  const raw = await callGemini({ parts, apiKey, model });
+  const data = extractJSON(raw);
+  if (!data || !Array.isArray(data.platos)) throw new AIError('La IA no devolvió la lista de platos.', 'json');
+  // saneado mínimo
+  return data.platos.slice(0, 3).map(p => ({
+    nombre: String(p.nombre || 'Plato').slice(0, 60),
+    porcion: String(p.porcion || '').slice(0, 40),
+    kcal: Math.max(0, Math.round(Number(p.kcal) || 0)),
+    protein: Math.max(0, Math.round(Number(p.protein) || 0)),
+    carbs: Math.max(0, Math.round(Number(p.carbs) || 0)),
+    fat: Math.max(0, Math.round(Number(p.fat) || 0)),
+    porque: String(p.porque || '').slice(0, 160)
+  }));
+}

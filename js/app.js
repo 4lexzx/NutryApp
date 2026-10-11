@@ -408,6 +408,12 @@ async function init() {
   setupNube();
   await exigirCuentaNube();
 
+  // Campana de notificaciones (excesos de macros + recomendaciones de la IA)
+  import('./notif-center.js').then(nc => {
+    nc.actualizarBadge();
+    document.getElementById('btn-notif').onclick = () => nc.abrirPanel();
+  }).catch(() => {});
+
   document.getElementById('btn-theme').onclick = async () => {
     const cur = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
     const next = cur === 'dark' ? 'light' : 'dark';

@@ -859,6 +859,8 @@ export async function saveMeal(draft, opts = {}) {
     updatedAt: Date.now()
   };
   await DB.put('meals', meal);
+  // Si al guardar se pasó de alguna meta, genera aviso + recomendación de la IA (async, no bloquea)
+  import('../notif-center.js').then(nc => nc.revisarExcesos(meal.date)).catch(() => {});
   if (navegar) {
     state.draft = null;
     toast(`Guardado: ${num(meal.totals.kcal)} kcal.`, 'ok');
