@@ -51,8 +51,8 @@ function statgridHTML(t, meta) {
   return MACROS.map(k => {
     const cls = k === 'kcal' ? 'kcal' : k === 'protein' ? 'prot' : k === 'carbs' ? 'carb' : 'gras';
     const lbl = k === 'protein' ? 'prot' : k === 'carbs' ? 'carb' : k === 'fat' ? 'gras' : 'kcal';
-    const metaTxt = meta ? `<span class="tiny muted"> / ${num(meta[k])}${UNI[k] === 'kcal' ? '' : 'g'}</span>` : '';
-    return `<div class="stat ${cls}"><div class="v">${num(t[k])}${metaTxt}</div><div class="k">${lbl}${UNI[k] === 'kcal' ? ' (kcal)' : ' (g)'}</div></div>`;
+    const kTxt = meta ? `${lbl} ${num(meta[k])}${UNI[k] === 'kcal' ? '' : 'g'}` : lbl;
+    return `<div class="stat ${cls}"><div class="v">${num(t[k])}</div><div class="k">${kTxt}</div></div>`;
   }).join('');
 }
 
@@ -122,7 +122,6 @@ export async function render(root, args, query) {
       <div class="card-title"><h3>${icon('note')} Describe lo que quieres comer</h3></div>
       <textarea id="sim-desc" class="ta-round" rows="3" placeholder="Ej. 1 seco de cabrito con frejoles, 1 vaso de chicha morada">${esc(desc)}</textarea>
       <button class="btn btn-analyze btn-lg btn-block" id="sim-go" type="button" style="margin-top:10px">${icon('sparkles')} Simular con la IA</button>
-      ${!sim ? '<div class="hint">La IA estima los macros de esa comida según platos típicos del norte del Perú. No se registra en tu día.</div>' : ''}
     </div>
 
     <div class="card" id="sim-resultado" style="display:none">
@@ -134,7 +133,6 @@ export async function render(root, args, query) {
       <div class="card-title"><h3>${icon('sparkles')} Sugerencias para ${esc(tipo)}</h3></div>
       <button class="btn btn-outline btn-block" id="sim-sug" type="button">${icon('utensils')} Pedir sugerencias a la IA</button>
       <div id="sim-sug-list" style="margin-top:12px"></div>
-      <div class="hint">Platos del norte del Perú (Piura/Sullana) que priorizan proteína y lo que te falta, sin pasarse de lo que ya estás al límite.</div>
     </div>
   `;
 
