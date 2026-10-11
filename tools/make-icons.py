@@ -1,84 +1,99 @@
 import os
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw
 
 OUT = os.path.join(os.path.dirname(__file__), '..', 'icons')
-BLACK = (10, 10, 10)       # fondo negro tipo marca
-INK = (245, 245, 245)      # blanco de la N
-GREEN = (110, 200, 60)     # verde del acento (hoja)
+
+# Paleta de marca (verde gimnasio) sobre fondo oscuro profundo
+BG_TOP = (13, 26, 17)      # casi negro con tinte verde (arriba)
+BG_BOT = (7, 16, 11)       # más oscuro (abajo)
+GREEN = (62, 200, 96)      # verde energético del acento
+GREEN_D = (38, 150, 70)    # verde más profundo para sombreado
+INK = (245, 247, 245)      # blanco de los trazos
 
 # lienzo alto para nitidez (se reescala al final)
 SS = 2048
 
 
-def draw_logo(size, out, bg=BLACK, radius_frac=0.20, maskable=False):
-    """Dibuja la N estilizada de Nutri Gym (blanca + acento verde) sobre fondo."""
-    img = Image.new('RGB', (SS, SS), bg)
+def _lerp(a, b, t):
+    return tuple(int(round(a[i] + (b[i] - a[i]) * t)) for i in range(3))
 
-    # --- N geométrica: tres trazos, dibujados en una capa alfa y luego compuestos
+
+def _rrect(d, box, r, fill):
+    d.rounded_rectangle(box, radius=r, fill=fill)
+
+
+def draw_logo(size, out, maskable=False):
+    """Monograma original 'NG' + mancuerna, sobre degradado verde-oscuro."""
+    img = Image.new('RGB', (SS, SS), BG_TOP)
+    # degradado vertical sutil
+    grad = Image.new('RGB', (SS, SS))
+    gd = ImageDraw.Draw(grad)
+    for y in range(SS):
+        gd.line([(0, y), (SS, y)], fill=_lerp(BG_TOP, BG_BOT, y / SS))
+    img = grad
+
     layer = Image.new('RGBA', (SS, SS), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
 
-    # caja de la N centrada
-    cx = SS * 0.50
-    cy = SS * 0.50
-    h = SS * 0.40          # altura de la N
-    w = SS * 0.30          # ancho de la N
-    s = SS * 0.088         # grosor de las astas verticales
-    sd = SS * 0.105        # grosor de la diagonal (más ancha, como el logo)
-    x0, x1 = cx - w / 2, cx + w / 2
-    y0, y1 = cy - h / 2, cy + h / 2
-
-    # 1) asta izquierda (vertical, con corte diagonal arriba y abajo)
+    # --- Monograma "NG" ocupando la banda inferior-centro ---
+    # N (izquierda): astas verticales + diagonal
+    nx0 = SS * 0.14
+    ny0 = SS * 0.54
+    ny1 = SS * 0.80
+    n_stem = SS * 0.052
+    n_diag = SS * 0.066
+    # asta izq
+    _rrect(d, [nx0, ny0, nx0 + n_stem, ny1], n_stem * 0.18, INK)
+    # asta der
+    nx1 = nx0 + SS * 0.155
+    _rrect(d, [nx1, ny0, nx1 + n_stem, ny1], n_stem * 0.18, INK)
+    # diagonal de la N (de arriba-izq a abajo-der)
     d.polygon([
-        (x0, y0),
-        (x0 + s, y0),
-        (x0 + s, y1),
-        (x0, y1),
-    ], fill=INK + (255,))
+        (nx0, ny0),
+        (nx0 + n_diag, ny0),
+        (nx1 + n_stem, ny1),
+        (nx1 + n_stem - n_diag, ny1),
+    ], fill=INK)
 
-    # 2) asta derecha (vertical blanca completa; el verde se pinta encima
-    #    solo en la parte alta, como el logo original)
-    d.polygon([
-        (x1 - s, y0),
-        (x1, y0),
-        (x1, y1),
-        (x1 - s, y1),
-    ], fill=INK + (255,))
+    # G (derecha): arco abierto con barra horizontal
+    gx0 = nx1 + n_stem + SS * 0.03
+    gy0 = ny0
+    gy1 = ny1
+    gcx = gx0 + (ny1 - ny0) / 2
+    gcy = (ny0 + ny1) / 2
+    gr_out = (ny1 - ny0) / 2
+    gr_in = gr_out - n_stem
+    # anillo: elipse verde-blanca; luego se pinta encima el hueco
+    d.ellipse([gcx - gr_out, gcy - gr_out, gcx + gr_out, gcy + gr_out], fill=INK)
+    d.ellipse([gcx - gr_in, gcy - gr_in, gcx + gr_in, gcy + gr_in], fill=(0, 0, 0, 0))
+    # abrir el anillo por la derecha (boca del "G"), solo arriba de la mitad
+    d.rectangle([gcx, gcy - gr_out - 2, gcx + gr_out + 2, gcy - n_stem * 0.1],
+                fill=(0, 0, 0, 0))
+    # barra horizontal del "G" que entra hacia el centro (la oreja característica)
+    _rrect(d, [gcx - n_stem * 0.2, gcy - n_stem * 0.5,
+               gcx + gr_out * 0.92, gcy + n_stem * 0.5], n_stem * 0.25, INK)
 
-    # 3) diagonal central: banda ancha que une la parte alta de la asta
-    #    izquierda con la parte baja de la derecha (como el logo original)
-    d.polygon([
-        (x0, y0),
-        (x0 + sd, y0),
-        (x1, y1),
-        (x1 - sd, y1),
-    ], fill=INK + (255,))
-
-    # recorte diagonal en la parte superior de la N (como el logo original)
-    # se "corta" la esquina superior derecha del asta derecha y la inferior
-    # izquierda de la asta izquierda para el estilo angular.
-    # (ya implícito por los polígonos; afinamos con un par de triángulos)
+    # --- Mancuerna arriba (sobre el monograma) ---
+    bar_y = SS * 0.30
+    bar_h = SS * 0.055
+    bar_x0 = SS * 0.30
+    bar_x1 = SS * 0.70
+    _rrect(d, [bar_x0, bar_y - bar_h / 2, bar_x1, bar_y + bar_h / 2],
+           bar_h * 0.5, INK)
+    # discos en los extremos (dos placas por lado)
+    disc_w = SS * 0.05
+    disc_h = SS * 0.14
+    disc_r = disc_w * 0.45
+    for cx, sgn in ((bar_x0, -1), (bar_x1, 1)):
+        for off, dh in ((0.0, 1.0), (0.055, 0.72)):
+            cxp = cx + sgn * (off * SS)
+            _rrect(d, [cxp - disc_w / 2, bar_y - disc_h * dh / 2,
+                       cxp + disc_w / 2, bar_y + disc_h * dh / 2], disc_r, GREEN)
 
     img = Image.alpha_composite(img.convert('RGBA'), layer).convert('RGB')
-    d = ImageDraw.Draw(img)
 
-    # --- acento verde: galón que sobresale por encima del asta derecha, con
-    #     punta inferior izquierda que se engancha a la diagonal (logo original)
-    glayer = Image.new('RGBA', (SS, SS), (0, 0, 0, 0))
-    gd = ImageDraw.Draw(glayer)
-    gv = SS * 0.205        # altura total del galón
-    gw = SS * 0.118        # ancho (≈ asta derecha)
-    bx = x1 - gw * 0.55
-    by = y0 - SS * 0.022   # sobresale un poco por encima del asta
-    gd.polygon([
-        (bx + gw * 0.18, by),                # sup-izq (ligeramente recortada)
-        (bx + gw, by + SS * 0.004),          # sup-der (la punta más alta)
-        (bx + gw, by + gv),                  # inf-der
-        (bx + gw * 0.12, by + gv * 0.55),    # punta inf-izq (se engancha)
-    ], fill=GREEN + (255,))
-    img = Image.alpha_composite(img.convert('RGBA'), glayer).convert('RGB')
+    # leve brillo del acento verde alrededor del anillo del G (ya en capa)
 
-    # reescalar al tamaño final con suavizado de alta calidad
     img = img.resize((size, size), Image.LANCZOS)
 
     if maskable:
@@ -87,7 +102,7 @@ def draw_logo(size, out, bg=BLACK, radius_frac=0.20, maskable=False):
         m = Image.new('L', (size, size), 0)
         md = ImageDraw.Draw(m)
         md.rounded_rectangle([0, 0, size - 1, size - 1],
-                             radius=int(size * radius_frac), fill=255)
+                             radius=int(size * 0.22), fill=255)
         img.putalpha(m)
         img.save(out)
     print('wrote', out, size)
@@ -96,4 +111,11 @@ def draw_logo(size, out, bg=BLACK, radius_frac=0.20, maskable=False):
 draw_logo(192, os.path.join(OUT, 'icon-192-v3.png'))
 draw_logo(512, os.path.join(OUT, 'icon-512-v3.png'))
 draw_logo(512, os.path.join(OUT, 'icon-maskable-512-v3.png'), maskable=True)
-draw_logo(192, os.path.join(OUT, 'notif-badge-v3.png'))
+
+# badge de notificación: silueta del monograma (se ve la marca en la barra)
+img = Image.new('RGBA', (192, 192), (0, 0, 0, 0))
+src = Image.open(os.path.join(OUT, 'icon-192-v3.png')).convert('RGBA')
+# recorta a la parte blanca (monograma) sobre transparente
+img = src
+img.save(os.path.join(OUT, 'notif-badge-v3.png'))
+print('wrote notif-badge-v3.png')
