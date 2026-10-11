@@ -11,7 +11,8 @@ import { icon } from '../icons.js';
 import { esc, num, toast, todayISO, toISODate } from '../util.js';
 import {
   haySesion, uidNube, pedirAmistad, misAmistades, responderAmistad,
-  quitarAmistad, bajarPerfiles, bajarCompartido, buscarUsuarios, verPerfil
+  quitarAmistad, bajarPerfiles, bajarCompartido, buscarUsuarios, verPerfil,
+  recomputarSocial, alCambiarDia
 } from '../cloud.js';
 import { currentUser } from '../auth.js';
 
@@ -19,6 +20,7 @@ let _hash = '';
 let _pendAntes = -1;          // para avisar cuando llega una solicitud nueva
 let _consulta = '';           // lo que se escribió en el buscador
 let _res = null;              // resultados de la última búsqueda
+let _cacheSocial = null;      // últimos datos pintados: se repintan al instante
 
 export async function render(root) {
   const conNube = haySesion();
@@ -46,9 +48,10 @@ export async function render(root) {
     <div class="card">
       <div class="card-title"><h3>${icon('search')} Buscar amigos</h3></div>
       <p class="hint" style="margin:0 0 10px">Escribe el usuario con el que entra tu amigo a la app.</p>
-      <div class="row">
-        <input id="am-in" type="text" placeholder="usuario" autocapitalize="none" autocorrect="off" autocomplete="off">
-        <button class="btn btn-primary" id="am-add" type="button" style="flex:none">${icon('search')}<span class="am-btn-txt">Buscar</span></button>
+      <div class="soc-search">
+        <span class="soc-search-ic">${icon('search')}</span>
+        <input id="am-in" type="search" placeholder="usuario" autocapitalize="none"
+               autocorrect="off" autocomplete="off" enterkeyhint="search" spellcheck="false">
       </div>
       <div id="am-res"></div>
     </div>
@@ -66,31 +69,46 @@ export async function render(root) {
   // refresco silencioso cuando la nube trae cambios (sin spinner ni parpadeo)
   const onNube = () => { if (root.isConnected) cargarAmigos(true); };
   document.addEventListener('nutri-nube-actualizada', onNube);
+
+  // si el día cambió (p. ej. cruzó la medianoche con la pestaña abierta),
+  // el resumen de "hoy" de los amigos debe vaciarse a las 00h. Se recalcula en
+  // la nube (quien registra lo sube) y aquí se filtra por la fecha real de cada día.
+  const offDia = alCambiarDia(() => { if (root.isConnected) cargarAmigos(false); });
   if (root) root.addEventListener('DOMNodeRemoved', () => {
     document.removeEventListener('nutri-nube-actualizada', onNube);
+    offDia();
   });
 
   const amIn = root.querySelector('#am-in');
   if (amIn) amIn.value = _consulta;
   pintarResultados();
 
+  // pinta de inmediato con la última respuesta en memoria (sin esperar la nube,
+  // que tarda ~1s y dejaba la lista vacía al entrar)
+  if (_cacheSocial) pintarSecciones(_cacheSocial);
   cargarAmigos(false);
 
-  /* Pinta solo si cambió el contenido (evita el parpadeo de repintar igual). */
+  /* Trae amistades + perfiles + resumen del día en paralelo y pinta. Si el
+     contenido no cambió (hash igual), no repinta (sin parpadeo). */
   async function cargarAmigos(silencioso) {
     const secReq = root.querySelector('#am-sec-req');
     if (!secReq) return;
-    const secAmi = root.querySelector('#am-sec-ami');
     const empty = root.querySelector('#am-empty');
-    const btnReq = root.querySelector('#soc-req');
-    const nReq = root.querySelector('#soc-req-n');
+
+    // el resumen social trae un "hoy" que puede haber quedado con la comida del
+    // día anterior tras cruzar la medianoche: se recalcula en la nube (quien
+    // registró) y aquí se filtra por la fecha real que trae cada día.
+    recomputarSocial().catch(() => {});
+
     const me = uidNube();
     let amis = [], perfs = [], comps = [];
     try {
+      // las tres a la vez: antes iban en cadena y tardaba ~1s en aparecer
       [amis, perfs, comps] = await Promise.all([misAmistades(), bajarPerfiles(), bajarCompartido()]);
     } catch (e) {
       try {
         [amis, perfs] = await Promise.all([misAmistades(), bajarPerfiles()]);
+        comps = [];
       } catch (e2) {
         if (!silencioso) {
           empty.style.display = '';
@@ -99,7 +117,6 @@ export async function render(root) {
         return;
       }
     }
-    const compDe = id => { const r = comps.find(x => x.user_id === id); return (r && r.contenido) || null; };
 
     const entrantes = amis.filter(a => a.estado === 'pendiente' && a.dos === me);
     const salientes = amis.filter(a => a.estado === 'pendiente' && a.uno === me);
@@ -111,29 +128,54 @@ export async function render(root) {
       salientes.map(a => [a.id, a.dos]),
       aceptadas.map(a => [a.id, a.uno, a.dos]),
       perfs.map(p => [p.user_id, p.usuario, p.foto, p.bio, p.meta_kcal, p.kcal_hoy, p.racha, p.pub_perfil, p.pub_comidas, p.pub_agua, p.pub_gym, p.actualizado]),
-      comps.map(c => [c.user_id, c.contenido && c.contenido.kcal, c.contenido && c.contenido.racha, c.contenido && JSON.stringify(c.contenido.macros)])
+      comps.map(c => [c.user_id, c.contenido && c.contenido.kcal, c.contenido && c.contenido.racha, c.contenido && c.contenido.dia, c.contenido && JSON.stringify(c.contenido.macros)])
     ]);
     if (silencioso && hash === _hash) return;
     _hash = hash;
 
-    // quién manda/recibe cada solicitud aún no es amigo, así que su perfil no
-    // viene en `perfiles` (RLS): su nombre y foto salen del RPC ver_perfil
+    // guarda lo pintado para repintar de inmediato la próxima vez que se abra
+    // la pestaña, sin esperar la nube.
+    _cacheSocial = { me, amis, perfs, comps, entrantes, salientes, aceptadas };
+
+    // perfiles de quienes mandaron/recibieron solicitud (aún no son amigos, su
+    // ficha no viene en `perfiles` por RLS: sale del RPC ver_perfil)
     const idsFaltan = [...new Set([...entrantes.map(a => a.uno), ...salientes.map(a => a.dos)])]
       .filter(id => id !== me && !perfs.some(p => p.user_id === id));
-    let extra = [];
-    if (idsFaltan.length) {
-      extra = (await Promise.all(idsFaltan.map(id => verPerfil(id).catch(() => null)))).filter(Boolean);
-    }
-    const buscar = id => perfs.find(x => x.user_id === id) || extra.find(x => x.user_id === id) || null;
-    const avatar = id => { const pf = buscar(id); return pf && pf.foto ? `<img src="${pf.foto}" alt="">` : icon('user'); };
-    const nombre = id => { const pf = buscar(id); return (pf && pf.usuario) || 'amigo'; };
+    const extra = idsFaltan.length
+      ? (await Promise.all(idsFaltan.map(id => verPerfil(id).catch(() => null)))).filter(Boolean)
+      : [];
+
+    pintarSecciones(_cacheSocial, extra);
 
     // aviso: llegó una solicitud nueva mientras mirabas la app
     if (_pendAntes >= 0 && entrantes.length > _pendAntes && silencioso) {
       const ult = entrantes[entrantes.length - 1];
-      toast(`Nueva solicitud de amistad de ${nombre(ult.uno)}.`, 'ok');
+      const pf = extra.find(x => x.user_id === ult.uno) || perfs.find(x => x.user_id === ult.uno);
+      toast(`Nueva solicitud de amistad de ${(pf && pf.usuario) || 'un amigo'}.`, 'ok');
     }
     _pendAntes = entrantes.length;
+  }
+
+  /* Pinta solicitudes + lista de amigos + contador. Recibe extra opcional con
+     perfiles de no-amigos (solicitudes). Separado de cargarAmigos para poder
+     repintar al instante desde _cacheSocial sin volver a tocar la nube. */
+  function pintarSecciones(d, extra) {
+    const secReq = root.querySelector('#am-sec-req');
+    const secAmi = root.querySelector('#am-sec-ami');
+    const empty = root.querySelector('#am-empty');
+    const btnReq = root.querySelector('#soc-req');
+    const nReq = root.querySelector('#soc-req-n');
+    if (!secReq || !secAmi) return;
+    const { me, amis, perfs, comps, entrantes, salientes, aceptadas } = d;
+
+    const buscar = id => perfs.find(x => x.user_id === id) || (extra && extra.find(x => x.user_id === id)) || null;
+    const avatar = id => { const pf = buscar(id); return pf && pf.foto ? `<img src="${pf.foto}" alt="">` : icon('user'); };
+    const nombre = id => { const pf = buscar(id); return (pf && pf.usuario) || 'amigo'; };
+    const compDe = id => {
+      const r = comps.find(x => x.user_id === id);
+      return (r && r.contenido) || null;
+    };
+
     pintarNav(entrantes.length);
 
     // botón de pendientes (arriba) con el contador
@@ -249,18 +291,23 @@ export async function render(root) {
   function fichaAmigo(fid, buscar, compDe, avatar, nombre) {
     const pf = buscar(fid) || {};
     const c = compDe(fid) || {};
+    // el resumen puede traer el día al que pertenece: si no es el de hoy, las
+    // kcal/comidas/macros NO son "de hoy" (pasó la medianoche y aún no se
+    // recalculó). Se muestran vacíos hasta que quien registró suba lo nuevo.
+    const diaComp = c.dia || '';
+    const esHoy = !diaComp || diaComp === todayISO();
     const pub = k => pf[k] !== false;   // por defecto todo público (perfiles viejos)
     const privado = !pub('pub_perfil') && !pub('pub_comidas') && !pub('pub_agua') && !pub('pub_gym');
-    const M = c.macros || {};
+    const M = esHoy ? (c.macros || {}) : {};
     const MT = c.metas || {};
     const meta = Number(c.meta) || Number(pf.meta_kcal) || 0;
-    const kcal = Number(c.kcal) || Number(pf.kcal_hoy) || 0;
-    const ok = c.cumplio !== undefined ? !!c.cumplio : !!pf.cumplio;
+    const kcal = esHoy ? (Number(c.kcal) || Number(pf.kcal_hoy) || 0) : 0;
+    const ok = esHoy && (c.cumplio !== undefined ? !!c.cumplio : !!pf.cumplio);
     const racha = pub('pub_comidas') ? (Number(c.racha) || Number(pf.racha) || 0) : 0;
     const agua = pub('pub_agua') && c.agua ? Number(c.agua.r) || 0 : 0;
     const gym = pub('pub_gym') && c.gym ? Number(c.gym.r) || 0 : 0;
-    const comidas = pub('pub_comidas') && Array.isArray(c.comidas) ? c.comidas : [];
-    const viejo = !pf.actualizado || toISODate(new Date(pf.actualizado)) !== todayISO();
+    const comidas = (esHoy && pub('pub_comidas') && Array.isArray(c.comidas)) ? c.comidas : [];
+    const viejo = !esHoy || !pf.actualizado || toISODate(new Date(pf.actualizado)) !== todayISO();
     const pct = meta ? Math.max(0, Math.min(100, Math.round(kcal / meta * 100))) : 0;
     const detalle = meta ? `${num(kcal)} / ${num(meta)} kcal` : `${num(kcal)} kcal`;
     const estado = ok ? 'meta ✓' : (meta ? pct + '%' : num(kcal));
@@ -377,9 +424,18 @@ export async function render(root) {
     }
     pintarResultados();
   }
-  const amAdd = root.querySelector('#am-add');
-  if (amAdd) amAdd.onclick = buscarAmigo;
-  if (amIn) amIn.onkeydown = e => { if (e.key === 'Enter') buscarAmigo(); };
+  if (amIn) {
+    amIn.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); buscarAmigo(); } };
+    // busca al escribir (con espera corta) y limpia si borra el texto
+    let tBusca = null;
+    amIn.oninput = () => {
+      clearTimeout(tBusca);
+      const v = (amIn.value || '').trim();
+      if (!v) { _consulta = ''; _res = null; pintarResultados(); return; }
+      if (v.length < 2) return;
+      tBusca = setTimeout(buscarAmigo, 350);
+    };
+  }
 }
 
 /* Aviso (punto rojo) de solicitudes pendientes en la barra de navegación. */

@@ -888,6 +888,10 @@ async function calcularCompartido() {
   } catch (e) { /* sin pesos */ }
 
   return {
+    // a qué día pertenece el "hoy" de este contenido: sirve para que un amigo
+    // sepa si las kcal/comidas son del día de hoy o quedaron del anterior
+    // (pasó la medianoche y aún no se recalculó).
+    dia: hoy,
     comidas,
     historial,
     agua: { v: aguaHoy, meta: aguaMeta, r: rachaAgua },
@@ -1016,4 +1020,45 @@ export async function responderAmistad(id, aceptar) {
 export async function quitarAmistad(id) {
   await rest('/amistades?id=eq.' + encodeURIComponent(id), { method: 'DELETE' });
   return true;
+}
+
+/* ---------------- cambio de día (medianoche) ---------------- */
+let _diaActual = todayISO();
+let _tDia = null;
+const _avisosDia = [];
+
+function checarDia() {
+  const hoy = todayISO();
+  if (hoy === _diaActual) return;
+  _diaActual = hoy;
+  // sube ya el resumen del día nuevo: al cruzar la medianoche el "hoy" de la
+  // nube seguía con la comida del día anterior; así se limpia a las 00h.
+  subirPerfilSocial().catch(() => {});
+  for (const fn of _avisosDia) { try { fn(hoy); } catch (e) { /* nada */ } }
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checarDia(); });
+  window.addEventListener('focus', checarDia);
+  if (window.matchMedia) {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    if (mq.addEventListener) mq.addEventListener('change', checarDia);
+  }
+  _tDia = setInterval(checarDia, 60000);
+}
+
+/* Avisa (una sola vez por oyente) cuando cambia el día local. */
+export function alCambiarDia(fn) {
+  if (typeof fn !== 'function') return () => {};
+  _avisosDia.push(fn);
+  return () => {
+    const i = _avisosDia.indexOf(fn);
+    if (i >= 0) _avisosDia.splice(i, 1);
+  };
+}
+
+/* Fuerza el recálculo del resumen en la nube (el "hoy" de tus amigos). */
+export async function recomputarSocial() {
+  if (!haySesion()) return false;
+  return subirPerfilSocial();
 }

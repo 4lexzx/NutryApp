@@ -11,6 +11,10 @@ import {
   quitarAmistad, pedirAmistad, responderAmistad, verPerfil
 } from '../cloud.js';
 
+// historial de la persona que se está mirando y a qué día se le está viendo
+// (por defecto, hoy). Se guarda aquí para que no se pierda al repintar.
+const _amView = new Map();   // idAmigo -> { dia }
+
 export async function render(root, path) {
   const id = String((path && path[0]) || '');
   const volver = `<a class="btn btn-outline btn-block" href="#/social" style="margin-top:10px">${icon('chevronLeft')} Volver a Social</a>`;
@@ -55,30 +59,49 @@ export async function render(root, path) {
   const privado = !visible('pub_perfil') && !visible('pub_comidas') &&
     (!esAmigo || (!visible('pub_historial') && !visible('pub_agua') && !visible('pub_gym')));
 
+  // día a la vista (por defecto hoy). Se guarda por amigo para no perderlo al repintar.
+  const hoyISO = todayISO();
+  const st = _amView.get(id) || { dia: hoyISO };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(st.dia)) st.dia = hoyISO;
+  const diaSel = st.dia;
+  _amView.set(id, st);
+
+  // el "hoy" del contenido viene etiquetado con su día (c.dia); si es otro día
+  // (pasó la medianoche y aún no se recalcula), no se pinta como "hoy" de hoy.
+  const diaComp = c.dia || '';
+  const esHoyReal = !diaComp || diaComp === hoyISO;
+
   const meta = Number(c.meta) || Number(pub.meta_kcal) || 0;
-  const kcal = Number(c.kcal) || Number(pub.kcal_hoy) || 0;
-  const ok = c.cumplio !== undefined ? !!c.cumplio : !!pub.cumplio;
+  const kcal = esHoyReal ? (Number(c.kcal) || Number(pub.kcal_hoy) || 0) : 0;
+  const ok = esHoyReal && (c.cumplio !== undefined ? !!c.cumplio : !!pub.cumplio);
   const racha = Number(c.racha) || Number(pub.racha) || 0;
   const pct = meta ? Math.max(0, Math.min(100, Math.round(kcal / meta * 100))) : 0;
-  const M = c.macros || {};
+  const M = esHoyReal ? (c.macros || {}) : {};
   const MT = c.metas || {};
   const nombre = pub.usuario || 'amigo';
   const foto = visible('pub_perfil') && pub.foto ? `<img src="${pub.foto}" alt="">` : icon('user');
   const bio = visible('pub_perfil') && pub.bio ? `<p class="small" style="margin:8px 0 0">${esc(pub.bio)}</p>` : '';
 
-  const comidas = esAmigo && visible('pub_comidas') && Array.isArray(c.comidas) ? c.comidas : [];
+  const comidas = (esHoyReal && esAmigo && visible('pub_comidas') && Array.isArray(c.comidas)) ? c.comidas : [];
   const historial = esAmigo && visible('pub_historial') && Array.isArray(c.historial) ? c.historial : [];
   const agua = esAmigo && visible('pub_agua') && c.agua ? c.agua : null;
   const gym = esAmigo && visible('pub_gym') && c.gym ? c.gym : null;
 
-  const estadoBadge = (esAmigo && visible('pub_comidas') && meta)
+  // kcal/macros del día que se pidió ver (para el selector de historial)
+  const diaEntry = historial.find(d => d.f === diaSel) || null;
+  const esHoySel = diaSel === hoyISO;
+  const kcalSel = esHoySel ? kcal : (diaEntry ? Number(diaEntry.k) || 0 : 0);
+  const macroSel = esHoySel ? M : (diaEntry ? { p: Number(diaEntry.p) || 0, c: Number(diaEntry.c) || 0, f: Number(diaEntry.f) || 0 } : null);
+  const nComidasSel = esHoySel ? comidas.length : (diaEntry ? Number(diaEntry.n) || 0 : 0);
+
+  const estadoBadge = (esHoyReal && esAmigo && visible('pub_comidas') && meta)
     ? `<span class="badge ${ok ? 'ok' : 'warn'}">${ok ? 'meta ✓' : pct + '%'}</span>` : '';
 
-  const resumenHoy = (visible('pub_comidas') && (kcal || meta)) ? `
+  const resumenHoy = (esHoyReal && visible('pub_comidas') && (kcal || meta)) ? `
     <div class="soc-hoy">
       <div class="soc-hoy-v">${num(kcal)}<span> / ${num(meta || 0)} kcal</span></div>
       ${meta ? `<div class="am-prog ${ok ? 'ok' : ''}"><i style="width:${Math.min(100, pct)}%"></i></div>` : ''}
-      <div class="tiny muted" style="margin-top:5px">${icon('clock')} ${esc(fmtLongDate(todayISO()))}</div>
+      <div class="tiny muted" style="margin-top:5px">${icon('clock')} ${esc(fmtLongDate(hoyISO))}</div>
     </div>` : '';
 
   const chips = (visible('pub_perfil') && (racha || (agua && agua.r) || (gym && gym.r))) ? `<div class="am-chips" style="margin-top:8px">${
@@ -103,11 +126,12 @@ export async function render(root, path) {
       </div>
       <p class="tiny muted" style="margin:8px 0 0">${esc(nombre)} recibirá tu solicitud y podrá aceptarla desde su Social.</p>`;
 
-  const seccComidas = esAmigo && visible('pub_comidas') ? `
+  const seccComidas = (esAmigo && visible('pub_comidas')) ? `
     <div class="card">
       <div class="card-title"><h3>${icon('utensils')} Comidas de hoy</h3>${estadoBadge}</div>
+      ${esHoyReal ? `
       <div class="macro-hero">
-        <div class="big">${num(kcal)}</div><div class="lbl">kcal de ${num(meta || 0)} · ${esc(fmtLongDate(todayISO()))}</div>
+        <div class="big">${num(kcal)}</div><div class="lbl">kcal de ${num(meta || 0)} · ${esc(fmtLongDate(hoyISO))}</div>
       </div>
       ${meta ? `<div class="am-prog ${ok ? 'ok' : ''}" style="margin:10px 0 4px"><i style="width:${pct}%"></i></div>` : ''}
       ${(M.p != null || M.c != null || M.f != null) ? `
@@ -119,11 +143,25 @@ export async function render(root, path) {
       ${comidas.length ? `<ul class="am-meals big">${comidas.map(m => `
         <li><span class="am-meal-h">${esc(m.h || '')}</span> <span class="am-meal-n">${esc(m.n || '')}</span> <b>${num(m.k || 0)} kcal</b></li>`).join('')}</ul>`
       : `<p class="tiny muted" style="margin-top:10px">Todavía no anotó comidas hoy.</p>`}
+      ` : `<p class="tiny muted" style="margin-top:4px">Aún sin datos de hoy.</p>`}
     </div>` : '';
 
   const seccHistorial = (esAmigo && visible('pub_historial') && historial.length) ? `
     <div class="card">
-      <div class="card-title"><h3>${icon('barChart')} Historial (14 días)</h3></div>
+      <div class="card-title"><h3>${icon('barChart')} Historial</h3>
+        ${!esHoySel ? `<span class="badge">${esc(fmtLongDate(diaSel))}</span>` : ''}</div>
+      ${!esHoySel ? `
+      <div class="macro-hero" style="margin-bottom:6px">
+        <div class="big">${num(kcalSel)}</div>
+        <div class="lbl">kcal · ${esc(fmtLongDate(diaSel))}${nComidasSel ? ` · ${nComidasSel} comida${nComidasSel === 1 ? '' : 's'}` : ''}</div>
+      </div>
+      ${(macroSel && (macroSel.p != null || macroSel.c != null || macroSel.f != null)) ? `
+      <div class="am-macros" style="margin:6px 0 2px">
+        ${macroTag('Proteína', macroSel.p, MT.protein)}
+        ${macroTag('Carbos', macroSel.c, MT.carbs)}
+        ${macroTag('Grasas', macroSel.f, MT.fat)}
+      </div>` : ''}` : ''}
+      ${selectorDiaHTML(diaSel, historial, hoyISO)}
       <div class="chart-box"><canvas id="am-hist"></canvas></div>
     </div>` : '';
 
@@ -181,6 +219,15 @@ export async function render(root, path) {
       });
     });
   }
+
+  // selector de día: permite ver el resumen (kcal/macros) de días pasados
+  const sel = root.querySelector('#am-dia-sel');
+  if (sel) sel.onchange = () => {
+    const v = String(sel.value || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+    st.dia = v;
+    render(root, [id]);
+  };
 
   const del = root.querySelector('#am-del');
   if (del) del.onclick = async () => {
@@ -245,4 +292,26 @@ function macroTag(label, val, goal) {
   if (val == null) return '';
   const g = goal ? ` / ${num(goal)} g` : ' g';
   return `<span class="am-macro">${label} <b>${num(val)}${g}</b></span>`;
+}
+
+/* Selector de día para ver el historial de días pasados de un amigo.
+   Muestra los días que traen datos, del más reciente al más viejo. */
+function selectorDiaHTML(diaSel, historial, hoyISO) {
+  const conDatos = historial.filter(d => Number(d.k) > 0 || Number(d.n) > 0);
+  if (conDatos.length < 2) return '';   // sin días de sobra no hay nada que elegir
+  // día de hoy primero, luego los demás (más recientes primero)
+  const opts = [{ f: hoyISO, hoy: true }]
+    .concat(conDatos.filter(d => d.f !== hoyISO))
+    .sort((a, b) => String(b.f).localeCompare(String(a.f)));
+  const items = opts.map(d => {
+    const f = fromISODate(d.f);
+    const etiqueta = d.f === hoyISO
+      ? 'Hoy'
+      : `${f.getDate()}/${f.getMonth() + 1}${d.f === diaSel ? ' ·' : ''}`;
+    return `<option value="${esc(d.f)}"${d.f === diaSel ? ' selected' : ''}>${esc(etiqueta)}</option>`;
+  }).join('');
+  return `
+    <label class="field" style="margin:0 0 10px">
+      <select id="am-dia-sel" aria-label="Elegir día del historial">${items}</select>
+    </label>`;
 }

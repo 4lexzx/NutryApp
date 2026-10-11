@@ -1161,6 +1161,32 @@ code.codeblock {
 .soc-hit-act { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 10px; }
 .soc-act { display: flex; gap: 10px; }
 .soc-act .btn { flex: 1; }
+
+/* --- Buscar amigos: campo estilo Apple (lupa + píldora redondeada) --- */
+.soc-search {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--field); border-radius: 12px;
+  padding: 0 12px; min-height: 44px;
+  border: 1px solid transparent;
+  transition: border-color .15s, box-shadow .15s;
+}
+.soc-search:focus-within {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--brand) 28%, transparent);
+}
+.soc-search-ic { display: flex; color: var(--txt-3); flex: none; }
+.soc-search-ic .ic { width: 18px; height: 18px; }
+.soc-search input {
+  flex: 1; min-width: 0; background: transparent; border: none;
+  padding: 10px 0; min-height: 42px; font-size: 1rem; color: var(--txt);
+  -webkit-appearance: none; appearance: none;
+}
+.soc-search input:focus { box-shadow: none; }
+.soc-search input::placeholder { color: var(--txt-3); }
+/* la "×" nativa del input[type=search] */
+.soc-search input::-webkit-search-decoration,
+.soc-search input::-webkit-search-cancel-button,
+.soc-search input::-webkit-search-results-button { -webkit-appearance: none; }
 .soc-hoy {
   margin-top: 12px; padding: 12px; border-radius: 12px;
   background: var(--card-2); border: 1px solid var(--hairline);
