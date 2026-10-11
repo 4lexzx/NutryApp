@@ -1,6 +1,6 @@
 /* Ajustes: instalación, tema, IA, agua, respaldo y datos. */
 
-import { DB, getSettings, saveSettings, getProfile, getPrompt, limpiarPlatosBase, listarPlatosBase, borrarPlatoBase } from '../db.js';
+import { DB, getSettings, saveSettings, getProfile } from '../db.js';
 import { icon } from '../icons.js';
 import { exportMealsCSV, exportWeightsCSV, exportBackup, importBackup, backupSummary, dataHelpHTML } from '../export.js';
 import { testApiKey, modelOptions } from '../ai.js';
@@ -18,8 +18,6 @@ export async function render(root) {
   const s = await getSettings();
   const prof = await getProfile();
   const summary = await backupSummary();
-  const promptSaved = !!(await getPrompt());
-  const nBase = await DB.count('platos').catch(() => 0);
   const rem = (s.rem && typeof s.rem === 'object') ? s.rem : { on: false, ids: RECORDS_DEF.map(r => r.id) };
   const remIds = Array.isArray(rem.ids) ? rem.ids : [];
   const perm = ('Notification' in window) ? Notification.permission : 'unsupported';
@@ -81,30 +79,6 @@ const cuentaOtra = conNube && !!currentUser() &&
         <button class="btn btn-sm btn-ghost" id="s-key-del" type="button">Borrar</button>
       </div>
       <div id="s-key-res" class="hint"></div>
-      <div class="divider"></div>
-      <div class="spread">
-        <div>
-          <b class="small">Instrucciones de la IA</b>
-          <div class="tiny muted">${promptSaved ? `${icon('check')} Prompt personalizado` : 'Usando el predeterminado (comida peruana)'}</div>
-        </div>
-        <a class="btn btn-sm btn-outline" href="#/ia">Editar</a>
-      </div>
-      <div class="divider"></div>
-      <div class="spread">
-        <div>
-          <b class="small">Mis porciones estándar (base de platos)</b>
-          <div class="tiny muted" id="s-base-count">${nBase === 0
-            ? 'Sin porciones guardadas: los primeros análisis se repiten solo una vez'
-            : `${nBase} porción${nBase === 1 ? '' : 'es'} guardada${nBase === 1 ? '' : 's'} · salen igual y sin gastar cuota`}</div>
-        </div>
-        <div class="row">
-          <button class="btn btn-sm btn-outline" id="s-base-ver" type="button">Ver</button>
-          <button class="btn btn-sm btn-ghost" id="s-base-clear" type="button" ${nBase ? '' : 'disabled'}>Borrar</button>
-        </div>
-      </div>
-      <p class="tiny muted" style="margin-top:10px">Tu clave queda guardada en tu perfil de la nube: viaja contigo a
-        otros dispositivos y solo tú puedes verla. Cada análisis la usa a través de /api/ai y la función la
-        descarta al terminar.</p>
     </div>
 
     <div class="card">
@@ -164,12 +138,8 @@ const cuentaOtra = conNube && !!currentUser() &&
     <div class="card" id="s-nube">
       <div class="card-title"><h3>${icon('upload')} Nube (respaldo en internet)</h3>
         <span class="badge ${!nubeOk ? 'warn' : conNube ? 'ok' : nubeLocal ? '' : 'warn'}" id="nb-badge">${!nubeOk ? 'sin configurar' : conNube ? 'conectada' : nubeLocal ? 'solo local' : 'conectando…'}</span></div>
-      <p class="small muted">Tus datos se guardan <b>solos</b> en tu cuenta cada vez que haces un cambio, y se bajan
-        en cualquier dispositivo donde entres. La nube entra <b>sola</b> al abrir la app y <b>nunca se cierra</b>:
-        aquí no hay nada que tocar ni que configurar.</p>
       ${!nubeOk ? `
-        <div class="note">${icon('alert')} La nube de esta instalación todavía no está configurada
-          (falta la URL y la clave pública de Supabase en <b>js/config.js</b>).</div>` : `
+        <div class="note">${icon('alert')} La nube de esta instalación todavía no está configurada.</div>` : `
         <div class="spread">
           <div>
             <b class="small" id="nb-email">${esc(emailSesion() || (nubeLocal ? 'desarrollo local' : 'conectando…'))}</b>
@@ -180,8 +150,6 @@ const cuentaOtra = conNube && !!currentUser() &&
               : (nubeLocal ? 'En local (desarrollo) la nube se apaga para no tocar la real.' : 'Conectando la nube…')}</div>
           </div>
         </div>`}
-      <div class="note" style="margin-top:10px">${icon('shield')} Si un día dejas de pagar Supabase (plan gratis se pausa
-        tras 7 días sin uso), la app sigue funcionando en local; solo se apaga la sincronización.</div>
     </div>
 
     <div class="card">
@@ -195,19 +163,16 @@ const cuentaOtra = conNube && !!currentUser() &&
         </div>
       </div>
       <button class="btn btn-danger btn-block" id="s-logout" type="button">${icon('logout')} Cerrar sesión</button>
-      <p class="tiny muted" style="margin-top:10px">Al cerrar sesión volverás a la pantalla de acceso.
-        Tus comidas y ajustes <b>siguen guardados</b> en el teléfono.</p>
     </div>
 
     <div class="card">
-      <div class="card-title"><h3><img class="acerca-logo" src="icons/icon-192-v3.png" alt=""> ${icon('info')} Acerca de</h3></div>
-      <p class="small muted">Nutri Gym v${VERSION} · PWA con nube (Supabase) e IA con tu propia clave de Gemini.<br>
-      Tus datos y tu perfil viven <b>en tu cuenta</b>: al iniciar sesión se suben y se bajan solos. El respaldo
-      .json es opcional, por si un día quieres copia fuera de la nube.</p>
-      <div class="col" style="margin:10px 0 4px">
-        <button class="btn btn-primary btn-block" id="s-update" type="button" disabled>${icon('check')} Estás al día</button>
-        <div class="hint" id="s-update-hint">Última versión instalada: v${VERSION}. Si sale una nueva, este botón se activa.</div>
-      </div>
+      <div class="card-title"><h3><img class="acerca-logo" src="icons/icon-192-v3.png" alt=""> ${icon('info')} Acerca de</h3>
+        <span class="badge" id="s-update-badge">v${VERSION}</span></div>
+      <p class="small muted">Nutri Gym es una app para llevar el control de tu nutrición y tus entrenamientos:
+      registra tus comidas con fotos o texto, simula platos antes de comerlos, arma tus batidos, sigue tus macros,
+      agua, peso y rutina de gimnasio, y te avisa si te pasas de alguna meta. Tus datos se guardan en tu cuenta
+      y se sincronizan solos entre tus dispositivos.</p>
+      <button class="btn btn-primary btn-block hidden" id="s-update" type="button">${icon('refresh')} Actualizar ahora</button>
       <div class="note danger">${icon('lock')} Consejo: haz un <b>respaldo .json</b> al menos una vez por semana y guárdalo en
         Google Drive, tu PC o por correo. Si borras los datos del navegador, se pierde el historial.</div>
     </div>
@@ -215,23 +180,18 @@ const cuentaOtra = conNube && !!currentUser() &&
 
   /* actualización de la app */
   const actBtn = root.querySelector('#s-update');
-  const actHint = root.querySelector('#s-update-hint');
+  const actBadge = root.querySelector('#s-update-badge');
   const refrescAct = () => {
     const hay = !!window.__nutriAct;
-    actBtn.disabled = !hay;
-    actBtn.innerHTML = hay
-      ? icon('refresh') + ' Actualizar ahora'
-      : icon('check') + ' Estás al día';
-    actHint.innerHTML = hay
-      ? 'Hay una versión nueva. Al tocar, la app se recarga con lo último (también refresca el logo).'
-      : `Última versión instalada: v${VERSION}. Si sale una nueva, este botón se activa.`;
+    actBtn.classList.toggle('hidden', !hay);
+    if (actBadge) actBadge.textContent = hay ? 'v' + VERSION + ' · nueva' : 'v' + VERSION;
   };
   refrescAct();
   if (hAct) document.removeEventListener('nutri-actualizacion', hAct);
   hAct = () => { if (document.contains(actBtn)) refrescAct(); };
   document.addEventListener('nutri-actualizacion', hAct);
   actBtn.onclick = async () => {
-    if (actBtn.disabled) return;
+    if (actBtn.classList.contains('hidden')) return;
     actBtn.disabled = true;
     actBtn.innerHTML = icon('refresh') + ' Actualizando…';
     if (window.__nutriAplicarAct) window.__nutriAplicarAct();
@@ -310,66 +270,6 @@ const cuentaOtra = conNube && !!currentUser() &&
     render(root);
   };
   root.querySelector('#s-model').onchange = async e => { await saveSettings({ model: e.target.value }); toast('Modelo: ' + e.target.value, 'ok'); };
-  /* ver mis porciones estándar (y poder revertir una guardada sin querer) */
-  const baseVer = root.querySelector('#s-base-ver');
-  if (baseVer) baseVer.onclick = async () => {
-    const lista = await listarPlatosBase().catch(() => []);
-    const filaHTML = p => {
-      const g = Math.round((p.items || []).reduce((a, i) => a + (Number(i.gramos) || 0), 0));
-      return `
-      <div class="spread" style="padding:10px 0;border-top:1px solid rgba(128,128,128,.25)">
-        <div>
-          <b class="small">${esc(p.nombre || p.clave)}</b>
-          <div class="tiny muted">${(p.items || []).length} ingrediente${(p.items || []).length === 1 ? '' : 's'} · ${g} g · ${p.fuente === 'usuario' ? 'tu porción' : 'analizada por IA'}</div>
-        </div>
-        <button class="btn btn-sm btn-ghost" data-del="${esc(p.clave)}" type="button">Quitar</button>
-      </div>`;
-    };
-    const s = openSheet(`
-      <h2>Mis porciones estándar</h2>
-      <p class="small muted">Porciones que salen siempre igual cuando vuelves a escribir el plato.
-        Si guardaste una sin querer, quítala aquí.</p>
-      <div id="base-lista">
-        ${lista.length ? lista.map(filaHTML).join('')
-        : '<div class="empty" style="padding:16px">Todavía no guardas ninguna porción estándar.</div>'}
-      </div>
-      <button class="btn btn-block btn-ghost" id="base-cerrar" type="button" style="margin-top:14px">Cerrar</button>`);
-    const refrescarContador = () => {
-      const n = s.root.querySelectorAll('[data-del]').length;
-      const cnt = root.querySelector('#s-base-count');
-      if (cnt)       cnt.textContent = n === 0
-        ? 'Sin porciones guardadas'
-        : `${n} porción${n === 1 ? '' : 'es'} guardada${n === 1 ? '' : 's'} · salen igual siempre`;
-      const clear = root.querySelector('#s-base-clear');
-      if (clear) clear.disabled = n === 0;
-      if (!n) {
-        const vacio = s.root.querySelector('#base-lista');
-        if (vacio && !vacio.querySelector('.empty')) vacio.innerHTML = '<div class="empty" style="padding:16px">Todavía no guardas ninguna porción estándar.</div>';
-      }
-    };
-    s.root.querySelector('#base-cerrar').onclick = () => { s.close(); render(root); };
-    s.root.querySelectorAll('[data-del]').forEach(btn => {
-      btn.onclick = async () => {
-        await borrarPlatoBase(btn.dataset.del).catch(() => {});
-        const fila = btn.closest('.spread');
-        if (fila) fila.remove();
-        refrescarContador();
-        toast('Porción estándar quitada.', 'ok');
-      };
-    });
-  };
-
-  root.querySelector('#s-base-clear').onclick = async () => {
-    const ok = await confirmSheet({
-      title: '¿Borrar la base de platos?',
-      msg: 'Se olvidarán las porciones estándar guardadas. Tus comidas guardadas NO se tocan.',
-      okText: 'Borrar', danger: true
-    });
-    if (!ok) return;
-    await limpiarPlatosBase();
-    toast('Base de platos borrada.', 'ok');
-    render(root);
-  };
   root.querySelector('#s-key-test').onclick = async e => {
     const btn = e.target, res = root.querySelector('#s-key-res');
     const key = keyIn.value.trim();
