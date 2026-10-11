@@ -137,34 +137,61 @@ export function openSheet(html, opts = {}) {
   const root = document.getElementById('modal-root');
   const back = document.createElement('div');
   back.className = 'sheet-back';
-  back.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`;
+  back.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="sheet-drag"><div class="grab"></div></div>${html}</div>`;
   root.appendChild(back);
   const sheet = back.querySelector('.sheet');
-  const grab = sheet.querySelector('.grab');
-  const close = () => { back.remove(); document.removeEventListener('keydown', onKey); };
+  const dragZone = sheet.querySelector('.sheet-drag');
+  let cerrado = false;
+  const close = () => {
+    if (cerrado) return;
+    cerrado = true;
+    back.remove();
+    document.removeEventListener('keydown', onKey);
+    window.removeEventListener('popstate', onPop);
+    // si se cerró por UI (no por el botón atrás), quitamos el estado que empujamos
+    if (!cerradoPorAtras && history.state && history.state.nutriSheet) history.back();
+  };
   const onKey = e => { if (e.key === 'Escape') close(); };
   document.addEventListener('keydown', onKey);
   back.addEventListener('click', e => { if (e.target === back && !opts.sticky) close(); });
 
-  /* Arrastrar el .grab hacia abajo para cerrar (patrón iOS/Android) */
+  /* Botón de retroceso del teléfono (Android) cierra la hoja */
+  let cerradoPorAtras = false;
+  let onPop = null;
   if (!opts.sticky) {
-    let startY = 0, dragging = false;
-    const threshold = 80;
-    grab.addEventListener('pointerdown', e => {
-      dragging = true;
+    try { history.pushState({ ...(history.state || {}), nutriSheet: true }, ''); } catch (_) {}
+    onPop = () => { cerradoPorAtras = true; close(); };
+    window.addEventListener('popstate', onPop);
+  }
+
+  /* Arrastrar hacia abajo para cerrar: toda la cabecera es zona de agarre */
+  if (!opts.sticky) {
+    let startY = 0, dragging = false, started = false;
+    const threshold = 70;
+    dragZone.addEventListener('pointerdown', e => {
+      // no robar el gesto si tocan un botón/enlace dentro de la cabecera
+      if (e.target.closest('button, a, input, select, textarea')) return;
+      dragging = true; started = false;
       startY = e.clientY;
-      sheet.style.transition = 'none';
-      try { grab.setPointerCapture(e.pointerId); } catch (_) {}
     });
-    grab.addEventListener('pointermove', e => {
+    dragZone.addEventListener('pointermove', e => {
       if (!dragging) return;
-      const dy = Math.max(0, e.clientY - startY);
-      sheet.style.transform = `translateY(${dy}px)`;
-      back.style.opacity = String(Math.max(0.25, 1 - dy / 320));
+      const dy = e.clientY - startY;
+      if (!started) {
+        // solo empezar a arrastrar si el movimiento es claramente hacia abajo
+        if (dy < 6) { dragging = false; return; }
+        started = true;
+        sheet.style.transition = 'none';
+        try { dragZone.setPointerCapture(e.pointerId); } catch (_) {}
+      }
+      const d = Math.max(0, dy);
+      sheet.style.transform = `translateY(${d}px)`;
+      back.style.opacity = String(Math.max(0.25, 1 - d / 320));
     });
     const endDrag = e => {
-      if (!dragging) return;
+      if (!dragging) { return; }
       dragging = false;
+      if (!started) return;
       const dy = Math.max(0, (e.clientY != null ? e.clientY : startY) - startY);
       sheet.style.transition = 'transform .25s ease, opacity .25s ease';
       if (dy > threshold) {
@@ -176,10 +203,11 @@ export function openSheet(html, opts = {}) {
         back.style.opacity = '1';
       }
     };
-    grab.addEventListener('pointerup', endDrag);
-    grab.addEventListener('pointercancel', () => {
+    dragZone.addEventListener('pointerup', endDrag);
+    dragZone.addEventListener('pointercancel', () => {
       if (!dragging) return;
       dragging = false;
+      if (!started) return;
       sheet.style.transition = 'transform .25s ease';
       sheet.style.transform = 'translateY(0)';
       back.style.opacity = '1';

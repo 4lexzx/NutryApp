@@ -581,8 +581,9 @@ select:disabled { opacity: .55; cursor: default; }
   box-shadow: 0 -8px 40px rgba(0, 0, 0, .35);
   animation: sheetUp .28s cubic-bezier(.2, .8, .2, 1);
 }
-.sheet .grab { width: 40px; height: 5px; background: var(--line); border-radius: 99px; margin: 0 auto 14px; padding: 14px 0; background-clip: content-box; touch-action: none; cursor: grab; }
-.sheet .grab:active { cursor: grabbing; }
+.sheet .sheet-drag { padding: 10px 0 2px; touch-action: none; cursor: grab; }
+.sheet .sheet-drag:active { cursor: grabbing; }
+.sheet .grab { width: 40px; height: 5px; background: var(--line); border-radius: 99px; margin: 0 auto; }
 .sheet h2 { margin-bottom: 8px; letter-spacing: -.02em; }
 @keyframes sheetUp { from { transform: translateY(40px); opacity: .5; } to { transform: none; opacity: 1; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
