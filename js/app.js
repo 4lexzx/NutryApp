@@ -142,6 +142,21 @@ async function applyTheme() {
 /* ---------- Instalación (beforeinstallprompt) ---------- */
 function setupInstall() {
   let deferred = null;
+  const K_AUTO = 'ng.autoInst';      // último intento (timestamp) o 'ok' si ya instaló
+  const K_GUIA = 'ng.instGuia';      // ya se mostró la guía manual una vez
+
+  const intentoReciente = () => {
+    try {
+      if (localStorage.getItem(K_AUTO) === 'ok') return true;      // ya decidió: no molestar
+      const t = Number(localStorage.getItem(K_AUTO) || 0);
+      return !!t && (Date.now() - t) < 7 * 86400000;              // reintento a los 7 días
+    } catch (e) { return false; }
+  };
+  const marcarIntento = () => { try { localStorage.setItem(K_AUTO, String(Date.now())); } catch (e) { /* nada */ } };
+  const yaInstalada = () => (navigator.standalone === true) ||
+    window.matchMedia('(display-mode: standalone)').matches;
+  const enLocal = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname);
+
   window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();
     deferred = e;
@@ -151,23 +166,48 @@ function setupInstall() {
 
     /* Android NO repinta el ícono de un acceso de pantalla de inicio: eso solo
        pasa cuando la app está instalada como app de verdad (WebAPK). Así que si
-       el navegador ofrece instalar, lo pedimos SOLA una vez (una sola
+       el navegador ofrece instalar, lo pedimos SOLA una vez (una única
        confirmación del sistema; no se puede evitar) en lugar de esperar a que
-       el usuario busque el menú de Chrome. Se recuerda en localStorage para no
-       volver a molestar. */
-    const yaInstalada = (navigator.standalone === true) ||
-      window.matchMedia('(display-mode: standalone)').matches;
-    const local = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname);
-    if (!yaInstalada && !local && localStorage.getItem('ng.autoInst') !== '1') {
-      setTimeout(() => {
+       el usuario busque el menú de Chrome. Si el usuario la cierra, se reintenta
+       a los 7 días; si la acepta, ya no se vuelve a preguntar nunca. */
+    if (!yaInstalada() && !enLocal && !intentoReciente()) {
+      setTimeout(async () => {
         if (!window.__nutriInstall) return;
-        localStorage.setItem('ng.autoInst', '1');
-        try { e.prompt(); } catch (err) { /* Chrome puede ignorarlo: ya queda el botón */ }
+        marcarIntento();                       // si Chrome ignora el prompt, no insistir a lo bruto
+        try {
+          e.prompt();
+          const r = await e.userChoice;
+          if (r && r.outcome === 'accepted') { try { localStorage.setItem(K_AUTO, 'ok'); } catch (err) { /* nada */ } }
+        } catch (err) { /* nada */ }
       }, 3500);
     }
   });
+
+  /* Respaldo: hay navegadores/ajustes donde el navegador NUNCA ofrece instalar
+     (iPhone/Safari, o Chrome que ya no dispara el aviso). En ese caso, una sola
+     vez mostramos cómo hacerlo a mano con dos toques. */
+  const ofrecerGuia = (intento = 0) => {
+    if (window.__nutriInstall || yaInstalada() || enLocal) return;
+    if (document.body.classList.contains('locked')) {          // aún en la pantalla de acceso
+      if (intento < 8) setTimeout(() => ofrecerGuia(intento + 1), 15000);
+      return;
+    }
+    try { if (localStorage.getItem(K_GUIA) === '1') return; localStorage.setItem(K_GUIA, '1'); } catch (e) { return; }
+    const esIOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    openSheet(`
+      <h2>Poner el ícono de la app</h2>
+      <p class="small muted">${esIOS
+        ? 'En iPhone: toca el botón <b>Compartir</b> (cuadrado con flecha) de abajo y elige <b>“Añadir a pantalla de inicio”</b>. Con eso el ícono de la app se actualizará solo cuando cambie.'
+        : 'En Android: toca el <b>⋮</b> de la esquina en Chrome y elige <b>“Instalar aplicación”</b> (o “Instalar app”). Con eso el ícono se actualizará solo cuando cambie; como acceso de pantalla de inicio, Android no lo renueva nunca.'}</p>
+      <button class="btn btn-primary btn-block" type="button" onclick="this.closest('.sheet-back').remove()">Entendido</button>
+    `);
+  };
+  setTimeout(() => ofrecerGuia(), 8000);
+
   window.addEventListener('appinstalled', () => {
     window.__nutriInstall = null;
+    try { localStorage.setItem(K_AUTO, 'ok'); } catch (e) { /* nada */ }
     const b = document.getElementById('btn-install');
     if (b) b.classList.add('hidden');
     toast('¡Nutri Gym instalada! Su ícono se actualizará solo en el futuro.', 'ok');
