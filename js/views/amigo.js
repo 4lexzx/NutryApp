@@ -83,7 +83,10 @@ export async function render(root, path) {
   const bio = visible('pub_perfil') && pub.bio ? `<p class="small" style="margin:8px 0 0">${esc(pub.bio)}</p>` : '';
 
   const comidas = (esHoyReal && esAmigo && visible('pub_comidas') && Array.isArray(c.comidas)) ? c.comidas : [];
-  const historial = esAmigo && visible('pub_historial') && Array.isArray(c.historial) ? c.historial : [];
+  // entradas con la fecha ilegible (la clave 'f' salía pisada por la grasa en
+  // versiones viejas de la nube) se ignoran para no pintar días "1/1"
+  const historialCru = esAmigo && visible('pub_historial') && Array.isArray(c.historial) ? c.historial : [];
+  const historial = historialCru.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(String(d && d.f)));
   const agua = esAmigo && visible('pub_agua') && c.agua ? c.agua : null;
   const gym = esAmigo && visible('pub_gym') && c.gym ? c.gym : null;
 
@@ -91,7 +94,7 @@ export async function render(root, path) {
   const diaEntry = historial.find(d => d.f === diaSel) || null;
   const esHoySel = diaSel === hoyISO;
   const kcalSel = esHoySel ? kcal : (diaEntry ? Number(diaEntry.k) || 0 : 0);
-  const macroSel = esHoySel ? M : (diaEntry ? { p: Number(diaEntry.p) || 0, c: Number(diaEntry.c) || 0, f: Number(diaEntry.f) || 0 } : null);
+  const macroSel = esHoySel ? M : (diaEntry ? { p: Number(diaEntry.p) || 0, c: Number(diaEntry.c) || 0, f: Number(diaEntry.g) || 0 } : null);
   const nComidasSel = esHoySel ? comidas.length : (diaEntry ? Number(diaEntry.n) || 0 : 0);
 
   const estadoBadge = (esHoyReal && esAmigo && visible('pub_comidas') && meta)

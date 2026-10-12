@@ -845,7 +845,7 @@ async function calcularCompartido() {
   for (let i = 0; i < 14; i++) {
     const f = toISODate(d);
     const e = porFecha[f];
-    historial.push({ f, k: e ? Math.round(e.k) : 0, p: e ? Math.round(e.p) : 0, c: e ? Math.round(e.c) : 0, f: e ? Math.round(e.f) : 0, n: e ? e.n : 0 });
+    historial.push({ f, k: e ? Math.round(e.k) : 0, p: e ? Math.round(e.p) : 0, c: e ? Math.round(e.c) : 0, g: e ? Math.round(e.f) : 0, n: e ? e.n : 0 });
     d.setDate(d.getDate() - 1);
   }
 

@@ -497,6 +497,7 @@ async function init() {
   // Campana de notificaciones (excesos de macros + recomendaciones de la IA)
   import('./notif-center.js').then(nc => {
     nc.actualizarBadge();
+    nc.revisarExcesos().catch(() => {});   // avisa excesos/casi-límites pendientes (dedupe interno)
     document.getElementById('btn-notif').onclick = () => nc.abrirPanel();
   }).catch(() => {});
 

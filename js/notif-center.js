@@ -1,10 +1,13 @@
-/* Centro de notificaciones: avisos de excesos de macros con recomendación
-   de platos de la IA. Se guardan en kv['notifs'] (se sincronizan solos). */
+/* Centro de notificaciones: avisos de excesos de macros (y de casi-límites)
+   con recomendación de la IA. Se guardan en kv['notifs'] (se sincronizan solos)
+   y además salen como notificación del sistema (barra de estado) si el usuario
+   dio permiso en Ajustes → Recordatorios. */
 
 import { DB, getProfile, getSettings } from './db.js';
 import { calcTargets, computeTotals, bonusGymKcal } from './nutrition.js';
 import { todayISO, esc, num, toast, openSheet } from './util.js';
 import { icon } from './icons.js';
+import { notificar } from './notif.js';
 
 const K = 'notifs';
 
@@ -45,7 +48,7 @@ export async function actualizarBadge() {
 
 export async function agregarNotif(notif) {
   const items = await listarNotifs();
-  const filtrados = items.filter(i => !(i.fecha === notif.fecha && i.macro === notif.macro && i.tipo === 'exceso'));
+  const filtrados = items.filter(i => !(i.fecha === notif.fecha && i.macro === notif.macro && i.tipo === (notif.tipo || 'exceso')));
   filtrados.unshift(Object.assign({ id: Date.now() + Math.floor(Math.random() * 1000), leida: false, ts: Date.now() }, notif));
   await guardar(filtrados);
   await actualizarBadge();
@@ -106,30 +109,58 @@ export async function resumenDia(date) {
   return { total, goal, excedidos, faltantes, profile, gymBonus };
 }
 
-/* ---------- Revisar y notificar excesos ---------- */
+/* ---------- Revisar y notificar excesos y casi-límites ---------- */
+const NOM_MACRO = { kcal: 'calorías', protein: 'proteína', carbs: 'carbohidratos', fat: 'grasas' };
+const CERCA_PCT = 90;   // % de la meta desde el cual se avisa "ya casi llegas"
+
 export async function revisarExcesos(date) {
-  const r = await resumenDia(date || todayISO());
+  const fecha = date || todayISO();
+  const r = await resumenDia(fecha);
   if (!r) return;
-  const macrosExcedidos = Object.keys(r.excedidos);
-  if (!macrosExcedidos.length) return;
-  for (const m of macrosExcedidos) {
-    const nombreMacro = { kcal: 'calorías', protein: 'proteína', carbs: 'carbohidratos', fat: 'grasas' }[m];
-    const yaExiste = (await listarNotifs()).some(i => i.fecha === (date || todayISO()) && i.macro === m && i.tipo === 'exceso');
-    if (yaExiste) continue;
-    await agregarNotif({
-      fecha: date || todayISO(),
-      tipo: 'exceso',
-      macro: m,
-      titulo: `Pasaste de ${nombreMacro}`,
-      cuerpo: `Llevas ${num(r.excedidos[m])} ${m === 'kcal' ? 'kcal' : 'g'} más de tu meta de ${nombreMacro}. Te recomiendo platos que completen lo que falta y sean bajos en ${nombreMacro}.`,
-      faltantes: r.faltantes,
-      excedidos: r.excedidos,
-      platos: null,
-      pendiente: true
-    });
+  const items = await listarNotifs();
+  const existe = (m, tipo) => items.some(i => i.fecha === fecha && i.macro === m && i.tipo === tipo);
+
+  for (const m of ['kcal', 'protein', 'carbs', 'fat']) {
+    const nombre = NOM_MACRO[m];
+    const meta = Number(r.goal[m]) || 0;
+    const total = Number(r.total[m]) || 0;
+    if (meta <= 0) continue;
+
+    if (total > meta) {
+      if (existe(m, 'exceso')) continue;
+      const cuerpo = `Llevas ${num(total - meta)} ${m === 'kcal' ? 'kcal' : 'g'} más de tu meta de ${nombre}. Te recomiendo platos bajos en ${nombre} que completen lo que falta.`;
+      await agregarNotif({
+        fecha,
+        tipo: 'exceso',
+        macro: m,
+        titulo: `Pasaste de ${nombre}`,
+        cuerpo,
+        faltantes: r.faltantes,
+        excedidos: r.excedidos,
+        platos: null,
+        pendiente: true
+      });
+      notificar('NutriGym', cuerpo, `nutri-exc-${fecha}-${m}`).catch(() => {});
+    } else if (total >= meta * CERCA_PCT / 100) {
+      if (existe(m, 'casi')) continue;
+      const pct = Math.round(total / meta * 100);
+      const cuerpo = `Llevas el ${pct}% de tu meta de ${nombre} (${num(total)} de ${num(meta)}${m === 'kcal' ? ' kcal' : ' g'}). Ya casi llegas al límite: elige comidas bajas en ${nombre}.`;
+      await agregarNotif({
+        fecha,
+        tipo: 'casi',
+        macro: m,
+        titulo: `Ya casi llegas al límite de ${nombre}`,
+        cuerpo,
+        platos: null,
+        pendiente: false
+      });
+      notificar('NutriGym', cuerpo, `nutri-casi-${fecha}-${m}`).catch(() => {});
+    }
   }
-  pedirRecomendacionesIA(date || todayISO()).catch(() => {});
+  pedirRecomendacionesIA(fecha).catch(() => {});
 }
+
+const K_HIST = 'recomHist';   // últimos platos recomendados (para no repetirlos)
 
 async function pedirRecomendacionesIA(date) {
   const items = await listarNotifs();
@@ -140,6 +171,12 @@ async function pedirRecomendacionesIA(date) {
   const r = await resumenDia(date);
   if (!r) return;
   const { recomendarPlatos } = await import('./ai.js');
+  // memoria de variedad: lo que ya comió hoy y lo que ya se le recomendó antes
+  const histRow = await DB.kvGet(K_HIST);
+  const hist = histRow && Array.isArray(histRow.n) ? histRow.n : [];
+  const meals = await DB.byDate('meals', date).catch(() => []);
+  const comidasHoy = meals.map(m => String(m.name || '').trim()).filter(Boolean);
+  const nuevos = [];
   for (const n of pendientes) {
     try {
       const platos = await recomendarPlatos({
@@ -150,7 +187,9 @@ async function pedirRecomendacionesIA(date) {
         consumido: r.total,
         excedidos: r.excedidos,
         faltantes: r.faltantes,
-        macroExcedido: n.macro
+        macroExcedido: n.macro,
+        comidasHoy,
+        evitar: hist
       });
       const todos = await listarNotifs();
       const idx = todos.findIndex(t => t.id === n.id);
@@ -159,6 +198,7 @@ async function pedirRecomendacionesIA(date) {
         todos[idx].pendiente = false;
         await guardar(todos);
       }
+      platos.forEach(p => { if (p && p.nombre) nuevos.push(String(p.nombre)); });
     } catch (e) {
       const todos = await listarNotifs();
       const idx = todos.findIndex(t => t.id === n.id);
@@ -169,6 +209,19 @@ async function pedirRecomendacionesIA(date) {
       }
     }
   }
+  if (!nuevos.length) return;
+  // guarda lo recomendado (últimos 20, sin repetir) para variar en las próximas veces
+  const vistos = new Set();
+  const mezcla = nuevos.concat(hist).filter(s => {
+    const key = String(s).toLowerCase();
+    if (vistos.has(key)) return false;
+    vistos.add(key);
+    return true;
+  });
+  await DB.kvSet({ k: K_HIST, n: mezcla.slice(0, 20) }).catch(() => {});
+  // y avisa también en la barra de estado del celular (si hay permiso)
+  const nombres = nuevos.filter((v, i, a) => a.indexOf(v) === i).slice(0, 3).join(', ');
+  notificar('NutriGym', `Platos que te convienen hoy: ${nombres}.`, `nutri-recom-${date}`).catch(() => {});
 }
 
 /* ---------- Panel de notificaciones (sheet) ---------- */
@@ -204,7 +257,7 @@ const VACIO = `
   <div class="empty">
     <span class="ico">${icon('bell')}</span>
     <b>Sin notificaciones</b>
-    <p class="small muted">Cuando superes alguna de tus metas (grasas, carbohidratos, etc.) te avisaré aquí con platos que te convienen.</p>
+    <p class="small muted">Cuando te acerques o superes alguna de tus metas (calorías, proteína, etc.) te avisaré aquí y en la barra de tu celular, con platos que te convienen.</p>
   </div>`;
 
 export async function abrirPanel() {

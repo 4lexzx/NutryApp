@@ -300,12 +300,12 @@ function friendlyError(status, bodyText, kind) {
   return new AIError(apiMsg ? `Error de Gemini (${status}): ${apiMsg}` : `Error de Gemini (${status}).`, 'otro');
 }
 
-async function callGemini({ parts, apiKey, model, variant = 0, attempt = 0 }) {
+async function callGemini({ parts, apiKey, model, variant = 0, attempt = 0, temperature = 0.2 }) {
   // La clave la pega CADA CLIENTE en Ajustes → IA (solo en su celular).
   // El navegador llama a casa (/api/ai) y esa función es quien llama a Google.
   const url = '/api/ai';
   // variant 0 = completo · 1 = sin thinking · 2 = sin thinking ni responseMimeType
-  const cfg = { temperature: 0.2 };
+  const cfg = { temperature };
   if (variant < 2) cfg.responseMimeType = 'application/json';
   if (variant < 1 && /2\.5|3\./.test(String(model))) cfg.thinkingConfig = { thinkingBudget: 0 };
 
@@ -337,16 +337,16 @@ async function callGemini({ parts, apiKey, model, variant = 0, attempt = 0 }) {
       throw new AIError('Falta tu API key de Gemini. Ve a Ajustes → IA y pégala (se guarda solo en tu celular).', 'sin-key');
     }
     if (res.status === 400 && variant < 2 && /thinking/.test(low)) {
-      return callGemini({ parts, apiKey, model, variant: 1 });
+      return callGemini({ parts, apiKey, model, variant: 1, temperature });
     }
     if (res.status === 400 && variant < 2 && /mime/.test(low)) {
-      return callGemini({ parts, apiKey, model, variant: 2 });
+      return callGemini({ parts, apiKey, model, variant: 2, temperature });
     }
     // error transitorio del servidor de Google: esperamos y reintentamos una vez
     const transitorio = res.status === 500 || res.status === 503 || /overloaded|unavailable|internal/.test(low);
     if (transitorio && attempt < 1) {
       await new Promise(r => setTimeout(r, 2500));
-      return callGemini({ parts, apiKey, model, variant, attempt: attempt + 1 });
+      return callGemini({ parts, apiKey, model, variant, attempt: attempt + 1, temperature });
     }
     throw friendlyError(res.status, text, text);
   }
@@ -571,6 +571,7 @@ Dado el resumen del día de un usuario, recomienda 1 a 3 platos (o porciones peq
 2. Ayuden a COMPLETAR el/los macro(s) que aún FALTAN.
 3. Sean realistas para el resto del día (respetando las calorías que aún quedan).
 4. Sean platos típicos del norte del Perú o platos comunes de gimnasio (pollo, pescado, huevos, etc.).
+5. NO repitas platos que ya comió hoy ni platos de recomendaciones anteriores: sorpréndelo con opciones NUEVAS cada vez; alterna entre platos del norte, comidas de gimnasio, ensaladas, sopas, sandwichs o bebidas según el caso.
 Devuelve SOLO un JSON con este formato exacto, sin texto adicional:
 { "platos": [ { "nombre": "string", "porcion": "string", "kcal": number, "protein": number, "carbs": number, "fat": number, "porque": "string" } ] }
 Donde "porque" explica en 1 frase por qué este plato encaja (ej: "bajo en grasa, alta en proteína para completar lo que falta").
@@ -587,9 +588,11 @@ Donde "porque" explica en 1 frase por qué este plato encaja (ej: "bajo en grasa
  * @param {object} opts.excedidos   – { kcal?, protein?, carbs?, fat? } (solo > 0)
  * @param {object} opts.faltantes   – { kcal?, protein?, carbs?, fat? } (solo > 0)
  * @param {string} opts.macroExcedido – nombre del macro principal excedido
+ * @param {string[]} [opts.comidasHoy] – nombres de los platos ya comidos hoy (para no repetirlos)
+ * @param {string[]} [opts.evitar]     – platos de recomendaciones anteriores (para no repetirlos)
  * @returns {Promise<Array<{nombre,porcion,kcal,protein,carbs,fat,porque}>>}
  */
-export async function recomendarPlatos({ apiKey, model, perfil, metas, consumido, excedidos, faltantes, macroExcedido }) {
+export async function recomendarPlatos({ apiKey, model, perfil, metas, consumido, excedidos, faltantes, macroExcedido, comidasHoy = [], evitar = [] }) {
   const L = ['kcal', 'protein', 'carbs', 'fat'];
   const nom = { kcal: 'calorías', protein: 'proteína', carbs: 'carbohidratos', fat: 'grasas' };
   const g = v => (Number(v) || 0).toFixed(0);
@@ -603,10 +606,17 @@ export async function recomendarPlatos({ apiKey, model, perfil, metas, consumido
     `  Falta: ${L.filter(k => faltantes[k] > 0).map(k => `${nom[k]} ${g(faltantes[k])}`).join(', ') || 'nada'}`,
     `Macro principal excedido: ${nom[macroExcedido] || macroExcedido}.`,
     `Peso: ${perfil && perfil.weight ? perfil.weight + ' kg' : 'no indicado'}. Objetivo: ${perfil && perfil.objective ? perfil.objective : 'no indicado'}.`
-  ].join('\n');
+  ];
+  if (Array.isArray(comidasHoy) && comidasHoy.length) {
+    contexto.push(`Ya comió hoy: ${comidasHoy.slice(0, 8).join(', ')}. No le repitas esos platos.`);
+  }
+  if (Array.isArray(evitar) && evitar.length) {
+    contexto.push(`En recomendaciones anteriores ya se le sugirió: ${evitar.slice(-10).join(', ')}. No repitas ninguno de esos: elige platos diferentes.`);
+  }
 
-  const parts = [{ text: RECOMENDAR_PROMPT + '\n\n' + contexto }];
-  const raw = await callGemini({ parts, apiKey, model });
+  const parts = [{ text: RECOMENDAR_PROMPT + '\n\n' + contexto.join('\n') }];
+  // temperature alta a propósito: así cada recomendación sale distinta
+  const raw = await callGemini({ parts, apiKey, model, temperature: 0.9 });
   const data = extractJSON(raw);
   if (!data || !Array.isArray(data.platos)) throw new AIError('La IA no devolvió la lista de platos.', 'json');
   // saneado mínimo
